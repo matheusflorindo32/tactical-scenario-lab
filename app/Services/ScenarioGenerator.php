@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Services;
 
 final class ScenarioGenerator
@@ -20,16 +21,16 @@ final class ScenarioGenerator
             'learning_objectives' => [
                 'Reconhecer riscos e estabelecer prioridades de atendimento.',
                 'Aplicar avaliação MARCH de forma sequencial e documentada.',
-                'Comunicar achados, intervenções e necessidade de evacuação.'
+                'Comunicar achados, intervenções e necessidade de evacuação.',
             ],
             'expected_actions' => $this->expectedActions($threat),
             'critical_errors' => [
                 'Entrar em área não segura sem coordenação.',
                 'Não identificar ou controlar hemorragia maciça.',
                 'Omitir reavaliação após intervenção.',
-                'Não comunicar prioridade de evacuação.'
+                'Não comunicar prioridade de evacuação.',
             ],
-            'status' => 'draft'
+            'status' => 'draft',
         ];
     }
 
@@ -39,6 +40,7 @@ final class ScenarioGenerator
         if ($threat === 'ativa') {
             array_unshift($actions, 'Coordenar movimentação para cobertura e reduzir exposição.');
         }
+
         return $actions;
     }
 }
