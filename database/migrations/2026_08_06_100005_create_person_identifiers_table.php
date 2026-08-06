@@ -5,18 +5,11 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * person_identifiers — documentos e códigos operacionais (CPF, RG,
- * matrícula, passaporte, registro profissional, temp_code, QR).
+ * Documentos e códigos operacionais da pessoa.
  *
- * `value_normalized` é a versão canonizada (só dígitos para CPF/telefone,
- * lowercase p/ outros) — usada para busca exata e detecção de duplicidade.
- *
- * Índice único (type, value_normalized, organization_id) previne o MESMO
- * documento em cadastros distintos DENTRO da mesma organização; entre
- * organizações a mesma pessoa pode ter cadastros distintos até que um
- * curador faça mesclagem.
- *
- * Ver docs/EXPANSION_PLAN.md §3.2 e §5.2.
+ * O valor original é criptografado. A busca exata usa uma impressão digital
+ * HMAC e a interface recebe apenas o valor mascarado. Não há restrição única
+ * rígida: possíveis duplicidades geram alerta e decisão humana.
  */
 return new class extends Migration
 {
@@ -28,14 +21,23 @@ return new class extends Migration
 
         Schema::create('person_identifiers', function (Blueprint $table) {
             $table->id();
+            $table->uuid('uuid')->unique();
             $table->foreignId('person_id')->constrained('people')->cascadeOnDelete();
             $table->foreignId('organization_id')->constrained('organizations')->cascadeOnDelete();
             $table->enum('type', [
-                'cpf', 'rg', 'id_funcional', 'matricula', 'passaporte',
-                'registro_profissional', 'temp_code', 'qr', 'other',
+                'cpf',
+                'rg',
+                'id_funcional',
+                'matricula',
+                'passaporte',
+                'registro_profissional',
+                'temp_code',
+                'qr',
+                'other',
             ]);
-            $table->string('value', 60);
-            $table->string('value_normalized', 60);
+            $table->text('value_encrypted');
+            $table->char('value_fingerprint', 64);
+            $table->string('masked_value', 160);
             $table->string('issuer', 60)->nullable();
             $table->char('country', 2)->nullable();
             $table->char('state', 2)->nullable();
@@ -44,14 +46,10 @@ return new class extends Migration
             $table->date('expires_at')->nullable();
             $table->text('notes')->nullable();
             $table->timestamps();
+            $table->softDeletes();
 
-            // Não permite mesmo documento repetido dentro da MESMA organização.
-            $table->unique(
-                ['type', 'value_normalized', 'organization_id'],
-                'person_identifiers_type_value_org_unique',
-            );
+            $table->index(['organization_id', 'type', 'value_fingerprint'], 'person_identifier_lookup');
             $table->index(['person_id', 'is_primary']);
-            $table->index('value_normalized');
         });
     }
 
