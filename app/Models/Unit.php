@@ -2,14 +2,14 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use App\Models\Concerns\HasPublicUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Unit extends Model
 {
-    use HasUuids;
+    use HasPublicUuid;
 
     protected $fillable = [
         'uuid',
@@ -20,20 +20,6 @@ class Unit extends Model
         'status',
         'notes',
     ];
-
-    public function uniqueIds(): array
-    {
-        return ['uuid'];
-    }
-
-    public function getRouteKeyName(): string
-    {
-        return 'uuid';
-    }
-
-    // --------------------------------------------------------------
-    // Relacionamentos
-    // --------------------------------------------------------------
 
     public function organization(): BelongsTo
     {
