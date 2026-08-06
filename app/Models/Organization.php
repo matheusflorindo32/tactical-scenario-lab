@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Str;
 
 class Organization extends Model
 {
+    use HasPublicUuid;
+
     protected $fillable = [
         'uuid',
         'name',
@@ -15,28 +17,6 @@ class Organization extends Model
         'status',
         'notes',
     ];
-
-    /**
-     * PK continua sendo `id` BIGINT — HasUuids do Laravel substituiria a
-     * PK, que não é o que queremos. Geramos UUID à parte para URLs opacas.
-     */
-    protected static function booted(): void
-    {
-        static::creating(function (Organization $model) {
-            if (empty($model->uuid)) {
-                $model->uuid = (string) Str::uuid();
-            }
-        });
-    }
-
-    public function getRouteKeyName(): string
-    {
-        return 'uuid';
-    }
-
-    // --------------------------------------------------------------
-    // Relacionamentos
-    // --------------------------------------------------------------
 
     public function units(): HasMany
     {
@@ -62,10 +42,6 @@ class Organization extends Model
     {
         return $this->hasMany(PersonRole::class);
     }
-
-    // --------------------------------------------------------------
-    // Guards de status
-    // --------------------------------------------------------------
 
     public function isActive(): bool
     {
