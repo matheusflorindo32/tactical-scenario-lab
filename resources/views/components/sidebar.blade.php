@@ -71,9 +71,14 @@ $sections = [
     </div>
 </aside>
 
-{{-- Overlay em mobile --}}
+{{-- Overlay para drawer em mobile --}}
 <div
-    x-data
-    x-show="$store.ui.toast || false"
-    style="display:none"
+    x-data="{ open: false }"
+    x-on:toggle-sidebar.window="open = ! open"
+    x-show="open"
+    x-transition.opacity
+    x-cloak
+    x-on:click="$dispatch('toggle-sidebar')"
+    class="fixed inset-0 z-30 bg-navy-950/50 backdrop-blur-sm lg:hidden"
+    aria-hidden="true"
 ></div>
