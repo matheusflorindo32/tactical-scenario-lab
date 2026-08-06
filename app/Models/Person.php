@@ -36,6 +36,15 @@ class Person extends Model
         'notes',
     ];
 
+    protected static function booted(): void
+    {
+        static::creating(function (Person $person): void {
+            if (blank($person->status)) {
+                $person->status = 'incomplete';
+            }
+        });
+    }
+
     protected function casts(): array
     {
         return [
