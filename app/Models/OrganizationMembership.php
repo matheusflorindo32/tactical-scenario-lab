@@ -2,12 +2,18 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class OrganizationMembership extends Model
 {
+    use HasPublicUuid;
+    use SoftDeletes;
+
     protected $fillable = [
+        'uuid',
         'person_id',
         'organization_id',
         'unit_id',
@@ -22,7 +28,7 @@ class OrganizationMembership extends Model
     {
         return [
             'started_at' => 'date',
-            'ended_at'   => 'date',
+            'ended_at' => 'date',
         ];
     }
 
