@@ -5,14 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * person_roles — papel contextual da pessoa DENTRO de uma organização.
- * NÃO é o "papel único permanente" (esse conceito não existe no plano).
- *
- * Abilities extras (json) permitem compor permissões granulares como
- * `pii_reveal`, `export_reports`, `manage_protocols`, `merge_people`
- * sem inflar o enum de roles.
- *
- * Ver docs/EXPANSION_PLAN.md §3.3 e §9.
+ * Papel contextual da pessoa dentro de uma organização.
  */
 return new class extends Migration
 {
@@ -24,11 +17,19 @@ return new class extends Migration
 
         Schema::create('person_roles', function (Blueprint $table) {
             $table->id();
+            $table->uuid('uuid')->unique();
             $table->foreignId('person_id')->constrained('people')->cascadeOnDelete();
             $table->foreignId('organization_id')->constrained('organizations')->cascadeOnDelete();
             $table->enum('role', [
-                'admin_tma', 'manager_org', 'coordinator', 'instructor',
-                'evaluator', 'student', 'support', 'auditor', 'viewer',
+                'admin_tma',
+                'manager_org',
+                'coordinator',
+                'instructor',
+                'evaluator',
+                'student',
+                'support',
+                'auditor',
+                'viewer',
             ]);
             $table->json('abilities')->nullable();
             $table->timestamp('granted_at')->useCurrent();
@@ -36,11 +37,9 @@ return new class extends Migration
             $table->timestamp('revoked_at')->nullable();
             $table->text('notes')->nullable();
             $table->timestamps();
+            $table->softDeletes();
 
-            $table->unique(
-                ['person_id', 'organization_id', 'role'],
-                'person_roles_person_org_role_unique',
-            );
+            $table->index(['person_id', 'organization_id', 'role'], 'person_role_lookup');
             $table->index(['organization_id', 'role']);
         });
     }
