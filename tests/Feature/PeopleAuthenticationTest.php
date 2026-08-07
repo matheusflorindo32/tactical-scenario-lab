@@ -7,6 +7,7 @@ use App\Models\OrganizationMembership;
 use App\Models\Person;
 use App\Models\PersonRole;
 use App\Models\User;
+use App\Models\UserOrganizationAccess;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -42,8 +43,19 @@ class PeopleAuthenticationTest extends TestCase
 
     public function test_authenticated_active_user_can_open_people_workflow(): void
     {
-        [$person] = $this->personContext();
-        $this->actingAs(User::factory()->create(['status' => 'active']));
+        [$person, , , $organization] = $this->personContext();
+        $user = User::factory()->create(['status' => 'active']);
+
+        UserOrganizationAccess::create([
+            'user_id' => $user->id,
+            'organization_id' => $organization->id,
+            'role' => 'viewer',
+            'abilities' => ['people.view'],
+            'granted_at' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->withSession(['active_organization_id' => $organization->id]);
 
         $this->get(route('people.index'))->assertOk();
         $this->get(route('people.create'))->assertOk();
@@ -72,6 +84,6 @@ class PeopleAuthenticationTest extends TestCase
             'granted_at' => now(),
         ]);
 
-        return [$person, $membership, $role];
+        return [$person, $membership, $role, $organization];
     }
 }
