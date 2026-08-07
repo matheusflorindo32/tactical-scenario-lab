@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ActiveOrganizationController;
 use App\Http\Controllers\AuthenticatedSessionController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OrganizationMembershipController;
@@ -45,6 +46,9 @@ Route::get('/dashboard', function () {
 })->middleware('auth')->name('dashboard');
 
 Route::middleware('auth')->group(function () {
+    Route::post('/organizations/{organization}/activate', [ActiveOrganizationController::class, 'update'])
+        ->name('organizations.activate');
+
     Route::resource('organizations', OrganizationController::class)
         ->only(['index', 'create', 'store', 'show', 'edit', 'update']);
     Route::patch('/organizations/{organization}/deactivate', [OrganizationController::class, 'deactivate'])
