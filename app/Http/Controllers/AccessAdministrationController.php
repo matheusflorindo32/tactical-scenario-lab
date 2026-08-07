@@ -24,7 +24,7 @@ class AccessAdministrationController extends Controller
 
         $accesses = UserOrganizationAccess::query()
             ->where('organization_id', $organizationId)
-            ->whereNull('revoked_at')
+            ->currentlyValid()
             ->with('user:id,name,email,status')
             ->orderBy('role')
             ->orderBy('user_id')
@@ -54,6 +54,7 @@ class AccessAdministrationController extends Controller
     ): RedirectResponse {
         $organizationId = $activeOrganization->ensureAbility($request, AccessAbility::ACCESS_MANAGE);
         $validated = $this->validateGrant($request);
+        $this->ensureAdministrativeAccessDoesNotExpire($validated['abilities'], $validated['expires_at'] ?? null);
 
         $user = User::query()
             ->whereRaw('LOWER(email) = ?', [mb_strtolower(trim($validated['email']))])
@@ -66,7 +67,7 @@ class AccessAdministrationController extends Controller
                 ->where('role', $validated['role'])
                 ->first();
 
-            if ($existing && $existing->revoked_at === null) {
+            if ($existing && $existing->isActive()) {
                 throw ValidationException::withMessages([
                     'email' => 'Esta conta já possui uma concessão ativa com este papel na organização.',
                 ]);
@@ -76,6 +77,7 @@ class AccessAdministrationController extends Controller
                 $existing->update([
                     'abilities' => $validated['abilities'],
                     'granted_at' => now(),
+                    'expires_at' => $validated['expires_at'] ?? null,
                     'revoked_at' => null,
                 ]);
 
@@ -88,6 +90,7 @@ class AccessAdministrationController extends Controller
                 'role' => $validated['role'],
                 'abilities' => $validated['abilities'],
                 'granted_at' => now(),
+                'expires_at' => $validated['expires_at'] ?? null,
             ]);
         });
 
@@ -98,6 +101,7 @@ class AccessAdministrationController extends Controller
             [
                 'role' => $access->role,
                 'abilities' => $access->abilities ?? [],
+                'expires_at' => $access->expires_at?->toIso8601String(),
                 'regrant' => $access->wasRecentlyCreated === false,
             ],
             $request,
@@ -135,7 +139,9 @@ class AccessAdministrationController extends Controller
         $validated = $request->validate([
             'abilities' => ['required', 'array', 'min:1'],
             'abilities.*' => ['string', 'distinct', Rule::in(AccessAbility::all())],
+            'expires_at' => ['nullable', 'date', 'after:now'],
         ]);
+        $this->ensureAdministrativeAccessDoesNotExpire($validated['abilities'], $validated['expires_at'] ?? null);
 
         $removesAccessManagement = in_array(AccessAbility::ACCESS_MANAGE, $access->abilities ?? [], true)
             && ! in_array(AccessAbility::ACCESS_MANAGE, $validated['abilities'], true);
@@ -144,24 +150,32 @@ class AccessAdministrationController extends Controller
             $this->ensureAnotherAdministratorExists($organizationId, $access->id);
         }
 
-        $before = $access->abilities ?? [];
-        $access->update(['abilities' => $validated['abilities']]);
+        $before = [
+            'abilities' => $access->abilities ?? [],
+            'expires_at' => $access->expires_at?->toIso8601String(),
+        ];
+        $access->update([
+            'abilities' => $validated['abilities'],
+            'expires_at' => $validated['expires_at'] ?? null,
+        ]);
 
         $audit->record(
-            'access.abilities_updated',
+            'access.updated',
             $access,
             $organizationId,
             [
                 'role' => $access->role,
-                'previous_abilities' => $before,
+                'previous_abilities' => $before['abilities'],
                 'current_abilities' => $access->abilities ?? [],
+                'previous_expires_at' => $before['expires_at'],
+                'current_expires_at' => $access->expires_at?->toIso8601String(),
             ],
             $request,
         );
 
         return redirect()
             ->route('access.index')
-            ->with('success', 'Habilidades de acesso atualizadas.');
+            ->with('success', 'Habilidades e validade do acesso atualizadas.');
     }
 
     public function revoke(
@@ -186,6 +200,7 @@ class AccessAdministrationController extends Controller
             [
                 'role' => $access->role,
                 'abilities' => $access->abilities ?? [],
+                'expires_at' => $access->expires_at?->toIso8601String(),
             ],
             $request,
         );
@@ -202,7 +217,7 @@ class AccessAdministrationController extends Controller
         AuditLogger $audit,
     ): RedirectResponse {
         $organizationId = $activeOrganization->ensureAbility($request, AccessAbility::ACCESS_MANAGE);
-        $this->ensureManagedAccount($request, $user, $organizationId);
+        $this->ensureManagedAccount($user, $organizationId);
 
         if ($user->id === $request->user()->id) {
             throw ValidationException::withMessages([
@@ -213,7 +228,7 @@ class AccessAdministrationController extends Controller
         if ($user->isActive()) {
             $hasAdministrativeGrant = $user->organizationAccesses()
                 ->where('organization_id', $organizationId)
-                ->whereNull('revoked_at')
+                ->currentlyValid()
                 ->get()
                 ->contains(fn (UserOrganizationAccess $access): bool => in_array(
                     AccessAbility::ACCESS_MANAGE,
@@ -248,7 +263,7 @@ class AccessAdministrationController extends Controller
         AuditLogger $audit,
     ): RedirectResponse {
         $organizationId = $activeOrganization->ensureAbility($request, AccessAbility::ACCESS_MANAGE);
-        $this->ensureManagedAccount($request, $user, $organizationId);
+        $this->ensureManagedAccount($user, $organizationId);
 
         if (! $user->isActive()) {
             $user->update(['status' => 'active']);
@@ -278,23 +293,24 @@ class AccessAdministrationController extends Controller
             'role' => ['required', 'string', 'max:50', 'regex:/^[a-z0-9._-]+$/'],
             'abilities' => ['required', 'array', 'min:1'],
             'abilities.*' => ['string', 'distinct', Rule::in(AccessAbility::all())],
+            'expires_at' => ['nullable', 'date', 'after:now'],
         ]);
     }
 
     private function ensureManagedAccess(UserOrganizationAccess $access, int $organizationId): void
     {
         abort_if(
-            $access->organization_id !== $organizationId || $access->revoked_at !== null,
+            $access->organization_id !== $organizationId || ! $access->isActive(),
             403,
-            'A concessão solicitada não pertence ao contexto institucional ativo.',
+            'A concessão solicitada não pertence ao contexto institucional ativo ou já expirou.',
         );
     }
 
-    private function ensureManagedAccount(Request $request, User $user, int $organizationId): void
+    private function ensureManagedAccount(User $user, int $organizationId): void
     {
         $hasCurrentOrganizationAccess = $user->organizationAccesses()
             ->where('organization_id', $organizationId)
-            ->whereNull('revoked_at')
+            ->currentlyValid()
             ->exists();
 
         abort_unless(
@@ -305,7 +321,8 @@ class AccessAdministrationController extends Controller
 
         $hasOtherActiveGrant = $user->organizationAccesses()
             ->where('organization_id', '!=', $organizationId)
-            ->whereNull('revoked_at')
+            ->currentlyValid()
+            ->whereHas('organization', fn ($query) => $query->where('status', 'active'))
             ->exists();
 
         if ($hasOtherActiveGrant) {
@@ -315,11 +332,20 @@ class AccessAdministrationController extends Controller
         }
     }
 
+    private function ensureAdministrativeAccessDoesNotExpire(array $abilities, mixed $expiresAt): void
+    {
+        if ($expiresAt !== null && in_array(AccessAbility::ACCESS_MANAGE, $abilities, true)) {
+            throw ValidationException::withMessages([
+                'expires_at' => 'Concessões com access.manage não podem expirar automaticamente. Transfira a administração antes de limitar a validade.',
+            ]);
+        }
+    }
+
     private function ensureAnotherAdministratorExists(int $organizationId, int $excludedAccessId): void
     {
         $anotherAdministratorExists = UserOrganizationAccess::query()
             ->where('organization_id', $organizationId)
-            ->whereNull('revoked_at')
+            ->currentlyValid()
             ->whereKeyNot($excludedAccessId)
             ->whereJsonContains('abilities', AccessAbility::ACCESS_MANAGE)
             ->whereHas('user', fn ($query) => $query->where('status', 'active'))
@@ -336,7 +362,7 @@ class AccessAdministrationController extends Controller
     {
         $anotherAdministratorExists = UserOrganizationAccess::query()
             ->where('organization_id', $organizationId)
-            ->whereNull('revoked_at')
+            ->currentlyValid()
             ->where('user_id', '!=', $excludedUserId)
             ->whereJsonContains('abilities', AccessAbility::ACCESS_MANAGE)
             ->whereHas('user', fn ($query) => $query->where('status', 'active'))
