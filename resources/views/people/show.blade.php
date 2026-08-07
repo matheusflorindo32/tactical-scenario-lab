@@ -120,15 +120,35 @@
                 </div>
                 <div class="mt-5 space-y-4">
                     @forelse ($person->memberships as $membership)
-                        <div class="rounded-xl border border-ink-100 bg-ink-50/60 p-4">
-                            <p class="font-semibold text-navy-950">{{ $membership->organization->name }}</p>
-                            <p class="mt-1 text-sm text-ink-500">{{ $membership->unit?->name ?? 'Sem unidade definida' }}</p>
+                        <div class="rounded-xl border p-4 {{ $membership->isActive() ? 'border-clinical-200 bg-clinical-50/40' : 'border-ink-100 bg-ink-50/60' }}">
+                            <div class="flex items-start justify-between gap-3">
+                                <div>
+                                    <p class="font-semibold text-navy-950">{{ $membership->organization->name }}</p>
+                                    <p class="mt-1 text-sm text-ink-500">{{ $membership->unit?->name ?? 'Sem unidade definida' }}</p>
+                                </div>
+                                <span class="rounded-full px-2.5 py-1 text-xs font-medium {{ $membership->isActive() ? 'bg-clinical-100 text-clinical-800' : 'bg-ink-200 text-ink-700' }}">
+                                    {{ $membership->isActive() ? 'Ativo' : 'Encerrado' }}
+                                </span>
+                            </div>
                             @if ($membership->position)
                                 <p class="mt-2 text-sm font-medium text-ink-700">{{ $membership->position }}</p>
                             @endif
+                            <p class="mt-3 text-xs text-ink-500">
+                                Início: {{ $membership->started_at?->format('d/m/Y') ?? 'não informado' }}
+                                @if ($membership->ended_at)
+                                    · Encerramento: {{ $membership->ended_at->format('d/m/Y') }}
+                                @endif
+                            </p>
+                            @if ($membership->isActive())
+                                <form method="POST" action="{{ route('people.memberships.close', [$person, $membership]) }}" class="mt-4" onsubmit="return confirm('Confirmar o encerramento deste vínculo institucional? Papéis poderão ser revogados quando não houver outro vínculo ativo na organização.');">
+                                    @csrf
+                                    @method('PATCH')
+                                    <x-button type="submit" variant="danger">Encerrar vínculo</x-button>
+                                </form>
+                            @endif
                         </div>
                     @empty
-                        <p class="text-sm text-ink-500">Nenhum vínculo ativo.</p>
+                        <p class="text-sm text-ink-500">Nenhum vínculo cadastrado.</p>
                     @endforelse
                 </div>
             </section>
@@ -140,7 +160,9 @@
                 </div>
                 <div class="mt-4 flex flex-wrap gap-2">
                     @forelse ($person->roles as $role)
-                        <span class="rounded-full bg-navy-50 px-3 py-1.5 text-xs font-medium text-navy-800">{{ ucfirst(str_replace('_', ' ', $role->role)) }}</span>
+                        <span class="rounded-full px-3 py-1.5 text-xs font-medium {{ $role->revoked_at ? 'bg-ink-100 text-ink-500 line-through' : 'bg-navy-50 text-navy-800' }}">
+                            {{ ucfirst(str_replace('_', ' ', $role->role)) }}
+                        </span>
                     @empty
                         <span class="text-sm text-ink-500">Nenhum papel atribuído.</span>
                     @endforelse
