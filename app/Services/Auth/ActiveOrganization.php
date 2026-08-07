@@ -2,6 +2,7 @@
 
 namespace App\Services\Auth;
 
+use App\Models\Person;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -24,5 +25,23 @@ class ActiveOrganization
         if ($this->id($request) !== $organizationId) {
             throw new HttpException(403, 'O recurso solicitado pertence a outra organização.');
         }
+    }
+
+    public function ensurePerson(Request $request, Person $person, bool $requireActiveMembership = false): int
+    {
+        $organizationId = $this->id($request);
+
+        $membership = $person->memberships()
+            ->where('organization_id', $organizationId)
+            ->when($requireActiveMembership, fn ($query) => $query
+                ->where('status', 'active')
+                ->whereNull('ended_at'))
+            ->exists();
+
+        if (! $membership) {
+            throw new HttpException(403, 'A pessoa solicitada não pertence ao contexto institucional ativo.');
+        }
+
+        return $organizationId;
     }
 }
