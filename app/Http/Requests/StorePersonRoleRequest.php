@@ -7,31 +7,53 @@ use Illuminate\Validation\Rule;
 
 class StorePersonRoleRequest extends FormRequest
 {
+    public const ROLE_OPTIONS = [
+        'admin_tma' => 'Administrador TMA',
+        'manager_org' => 'Gestor institucional',
+        'coordinator' => 'Coordenador',
+        'instructor' => 'Instrutor',
+        'evaluator' => 'Avaliador',
+        'student' => 'Aluno',
+        'support' => 'Apoio',
+        'auditor' => 'Auditor',
+        'viewer' => 'Visualizador',
+    ];
+
+    public const ABILITY_OPTIONS = [
+        'people.view' => 'Visualizar pessoas',
+        'people.manage' => 'Gerenciar pessoas',
+        'scenarios.view' => 'Visualizar cenários',
+        'scenarios.manage' => 'Gerenciar cenários',
+        'evaluations.manage' => 'Gerenciar avaliações',
+        'reports.view' => 'Visualizar relatórios',
+    ];
+
     public function authorize(): bool
     {
         return true;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $abilities = $this->input('abilities');
+
+        if (is_array($abilities)) {
+            $this->merge([
+                'abilities' => array_values(array_unique(array_filter(
+                    $abilities,
+                    static fn ($ability): bool => is_string($ability) && $ability !== '',
+                ))),
+            ]);
+        }
     }
 
     public function rules(): array
     {
         return [
             'organization_id' => ['required', 'integer', 'exists:organizations,id'],
-            'role' => [
-                'required',
-                Rule::in([
-                    'admin_tma',
-                    'manager_org',
-                    'coordinator',
-                    'instructor',
-                    'evaluator',
-                    'student',
-                    'support',
-                    'auditor',
-                    'viewer',
-                ]),
-            ],
-            'abilities' => ['nullable', 'array', 'max:20'],
-            'abilities.*' => ['string', 'max:80'],
+            'role' => ['required', 'string', Rule::in(array_keys(self::ROLE_OPTIONS))],
+            'abilities' => ['nullable', 'array', 'max:12'],
+            'abilities.*' => ['string', Rule::in(array_keys(self::ABILITY_OPTIONS))],
             'notes' => ['nullable', 'string', 'max:3000'],
         ];
     }
@@ -43,7 +65,9 @@ class StorePersonRoleRequest extends FormRequest
             'organization_id.exists' => 'A organização selecionada não existe.',
             'role.required' => 'Selecione o papel institucional.',
             'role.in' => 'O papel selecionado é inválido.',
-            'abilities.max' => 'Selecione no máximo 20 habilidades específicas.',
+            'abilities.array' => 'As habilidades precisam ser enviadas em uma lista válida.',
+            'abilities.max' => 'Selecione no máximo 12 habilidades específicas.',
+            'abilities.*.in' => 'Uma das habilidades selecionadas não pertence ao catálogo permitido.',
         ];
     }
 }
