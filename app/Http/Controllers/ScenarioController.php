@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Scenario;
+use App\Services\Auth\ActiveOrganization;
 use App\Services\ScenarioGenerator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -12,20 +13,29 @@ use Illuminate\View\View;
 
 class ScenarioController extends Controller
 {
-    public function index(): View
+    public function index(Request $request, ActiveOrganization $activeOrganization): View
     {
+        $activeOrganization->ensureAbility($request, 'scenarios.view');
+
         return view('scenarios.index', [
             'scenarios' => Scenario::latest()->paginate(10),
         ]);
     }
 
-    public function create(): View
+    public function create(Request $request, ActiveOrganization $activeOrganization): View
     {
+        $activeOrganization->ensureAbility($request, 'scenarios.manage');
+
         return view('scenarios.create');
     }
 
-    public function store(Request $request, ScenarioGenerator $generator): RedirectResponse
-    {
+    public function store(
+        Request $request,
+        ScenarioGenerator $generator,
+        ActiveOrganization $activeOrganization,
+    ): RedirectResponse {
+        $activeOrganization->ensureAbility($request, 'scenarios.manage');
+
         $validated = $request->validate([
             'environment' => ['required', 'string', 'max:100'],
             'threat_level' => ['required', Rule::in(['controlada', 'potencial', 'ativa'])],
@@ -42,8 +52,13 @@ class ScenarioController extends Controller
             ->with('success', 'Cenário criado como rascunho.');
     }
 
-    public function show(Scenario $scenario): View
-    {
+    public function show(
+        Request $request,
+        Scenario $scenario,
+        ActiveOrganization $activeOrganization,
+    ): View {
+        $activeOrganization->ensureAbility($request, 'scenarios.view');
+
         return view('scenarios.show', compact('scenario'));
     }
 
@@ -52,8 +67,13 @@ class ScenarioController extends Controller
      * Idempotente: se já está em `running` ou `completed`, não muta e
      * devolve mensagem clara.
      */
-    public function execute(Scenario $scenario): RedirectResponse
-    {
+    public function execute(
+        Request $request,
+        Scenario $scenario,
+        ActiveOrganization $activeOrganization,
+    ): RedirectResponse {
+        $activeOrganization->ensureAbility($request, 'scenarios.manage');
+
         if (! $scenario->canBeStarted()) {
             return back()->with('error', 'Este cenário não pode ser iniciado (status atual: '.$scenario->status.').');
         }
@@ -78,8 +98,13 @@ class ScenarioController extends Controller
      *   precisa vir do catálogo gerado (`critical_errors`) para evitar
      *   inserção arbitrária vinda do formulário.
      */
-    public function evaluate(Request $request, Scenario $scenario): RedirectResponse
-    {
+    public function evaluate(
+        Request $request,
+        Scenario $scenario,
+        ActiveOrganization $activeOrganization,
+    ): RedirectResponse {
+        $activeOrganization->ensureAbility($request, 'evaluations.manage');
+
         if (! $scenario->canBeEvaluated()) {
             return back()->with('error', 'Inicie a execução antes de avaliar.');
         }
