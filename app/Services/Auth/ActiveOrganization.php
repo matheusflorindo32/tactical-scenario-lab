@@ -11,13 +11,19 @@ class ActiveOrganization
     public function id(Request $request): int
     {
         $organizationId = (int) $request->session()->get('active_organization_id', 0);
+
+        $this->ensureAccess($request, $organizationId);
+
+        return $organizationId;
+    }
+
+    public function ensureAccess(Request $request, int $organizationId): void
+    {
         $user = $request->user();
 
         if ($organizationId < 1 || ! $user || ! $user->hasOrganizationAccess($organizationId)) {
-            throw new HttpException(403, 'Nenhuma organização ativa válida foi selecionada.');
+            throw new HttpException(403, 'O usuário não possui acesso institucional válido para esta organização.');
         }
-
-        return $organizationId;
     }
 
     public function ensure(Request $request, int $organizationId): void
