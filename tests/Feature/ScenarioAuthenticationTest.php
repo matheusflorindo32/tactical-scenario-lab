@@ -20,6 +20,8 @@ class ScenarioAuthenticationTest extends TestCase
             'casualties' => 1,
             'mechanism' => 'Ferimento penetrante',
             'resources' => ['Kit IFAK'],
+            'learning_objectives' => ['Avaliar acesso protegido'],
+            'expected_actions' => ['Aplicar fluxo correto'],
             'critical_errors' => ['Falha crítica'],
             'status' => 'draft',
         ]);
