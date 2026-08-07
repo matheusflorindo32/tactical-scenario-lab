@@ -1,18 +1,29 @@
 <x-layouts.app :current="'access'" :title="'Acessos institucionais · Tactical Medicine Academy'">
     <x-slot:header>
-        <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emergency-700">Governança de acesso</p>
-            <h1 class="mt-2 font-display text-3xl font-semibold tracking-tight text-navy-950">Acessos institucionais</h1>
-            <p class="mt-2 max-w-3xl text-sm leading-6 text-ink-500">
-                Contas com concessão ativa em <strong class="font-semibold text-navy-950">{{ $organization->name }}</strong>. Esta visão é sempre limitada ao contexto institucional ativo.
-            </p>
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emergency-700">Governança de acesso</p>
+                <h1 class="mt-2 font-display text-3xl font-semibold tracking-tight text-navy-950">Acessos institucionais</h1>
+                <p class="mt-2 max-w-3xl text-sm leading-6 text-ink-500">
+                    Contas com concessão ativa em <strong class="font-semibold text-navy-950">{{ $organization->name }}</strong>. Esta visão é sempre limitada ao contexto institucional ativo.
+                </p>
+            </div>
+            <a href="{{ route('access.create') }}" class="inline-flex items-center justify-center rounded-xl bg-navy-950 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-navy-800">
+                Conceder acesso
+            </a>
         </div>
     </x-slot:header>
+
+    @error('access')
+        <div class="mb-5 rounded-xl border border-emergency-200 bg-emergency-50 px-4 py-3 text-sm text-emergency-800">
+            {{ $message }}
+        </div>
+    @enderror
 
     <section class="overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-sm">
         @forelse ($accesses as $access)
             <article class="border-b border-ink-100 px-5 py-5 last:border-b-0">
-                <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div class="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
                     <div class="min-w-0">
                         <div class="flex flex-wrap items-center gap-2">
                             <h2 class="truncate text-base font-semibold text-navy-950">{{ $access->user->name }}</h2>
@@ -24,7 +35,7 @@
                         <p class="mt-2 text-sm text-ink-600">Papel de acesso: <strong class="font-semibold text-navy-950">{{ $access->role }}</strong></p>
                     </div>
 
-                    <div class="max-w-2xl">
+                    <div class="max-w-2xl flex-1">
                         <p class="text-xs font-semibold uppercase tracking-[0.14em] text-ink-500">Habilidades efetivas</p>
                         <div class="mt-2 flex flex-wrap gap-2">
                             @forelse ($access->abilities ?? [] as $ability)
@@ -36,12 +47,26 @@
                             @endforelse
                         </div>
                     </div>
+
+                    <div class="flex shrink-0 flex-wrap gap-2">
+                        <a href="{{ route('access.edit', $access) }}" class="rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 transition hover:bg-ink-50">
+                            Editar
+                        </a>
+                        <form method="POST" action="{{ route('access.revoke', $access) }}" onsubmit="return confirm('Revogar este acesso institucional? O histórico será preservado.');">
+                            @csrf
+                            @method('PATCH')
+                            <button type="submit" class="rounded-xl border border-emergency-200 bg-emergency-50 px-4 py-2.5 text-sm font-semibold text-emergency-800 transition hover:bg-emergency-100">
+                                Revogar
+                            </button>
+                        </form>
+                    </div>
                 </div>
             </article>
         @empty
             <div class="px-6 py-16 text-center">
                 <h2 class="text-lg font-semibold text-navy-950">Nenhum acesso ativo</h2>
                 <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-500">Não há concessões ativas para a organização atual.</p>
+                <a href="{{ route('access.create') }}" class="mt-6 inline-flex rounded-xl bg-navy-950 px-5 py-3 text-sm font-semibold text-white">Conceder primeiro acesso</a>
             </div>
         @endforelse
     </section>
