@@ -5,6 +5,7 @@ use App\Http\Controllers\OrganizationMembershipController;
 use App\Http\Controllers\PersonContactController;
 use App\Http\Controllers\PersonController;
 use App\Http\Controllers\PersonIdentifierController;
+use App\Http\Controllers\PersonRoleController;
 use App\Http\Controllers\ScenarioController;
 use App\Http\Controllers\UnitController;
 use App\Models\Scenario;
@@ -57,6 +58,13 @@ Route::get('/people/{person}/memberships/create', [OrganizationMembershipControl
     ->name('people.memberships.create');
 Route::post('/people/{person}/memberships', [OrganizationMembershipController::class, 'store'])
     ->name('people.memberships.store');
+
+Route::get('/people/{person}/roles/create', [PersonRoleController::class, 'create'])
+    ->name('people.roles.create');
+Route::post('/people/{person}/roles', [PersonRoleController::class, 'store'])
+    ->name('people.roles.store');
+Route::patch('/people/{person}/roles/{role}/revoke', [PersonRoleController::class, 'revoke'])
+    ->name('people.roles.revoke');
 
 Route::resource('scenarios', ScenarioController::class)
     ->only(['index', 'create', 'store', 'show']);
