@@ -195,6 +195,78 @@ class AccessAdministrationController extends Controller
             ->with('success', 'Acesso revogado sem excluir o histórico da concessão.');
     }
 
+    public function deactivateAccount(
+        Request $request,
+        User $user,
+        ActiveOrganization $activeOrganization,
+        AuditLogger $audit,
+    ): RedirectResponse {
+        $organizationId = $activeOrganization->ensureAbility($request, AccessAbility::ACCESS_MANAGE);
+        $this->ensureManagedAccount($request, $user, $organizationId);
+
+        if ($user->id === $request->user()->id) {
+            throw ValidationException::withMessages([
+                'account' => 'A própria conta administrativa não pode ser inativada por este fluxo.',
+            ]);
+        }
+
+        if ($user->isActive()) {
+            $hasAdministrativeGrant = $user->organizationAccesses()
+                ->where('organization_id', $organizationId)
+                ->whereNull('revoked_at')
+                ->get()
+                ->contains(fn (UserOrganizationAccess $access): bool => in_array(
+                    AccessAbility::ACCESS_MANAGE,
+                    $access->abilities ?? [],
+                    true,
+                ));
+
+            if ($hasAdministrativeGrant) {
+                $this->ensureAnotherAdministratorUserExists($organizationId, $user->id);
+            }
+
+            $user->update(['status' => 'inactive']);
+
+            $audit->record(
+                'account.deactivated',
+                $user,
+                $organizationId,
+                ['status' => 'inactive'],
+                $request,
+            );
+        }
+
+        return redirect()
+            ->route('access.index')
+            ->with('success', 'Conta inativada. Sessões existentes serão bloqueadas no próximo acesso.');
+    }
+
+    public function reactivateAccount(
+        Request $request,
+        User $user,
+        ActiveOrganization $activeOrganization,
+        AuditLogger $audit,
+    ): RedirectResponse {
+        $organizationId = $activeOrganization->ensureAbility($request, AccessAbility::ACCESS_MANAGE);
+        $this->ensureManagedAccount($request, $user, $organizationId);
+
+        if (! $user->isActive()) {
+            $user->update(['status' => 'active']);
+
+            $audit->record(
+                'account.reactivated',
+                $user,
+                $organizationId,
+                ['status' => 'active'],
+                $request,
+            );
+        }
+
+        return redirect()
+            ->route('access.index')
+            ->with('success', 'Conta reativada com segurança.');
+    }
+
     private function validateGrant(Request $request): array
     {
         $request->merge([
@@ -218,6 +290,31 @@ class AccessAdministrationController extends Controller
         );
     }
 
+    private function ensureManagedAccount(Request $request, User $user, int $organizationId): void
+    {
+        $hasCurrentOrganizationAccess = $user->organizationAccesses()
+            ->where('organization_id', $organizationId)
+            ->whereNull('revoked_at')
+            ->exists();
+
+        abort_unless(
+            $hasCurrentOrganizationAccess,
+            403,
+            'A conta solicitada não possui concessão ativa no contexto institucional atual.',
+        );
+
+        $hasOtherActiveGrant = $user->organizationAccesses()
+            ->where('organization_id', '!=', $organizationId)
+            ->whereNull('revoked_at')
+            ->exists();
+
+        if ($hasOtherActiveGrant) {
+            throw ValidationException::withMessages([
+                'account' => 'O status da conta é global. Esta conta também possui acesso ativo em outra organização; revogue apenas a concessão local ou encaminhe a alteração a uma administração de nível superior.',
+            ]);
+        }
+    }
+
     private function ensureAnotherAdministratorExists(int $organizationId, int $excludedAccessId): void
     {
         $anotherAdministratorExists = UserOrganizationAccess::query()
@@ -225,11 +322,29 @@ class AccessAdministrationController extends Controller
             ->whereNull('revoked_at')
             ->whereKeyNot($excludedAccessId)
             ->whereJsonContains('abilities', AccessAbility::ACCESS_MANAGE)
+            ->whereHas('user', fn ($query) => $query->where('status', 'active'))
             ->exists();
 
         if (! $anotherAdministratorExists) {
             throw ValidationException::withMessages([
-                'access' => 'A organização precisa manter ao menos um administrador com access.manage.',
+                'access' => 'A organização precisa manter ao menos um administrador ativo com access.manage.',
+            ]);
+        }
+    }
+
+    private function ensureAnotherAdministratorUserExists(int $organizationId, int $excludedUserId): void
+    {
+        $anotherAdministratorExists = UserOrganizationAccess::query()
+            ->where('organization_id', $organizationId)
+            ->whereNull('revoked_at')
+            ->where('user_id', '!=', $excludedUserId)
+            ->whereJsonContains('abilities', AccessAbility::ACCESS_MANAGE)
+            ->whereHas('user', fn ($query) => $query->where('status', 'active'))
+            ->exists();
+
+        if (! $anotherAdministratorExists) {
+            throw ValidationException::withMessages([
+                'account' => 'A organização precisa manter ao menos um administrador ativo com access.manage.',
             ]);
         }
     }
