@@ -24,6 +24,11 @@ class OrganizationMembershipClosureTest extends TestCase
             'granted_at' => now(),
         ]);
 
+        $this->get(route('people.show', $person))
+            ->assertOk()
+            ->assertSee('Encerrar vínculo')
+            ->assertSee('Ativo');
+
         $this->patch(route('people.memberships.close', [$person, $membership]))
             ->assertRedirect(route('people.show', $person));
 
@@ -37,6 +42,12 @@ class OrganizationMembershipClosureTest extends TestCase
             'organization_id' => $organization->id,
             'subject_id' => $membership->id,
         ]);
+
+        $this->get(route('people.show', $person))
+            ->assertOk()
+            ->assertSee('Encerrado')
+            ->assertSee($membership->ended_at->format('d/m/Y'))
+            ->assertDontSee('Encerrar vínculo');
     }
 
     public function test_roles_remain_active_when_another_membership_in_same_organization_exists(): void
