@@ -11,6 +11,8 @@ use App\Http\Controllers\PersonRoleController;
 use App\Http\Controllers\ScenarioController;
 use App\Http\Controllers\UnitController;
 use App\Models\Scenario;
+use App\Services\Auth\ActiveOrganization;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
@@ -24,12 +26,22 @@ Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
     ->middleware('auth')
     ->name('logout');
 
-Route::get('/dashboard', function () {
-    $scenarios = Scenario::latest()->limit(6)->get();
-    $all = Scenario::all(['status', 'score', 'critical_errors']);
+Route::get('/dashboard', function (Request $request, ActiveOrganization $activeOrganization) {
+    $organizationId = $activeOrganization->id($request);
+
+    $scenarioQuery = Scenario::query()
+        ->where('organization_id', $organizationId);
+
+    $recent = (clone $scenarioQuery)
+        ->latest()
+        ->limit(6)
+        ->get();
+
+    $all = (clone $scenarioQuery)
+        ->get(['status', 'score', 'critical_errors']);
 
     return view('dashboard', [
-        'recent' => $scenarios,
+        'recent' => $recent,
         'total' => $all->count(),
         'drafts' => $all->where('status', 'draft')->count(),
         'running' => $all->where('status', 'running')->count(),
@@ -43,9 +55,9 @@ Route::get('/dashboard', function () {
             ->sortDesc()
             ->take(4),
     ]);
-})->middleware('auth')->name('dashboard');
+})->middleware(['auth', 'account.active'])->name('dashboard');
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'account.active'])->group(function () {
     Route::post('/organizations/{organization}/activate', [ActiveOrganizationController::class, 'update'])
         ->name('organizations.activate');
 
