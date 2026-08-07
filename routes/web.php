@@ -44,17 +44,19 @@ Route::get('/dashboard', function () {
     ]);
 })->middleware('auth')->name('dashboard');
 
-Route::resource('organizations', OrganizationController::class)
-    ->only(['index', 'create', 'store', 'show', 'edit', 'update']);
-Route::patch('/organizations/{organization}/deactivate', [OrganizationController::class, 'deactivate'])
-    ->name('organizations.deactivate');
+Route::middleware('auth')->group(function () {
+    Route::resource('organizations', OrganizationController::class)
+        ->only(['index', 'create', 'store', 'show', 'edit', 'update']);
+    Route::patch('/organizations/{organization}/deactivate', [OrganizationController::class, 'deactivate'])
+        ->name('organizations.deactivate');
 
-Route::get('/organizations/{organization}/units/create', [UnitController::class, 'create'])
-    ->name('organizations.units.create');
-Route::post('/units', [UnitController::class, 'store'])->name('units.store');
-Route::get('/units/{unit}/edit', [UnitController::class, 'edit'])->name('units.edit');
-Route::put('/units/{unit}', [UnitController::class, 'update'])->name('units.update');
-Route::patch('/units/{unit}/deactivate', [UnitController::class, 'deactivate'])->name('units.deactivate');
+    Route::get('/organizations/{organization}/units/create', [UnitController::class, 'create'])
+        ->name('organizations.units.create');
+    Route::post('/units', [UnitController::class, 'store'])->name('units.store');
+    Route::get('/units/{unit}/edit', [UnitController::class, 'edit'])->name('units.edit');
+    Route::put('/units/{unit}', [UnitController::class, 'update'])->name('units.update');
+    Route::patch('/units/{unit}/deactivate', [UnitController::class, 'deactivate'])->name('units.deactivate');
+});
 
 Route::resource('people', PersonController::class)
     ->only(['index', 'create', 'store', 'show', 'edit', 'update']);
