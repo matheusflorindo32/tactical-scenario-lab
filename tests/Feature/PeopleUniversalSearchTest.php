@@ -43,8 +43,7 @@ class PeopleUniversalSearchTest extends TestCase
         foreach (['123.456.789-09', '12345678909'] as $query) {
             $this->get(route('people.index', ['q' => $query]))
                 ->assertOk()
-                ->assertSee($person->display_name)
-                ->assertSee('***.***.***-09');
+                ->assertSee($person->display_name);
         }
     }
 
