@@ -61,6 +61,16 @@ Route::get('/dashboard', function (Request $request, ActiveOrganization $activeO
 Route::middleware(['auth', 'account.active'])->group(function () {
     Route::get('/access', [AccessAdministrationController::class, 'index'])
         ->name('access.index');
+    Route::get('/access/create', [AccessAdministrationController::class, 'create'])
+        ->name('access.create');
+    Route::post('/access', [AccessAdministrationController::class, 'store'])
+        ->name('access.store');
+    Route::get('/access/{access}/edit', [AccessAdministrationController::class, 'edit'])
+        ->name('access.edit');
+    Route::put('/access/{access}', [AccessAdministrationController::class, 'update'])
+        ->name('access.update');
+    Route::patch('/access/{access}/revoke', [AccessAdministrationController::class, 'revoke'])
+        ->name('access.revoke');
 
     Route::post('/organizations/{organization}/activate', [ActiveOrganizationController::class, 'update'])
         ->name('organizations.activate');
