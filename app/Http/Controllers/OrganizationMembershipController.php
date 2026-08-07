@@ -19,12 +19,17 @@ class OrganizationMembershipController extends Controller
 {
     public function create(Request $request, Person $person, ActiveOrganization $activeOrganization): View
     {
-        $organizationId = $activeOrganization->ensurePerson($request, $person);
+        $activeOrganization->ensurePerson($request, $person);
+
+        $organizationIds = $request->user()
+            ->activeOrganizationAccesses()
+            ->pluck('organization_id');
 
         $organizations = Organization::query()
-            ->whereKey($organizationId)
+            ->whereIn('id', $organizationIds)
             ->where('status', 'active')
             ->with(['units' => fn ($query) => $query->where('status', 'active')->orderBy('name')])
+            ->orderBy('name')
             ->get();
 
         return view('people.memberships.create', compact('person', 'organizations'));
@@ -37,21 +42,26 @@ class OrganizationMembershipController extends Controller
         ActiveOrganization $activeOrganization,
     ): RedirectResponse {
         $data = $request->validated();
-        $organizationId = $activeOrganization->ensurePerson($request, $person);
-        $activeOrganization->ensure($request, (int) $data['organization_id']);
+        $activeOrganization->ensurePerson($request, $person);
+
+        $organizationId = (int) $data['organization_id'];
+        $activeOrganization->ensureAccess($request, $organizationId);
+        $this->ensureOrganizationIsActive($organizationId);
         $this->ensureUnitBelongsToOrganization($data['unit_id'] ?? null, $organizationId);
         $this->ensureNoEquivalentActiveMembership($person, $organizationId, $data['unit_id'] ?? null);
 
-        $membership = OrganizationMembership::create([
-            'person_id' => $person->id,
-            'organization_id' => $organizationId,
-            'unit_id' => $data['unit_id'] ?? null,
-            'position' => $data['position'] ?? null,
-            'started_at' => $data['started_at'] ?? null,
-            'ended_at' => $data['ended_at'] ?? null,
-            'status' => $data['status'],
-            'notes' => $data['notes'] ?? null,
-        ]);
+        $membership = DB::transaction(function () use ($data, $person, $organizationId): OrganizationMembership {
+            return OrganizationMembership::create([
+                'person_id' => $person->id,
+                'organization_id' => $organizationId,
+                'unit_id' => $data['unit_id'] ?? null,
+                'position' => $data['position'] ?? null,
+                'started_at' => $data['started_at'] ?? null,
+                'ended_at' => $data['ended_at'] ?? null,
+                'status' => $data['status'],
+                'notes' => $data['notes'] ?? null,
+            ]);
+        });
 
         $audit->record('organization_membership.created', $membership, $organizationId, [
             'person_id' => $person->id,
@@ -72,8 +82,9 @@ class OrganizationMembershipController extends Controller
         AuditLogger $audit,
         ActiveOrganization $activeOrganization,
     ): RedirectResponse {
-        $organizationId = $activeOrganization->ensurePerson($request, $person);
         abort_unless($membership->person_id === $person->id, 404);
+
+        $organizationId = $activeOrganization->ensurePerson($request, $person);
         $activeOrganization->ensure($request, $membership->organization_id);
 
         if ($membership->isActive()) {
@@ -111,6 +122,15 @@ class OrganizationMembershipController extends Controller
         return redirect()
             ->route('people.show', $person)
             ->with('success', 'Vínculo encerrado sem apagar o histórico institucional.');
+    }
+
+    private function ensureOrganizationIsActive(int $organizationId): void
+    {
+        if (! Organization::query()->whereKey($organizationId)->where('status', 'active')->exists()) {
+            throw ValidationException::withMessages([
+                'organization_id' => 'A organização selecionada precisa estar ativa.',
+            ]);
+        }
     }
 
     private function ensureUnitBelongsToOrganization(?int $unitId, int $organizationId): void
