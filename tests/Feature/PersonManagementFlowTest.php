@@ -15,7 +15,7 @@ class PersonManagementFlowTest extends TestCase
 
     public function test_person_edit_form_is_available(): void
     {
-        $person = Person::create(['display_name' => 'Operador Alfa']);
+        [, $person] = $this->context();
 
         $this->get(route('people.edit', $person))
             ->assertOk()
