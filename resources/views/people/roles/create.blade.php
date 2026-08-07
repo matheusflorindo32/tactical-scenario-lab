@@ -33,7 +33,7 @@
                     <label>
                         <span class="text-sm font-semibold text-navy-950">Papel</span>
                         <select name="role" required class="mt-2 w-full rounded-xl border border-ink-300 bg-white px-4 py-3 text-sm outline-none focus:border-navy-700 focus:ring-4 focus:ring-navy-100">
-                            @foreach (['student' => 'Aluno', 'instructor' => 'Instrutor', 'evaluator' => 'Avaliador', 'coordinator' => 'Coordenador', 'support' => 'Apoio', 'manager_org' => 'Gestor institucional', 'auditor' => 'Auditor', 'viewer' => 'Visualizador', 'admin_tma' => 'Administrador TMA'] as $value => $label)
+                            @foreach ($roleOptions as $value => $label)
                                 <option value="{{ $value }}" @selected(old('role') === $value)>{{ $label }}</option>
                             @endforeach
                         </select>
@@ -43,13 +43,15 @@
                     <fieldset class="sm:col-span-2">
                         <legend class="text-sm font-semibold text-navy-950">Habilidades específicas <span class="font-normal text-ink-400">(opcional)</span></legend>
                         <div class="mt-3 grid gap-3 sm:grid-cols-2">
-                            @foreach (['people.view' => 'Visualizar pessoas', 'people.manage' => 'Gerenciar pessoas', 'scenarios.view' => 'Visualizar cenários', 'scenarios.manage' => 'Gerenciar cenários', 'evaluations.manage' => 'Gerenciar avaliações', 'reports.view' => 'Visualizar relatórios'] as $value => $label)
+                            @foreach ($abilityOptions as $value => $label)
                                 <label class="flex items-start gap-3 rounded-xl border border-ink-200 p-4 transition hover:bg-ink-50">
                                     <input type="checkbox" name="abilities[]" value="{{ $value }}" @checked(in_array($value, old('abilities', []), true)) class="mt-0.5 rounded border-ink-300 text-navy-900 focus:ring-navy-500">
                                     <span class="text-sm text-ink-700">{{ $label }}</span>
                                 </label>
                             @endforeach
                         </div>
+                        @error('abilities') <span class="mt-2 block text-sm text-emergency-700">{{ $message }}</span> @enderror
+                        @error('abilities.*') <span class="mt-2 block text-sm text-emergency-700">{{ $message }}</span> @enderror
                     </fieldset>
 
                     <label class="sm:col-span-2">
