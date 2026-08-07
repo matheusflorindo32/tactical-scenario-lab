@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreOrganizationRequest;
+use App\Http\Requests\UpdateOrganizationRequest;
 use App\Models\Organization;
 use App\Services\Audit\AuditLogger;
 use Illuminate\Http\RedirectResponse;
@@ -53,5 +54,57 @@ class OrganizationController extends Controller
         ]);
 
         return view('organizations.show', compact('organization'));
+    }
+
+    public function edit(Organization $organization): View
+    {
+        return view('organizations.edit', compact('organization'));
+    }
+
+    public function update(
+        UpdateOrganizationRequest $request,
+        Organization $organization,
+        AuditLogger $audit,
+    ): RedirectResponse {
+        $before = $organization->only(['kind', 'status']);
+        $organization->update($request->validated());
+
+        $audit->record(
+            'organization.updated',
+            $organization,
+            $organization->id,
+            [
+                'changed_fields' => array_keys($organization->getChanges()),
+                'previous_kind' => $before['kind'],
+                'current_kind' => $organization->kind,
+                'previous_status' => $before['status'],
+                'current_status' => $organization->status,
+            ],
+            $request,
+        );
+
+        return redirect()
+            ->route('organizations.show', $organization)
+            ->with('success', 'Organização atualizada com sucesso.');
+    }
+
+    public function deactivate(
+        Organization $organization,
+        AuditLogger $audit,
+    ): RedirectResponse {
+        if ($organization->status !== 'inactive') {
+            $organization->update(['status' => 'inactive']);
+
+            $audit->record(
+                'organization.deactivated',
+                $organization,
+                $organization->id,
+                ['status' => 'inactive'],
+            );
+        }
+
+        return redirect()
+            ->route('organizations.show', $organization)
+            ->with('success', 'Organização inativada sem excluir o histórico institucional.');
     }
 }
