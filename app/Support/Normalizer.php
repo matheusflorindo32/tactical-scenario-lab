@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use Illuminate\Support\Str;
+use RuntimeException;
 
 /**
  * Normalização central de documentos e contatos.
@@ -65,7 +66,11 @@ final class Normalizer
             ? self::contact($type, $value)
             : self::identifier($type, $value);
 
-        $key = (string) config('app.key');
+        $key = (string) config('privacy.fingerprint_key');
+
+        if ($key === '') {
+            throw new RuntimeException('PII fingerprint key is not configured.');
+        }
 
         return hash_hmac('sha256', "$domain:$type:$normalized", $key);
     }
