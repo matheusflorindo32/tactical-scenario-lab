@@ -49,8 +49,8 @@ class PeopleAuthenticationTest extends TestCase
         UserOrganizationAccess::create([
             'user_id' => $user->id,
             'organization_id' => $organization->id,
-            'role' => 'viewer',
-            'abilities' => ['people.view'],
+            'role' => 'manager_org',
+            'abilities' => ['people.view', 'people.manage'],
             'granted_at' => now(),
         ]);
 
