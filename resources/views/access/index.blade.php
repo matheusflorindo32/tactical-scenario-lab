@@ -5,7 +5,7 @@
                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emergency-700">Governança de acesso</p>
                 <h1 class="mt-2 font-display text-3xl font-semibold tracking-tight text-navy-950">Acessos institucionais</h1>
                 <p class="mt-2 max-w-3xl text-sm leading-6 text-ink-500">
-                    Contas com concessão ativa em <strong class="font-semibold text-navy-950">{{ $organization->name }}</strong>. Esta visão é sempre limitada ao contexto institucional ativo.
+                    Contas com concessão ativa em <strong class="font-semibold text-navy-950">{{ $organization->name }}</strong>. Acessos vencidos deixam automaticamente de autorizar e não aparecem nesta visão operacional.
                 </p>
             </div>
             <a href="{{ route('access.create') }}" class="inline-flex items-center justify-center rounded-xl bg-navy-950 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-navy-800">
@@ -44,6 +44,9 @@
                         </div>
                         <p class="mt-1 text-sm text-ink-500">{{ $access->user->email }}</p>
                         <p class="mt-2 text-sm text-ink-600">Papel de acesso: <strong class="font-semibold text-navy-950">{{ $access->role }}</strong></p>
+                        <p class="mt-1 text-xs text-ink-500">
+                            Validade: <strong class="font-semibold text-ink-700">{{ $access->expires_at?->format('d/m/Y H:i') ?? 'sem prazo' }}</strong>
+                        </p>
                     </div>
 
                     <div class="max-w-2xl flex-1">
@@ -95,7 +98,7 @@
         @empty
             <div class="px-6 py-16 text-center">
                 <h2 class="text-lg font-semibold text-navy-950">Nenhum acesso ativo</h2>
-                <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-500">Não há concessões ativas para a organização atual.</p>
+                <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-500">Não há concessões vigentes para a organização atual.</p>
                 <a href="{{ route('access.create') }}" class="mt-6 inline-flex rounded-xl bg-navy-950 px-5 py-3 text-sm font-semibold text-white">Conceder primeiro acesso</a>
             </div>
         @endforelse
