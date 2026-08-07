@@ -23,6 +23,20 @@ class PersonManagementFlowTest extends TestCase
             ->assertSee('Operador Alfa');
     }
 
+    public function test_profile_exposes_protected_management_actions(): void
+    {
+        [, $person] = $this->context();
+
+        $this->get(route('people.show', $person))
+            ->assertOk()
+            ->assertSee(route('people.edit', $person), false)
+            ->assertSee(route('people.identifiers.create', $person), false)
+            ->assertSee(route('people.contacts.create', $person), false)
+            ->assertSee(route('people.memberships.create', $person), false)
+            ->assertSee(route('people.roles.create', $person), false)
+            ->assertSee(route('people.deactivate', $person), false);
+    }
+
     public function test_person_general_data_can_be_updated_and_is_audited_without_values(): void
     {
         [$organization, $person] = $this->context();
