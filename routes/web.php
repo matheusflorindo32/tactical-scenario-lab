@@ -85,14 +85,16 @@ Route::post('/people/{person}/roles', [PersonRoleController::class, 'store'])
 Route::patch('/people/{person}/roles/{role}/revoke', [PersonRoleController::class, 'revoke'])
     ->name('people.roles.revoke');
 
-Route::resource('scenarios', ScenarioController::class)
-    ->only(['index', 'create', 'store', 'show']);
+Route::middleware('auth')->group(function () {
+    Route::resource('scenarios', ScenarioController::class)
+        ->only(['index', 'create', 'store', 'show']);
 
-Route::post('/scenarios/{scenario}/execute', [ScenarioController::class, 'execute'])
-    ->name('scenarios.execute');
+    Route::post('/scenarios/{scenario}/execute', [ScenarioController::class, 'execute'])
+        ->name('scenarios.execute');
 
-Route::post('/scenarios/{scenario}/evaluate', [ScenarioController::class, 'evaluate'])
-    ->name('scenarios.evaluate');
+    Route::post('/scenarios/{scenario}/evaluate', [ScenarioController::class, 'evaluate'])
+        ->name('scenarios.evaluate');
+});
 
 Route::get('/health', fn () => response()->json([
     'status' => 'ok',
