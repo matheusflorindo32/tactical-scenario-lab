@@ -2,12 +2,18 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PersonRole extends Model
 {
+    use HasPublicUuid;
+    use SoftDeletes;
+
     protected $fillable = [
+        'uuid',
         'person_id',
         'organization_id',
         'role',
@@ -21,7 +27,7 @@ class PersonRole extends Model
     protected function casts(): array
     {
         return [
-            'abilities'  => 'array',
+            'abilities' => 'array',
             'granted_at' => 'datetime',
             'revoked_at' => 'datetime',
         ];
@@ -42,7 +48,6 @@ class PersonRole extends Model
         return blank($this->revoked_at);
     }
 
-    /** Confere se esta role concede uma ability específica. */
     public function hasAbility(string $ability): bool
     {
         return is_array($this->abilities) && in_array($ability, $this->abilities, true);
