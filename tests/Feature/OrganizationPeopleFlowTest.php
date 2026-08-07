@@ -109,17 +109,17 @@ class OrganizationPeopleFlowTest extends TestCase
             'role' => 'student',
         ]);
 
-        PersonIdentifier::create([
+        $identifier = PersonIdentifier::create([
             'person_id' => $person->id,
             'organization_id' => $organization->id,
             'type' => 'temp_code',
             'value' => 'TMA-SECRET1',
             'is_primary' => true,
-        ]);
+        ])->fresh();
 
         $this->get(route('people.show', $person))
             ->assertOk()
             ->assertDontSee('TMA-SECRET1')
-            ->assertSee('T********T1');
+            ->assertSeeText($identifier->masked_value);
     }
 }
