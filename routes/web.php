@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AccessAdministrationController;
 use App\Http\Controllers\ActiveOrganizationController;
 use App\Http\Controllers\AuthenticatedSessionController;
 use App\Http\Controllers\OrganizationController;
@@ -58,6 +59,9 @@ Route::get('/dashboard', function (Request $request, ActiveOrganization $activeO
 })->middleware(['auth', 'account.active'])->name('dashboard');
 
 Route::middleware(['auth', 'account.active'])->group(function () {
+    Route::get('/access', [AccessAdministrationController::class, 'index'])
+        ->name('access.index');
+
     Route::post('/organizations/{organization}/activate', [ActiveOrganizationController::class, 'update'])
         ->name('organizations.activate');
 
