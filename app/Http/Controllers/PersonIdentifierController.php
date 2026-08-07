@@ -6,6 +6,7 @@ use App\Http\Requests\StorePersonIdentifierRequest;
 use App\Models\Organization;
 use App\Models\Person;
 use App\Models\PersonIdentifier;
+use App\Services\Audit\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -22,7 +23,7 @@ class PersonIdentifierController extends Controller
         return view('people.identifiers.create', compact('person', 'organizations'));
     }
 
-    public function store(StorePersonIdentifierRequest $request, Person $person): RedirectResponse
+    public function store(StorePersonIdentifierRequest $request, Person $person, AuditLogger $audit): RedirectResponse
     {
         $data = $request->validated();
         $this->ensurePersonBelongsToOrganization($person, (int) $data['organization_id']);
@@ -49,7 +50,7 @@ class PersonIdentifierController extends Controller
                 ->update(['is_primary' => false]);
         }
 
-        $person->identifiers()->create([
+        $identifier = $person->identifiers()->create([
             'organization_id' => $data['organization_id'],
             'type' => $data['type'],
             'value' => $data['value'],
@@ -60,6 +61,13 @@ class PersonIdentifierController extends Controller
             'is_primary' => (bool) ($data['is_primary'] ?? false),
             'notes' => $data['notes'] ?? null,
         ]);
+
+        $audit->record('person_identifier.created', $identifier, (int) $data['organization_id'], [
+            'person_id' => $person->id,
+            'type' => $identifier->type,
+            'masked_value' => $identifier->masked_value,
+            'confirmed_duplicate' => (bool) ($data['confirm_duplicate'] ?? false),
+        ], $request);
 
         return redirect()
             ->route('people.show', $person)
