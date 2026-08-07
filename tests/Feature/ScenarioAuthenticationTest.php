@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Models\Organization;
 use App\Models\Scenario;
 use App\Models\User;
+use App\Models\UserOrganizationAccess;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -36,7 +38,22 @@ class ScenarioAuthenticationTest extends TestCase
 
     public function test_authenticated_active_user_can_access_scenario_workflow(): void
     {
-        $this->actingAs(User::factory()->create(['status' => 'active']));
+        $organization = Organization::create([
+            'name' => 'Organização Cenários',
+            'status' => 'active',
+        ]);
+        $user = User::factory()->create(['status' => 'active']);
+
+        UserOrganizationAccess::create([
+            'user_id' => $user->id,
+            'organization_id' => $organization->id,
+            'role' => 'scenario_manager',
+            'abilities' => ['scenarios.view', 'scenarios.manage', 'evaluations.manage'],
+            'granted_at' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->withSession(['active_organization_id' => $organization->id]);
 
         $this->get(route('scenarios.index'))->assertOk();
         $this->get(route('scenarios.create'))->assertOk();
