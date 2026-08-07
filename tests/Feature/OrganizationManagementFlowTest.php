@@ -4,8 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\AuditLog;
 use App\Models\Organization;
-use App\Models\Person;
 use App\Models\OrganizationMembership;
+use App\Models\Person;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
