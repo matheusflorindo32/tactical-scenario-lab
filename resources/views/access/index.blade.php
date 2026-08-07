@@ -20,6 +20,17 @@
         </div>
     @enderror
 
+    @error('account')
+        <div class="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            {{ $message }}
+        </div>
+    @enderror
+
+    <div class="mb-5 rounded-2xl border border-ink-200 bg-white px-5 py-4 text-sm leading-6 text-ink-600 shadow-sm">
+        <strong class="font-semibold text-navy-950">Conta global x acesso local:</strong>
+        revogar remove apenas a concessão desta organização. Inativar a conta bloqueia o login global e, por segurança, só é permitido aqui quando a conta não possui outra concessão ativa em outra organização.
+    </div>
+
     <section class="overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-sm">
         @forelse ($accesses as $access)
             <article class="border-b border-ink-100 px-5 py-5 last:border-b-0">
@@ -52,6 +63,25 @@
                         <a href="{{ route('access.edit', $access) }}" class="rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 transition hover:bg-ink-50">
                             Editar
                         </a>
+
+                        @if ($access->user->status === 'active')
+                            <form method="POST" action="{{ route('access.accounts.deactivate', $access->user) }}" onsubmit="return confirm('Inativar esta conta globalmente? Use Revogar se a intenção for remover apenas o acesso desta organização.');">
+                                @csrf
+                                @method('PATCH')
+                                <button type="submit" class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-900 transition hover:bg-amber-100">
+                                    Inativar conta
+                                </button>
+                            </form>
+                        @else
+                            <form method="POST" action="{{ route('access.accounts.reactivate', $access->user) }}">
+                                @csrf
+                                @method('PATCH')
+                                <button type="submit" class="rounded-xl border border-clinical-200 bg-clinical-50 px-4 py-2.5 text-sm font-semibold text-clinical-800 transition hover:bg-clinical-100">
+                                    Reativar conta
+                                </button>
+                            </form>
+                        @endif
+
                         <form method="POST" action="{{ route('access.revoke', $access) }}" onsubmit="return confirm('Revogar este acesso institucional? O histórico será preservado.');">
                             @csrf
                             @method('PATCH')
