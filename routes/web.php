@@ -35,7 +35,9 @@ Route::get('/dashboard', function () {
 })->name('dashboard');
 
 Route::resource('organizations', OrganizationController::class)
-    ->only(['index', 'create', 'store', 'show']);
+    ->only(['index', 'create', 'store', 'show', 'edit', 'update']);
+Route::patch('/organizations/{organization}/deactivate', [OrganizationController::class, 'deactivate'])
+    ->name('organizations.deactivate');
 
 Route::get('/organizations/{organization}/units/create', [UnitController::class, 'create'])
     ->name('organizations.units.create');
