@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Organization;
 use App\Models\Unit;
 use App\Models\User;
+use App\Models\UserOrganizationAccess;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -50,7 +51,16 @@ class OrganizationAuthenticationTest extends TestCase
             'status' => 'active',
         ]);
 
-        $this->actingAs($user);
+        UserOrganizationAccess::create([
+            'user_id' => $user->id,
+            'organization_id' => $organization->id,
+            'role' => 'manager_org',
+            'abilities' => ['people.view'],
+            'granted_at' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->withSession(['active_organization_id' => $organization->id]);
 
         $this->get(route('organizations.index'))->assertOk();
         $this->get(route('organizations.show', $organization))->assertOk();
