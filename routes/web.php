@@ -71,6 +71,10 @@ Route::middleware(['auth', 'account.active'])->group(function () {
         ->name('access.update');
     Route::patch('/access/{access}/revoke', [AccessAdministrationController::class, 'revoke'])
         ->name('access.revoke');
+    Route::patch('/access/accounts/{user}/deactivate', [AccessAdministrationController::class, 'deactivateAccount'])
+        ->name('access.accounts.deactivate');
+    Route::patch('/access/accounts/{user}/reactivate', [AccessAdministrationController::class, 'reactivateAccount'])
+        ->name('access.accounts.reactivate');
 
     Route::post('/organizations/{organization}/activate', [ActiveOrganizationController::class, 'update'])
         ->name('organizations.activate');
