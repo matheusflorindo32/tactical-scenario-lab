@@ -1,0 +1,143 @@
+<x-layouts.app :current="'people'" :title="$person->preferredName().' · Tactical Medicine Academy'">
+    <x-slot:header>
+        <div class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+            <div class="flex min-w-0 items-center gap-4">
+                <div class="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-navy-950 text-xl font-bold text-white shadow-sm">
+                    {{ Str::upper(Str::substr($person->preferredName(), 0, 2)) }}
+                </div>
+                <div class="min-w-0">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="rounded-full px-2.5 py-1 text-xs font-medium {{ $person->status === 'active' ? 'bg-clinical-50 text-clinical-800' : 'bg-alert-50 text-alert-800' }}">
+                            {{ $person->status === 'active' ? 'Ativo' : 'Cadastro mínimo válido' }}
+                        </span>
+                        <span class="text-xs text-ink-400">UUID {{ Str::limit($person->uuid, 13, '…') }}</span>
+                    </div>
+                    <h1 class="mt-2 truncate font-display text-3xl font-semibold tracking-tight text-navy-950">{{ $person->preferredName() }}</h1>
+                    @if ($person->social_name && $person->social_name !== $person->display_name)
+                        <p class="mt-1 text-sm text-ink-500">Nome de cadastro: {{ $person->display_name }}</p>
+                    @endif
+                </div>
+            </div>
+            <x-button href="{{ route('people.index') }}" variant="secondary">Voltar para pessoas</x-button>
+        </div>
+    </x-slot:header>
+
+    @php
+        $pending = $person->pendingFields();
+        $completedGroups = 4 - count($pending);
+        $completion = max(25, (int) round(($completedGroups / 4) * 100));
+    @endphp
+
+    <div class="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+        <div class="space-y-6">
+            <section class="rounded-2xl border border-ink-200 bg-white p-6 shadow-sm">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h2 class="text-lg font-semibold text-navy-950">Completude do cadastro</h2>
+                        <p class="mt-1 text-sm text-ink-500">Pendências opcionais não bloqueiam o uso operacional.</p>
+                    </div>
+                    <strong class="text-2xl text-navy-950">{{ $completion }}%</strong>
+                </div>
+                <div class="mt-5 h-2 overflow-hidden rounded-full bg-ink-100" role="progressbar" aria-valuenow="{{ $completion }}" aria-valuemin="0" aria-valuemax="100">
+                    <div class="h-full rounded-full bg-clinical-600 transition-all" style="width: {{ $completion }}%"></div>
+                </div>
+                <div class="mt-4 flex flex-wrap gap-2">
+                    @forelse ($pending as $field)
+                        <span class="rounded-full bg-alert-50 px-3 py-1.5 text-xs font-medium text-alert-800">
+                            {{ ['birth_date' => 'Nascimento opcional', 'photo_path' => 'Foto opcional', 'documents' => 'Documento opcional', 'contacts' => 'Contato opcional'][$field] ?? $field }}
+                        </span>
+                    @empty
+                        <span class="rounded-full bg-clinical-50 px-3 py-1.5 text-xs font-medium text-clinical-800">Cadastro enriquecido</span>
+                    @endforelse
+                </div>
+            </section>
+
+            <section class="rounded-2xl border border-ink-200 bg-white p-6 shadow-sm">
+                <div class="flex items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-lg font-semibold text-navy-950">Documentos e códigos</h2>
+                        <p class="mt-1 text-sm text-ink-500">Valores integrais permanecem criptografados. Esta tela mostra somente máscaras.</p>
+                    </div>
+                    <span class="rounded-full bg-navy-50 px-3 py-1 text-xs font-semibold text-navy-800">{{ $person->identifiers->count() }}</span>
+                </div>
+                <div class="mt-5 divide-y divide-ink-100">
+                    @forelse ($person->identifiers as $identifier)
+                        <div class="flex flex-col gap-2 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <p class="text-sm font-semibold uppercase tracking-wide text-ink-500">{{ str_replace('_', ' ', $identifier->type) }}</p>
+                                <p class="mt-1 font-mono text-sm text-navy-950">{{ $identifier->masked() }}</p>
+                            </div>
+                            @if ($identifier->is_primary)
+                                <span class="w-fit rounded-full bg-clinical-50 px-2.5 py-1 text-xs font-medium text-clinical-800">Principal</span>
+                            @endif
+                        </div>
+                    @empty
+                        <p class="py-8 text-center text-sm text-ink-500">Nenhum documento informado. O cadastro continua válido.</p>
+                    @endforelse
+                </div>
+            </section>
+
+            <section class="rounded-2xl border border-ink-200 bg-white p-6 shadow-sm">
+                <div class="flex items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-lg font-semibold text-navy-950">Contatos</h2>
+                        <p class="mt-1 text-sm text-ink-500">Canais protegidos e vinculados ao contexto institucional.</p>
+                    </div>
+                    <span class="rounded-full bg-navy-50 px-3 py-1 text-xs font-semibold text-navy-800">{{ $person->contacts->count() }}</span>
+                </div>
+                <div class="mt-5 divide-y divide-ink-100">
+                    @forelse ($person->contacts as $contact)
+                        <div class="flex items-center justify-between gap-4 py-4 first:pt-0 last:pb-0">
+                            <div>
+                                <p class="text-sm font-semibold text-navy-950">{{ ucfirst($contact->label ?: $contact->type) }}</p>
+                                <p class="mt-1 text-sm text-ink-500">{{ $contact->masked() }}</p>
+                            </div>
+                            @if ($contact->is_primary)
+                                <span class="rounded-full bg-clinical-50 px-2.5 py-1 text-xs font-medium text-clinical-800">Principal</span>
+                            @endif
+                        </div>
+                    @empty
+                        <p class="py-8 text-center text-sm text-ink-500">Nenhum contato informado. O cadastro continua válido.</p>
+                    @endforelse
+                </div>
+            </section>
+        </div>
+
+        <aside class="space-y-6">
+            <section class="rounded-2xl border border-ink-200 bg-white p-6 shadow-sm">
+                <h2 class="text-sm font-semibold uppercase tracking-[0.14em] text-ink-500">Vínculos institucionais</h2>
+                <div class="mt-5 space-y-4">
+                    @forelse ($person->memberships as $membership)
+                        <div class="rounded-xl border border-ink-100 bg-ink-50/60 p-4">
+                            <p class="font-semibold text-navy-950">{{ $membership->organization->name }}</p>
+                            <p class="mt-1 text-sm text-ink-500">{{ $membership->unit?->name ?? 'Sem unidade definida' }}</p>
+                            @if ($membership->position)
+                                <p class="mt-2 text-sm font-medium text-ink-700">{{ $membership->position }}</p>
+                            @endif
+                        </div>
+                    @empty
+                        <p class="text-sm text-ink-500">Nenhum vínculo ativo.</p>
+                    @endforelse
+                </div>
+            </section>
+
+            <section class="rounded-2xl border border-ink-200 bg-white p-6 shadow-sm">
+                <h2 class="text-sm font-semibold uppercase tracking-[0.14em] text-ink-500">Papéis contextuais</h2>
+                <div class="mt-4 flex flex-wrap gap-2">
+                    @forelse ($person->roles as $role)
+                        <span class="rounded-full bg-navy-50 px-3 py-1.5 text-xs font-medium text-navy-800">{{ ucfirst(str_replace('_', ' ', $role->role)) }}</span>
+                    @empty
+                        <span class="text-sm text-ink-500">Nenhum papel atribuído.</span>
+                    @endforelse
+                </div>
+            </section>
+
+            @if ($person->notes)
+                <section class="rounded-2xl border border-ink-200 bg-white p-6 shadow-sm">
+                    <h2 class="text-sm font-semibold uppercase tracking-[0.14em] text-ink-500">Observações</h2>
+                    <p class="mt-3 whitespace-pre-line text-sm leading-6 text-ink-600">{{ $person->notes }}</p>
+                </section>
+            @endif
+        </aside>
+    </div>
+</x-layouts.app>
