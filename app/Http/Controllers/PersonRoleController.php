@@ -7,37 +7,41 @@ use App\Models\Organization;
 use App\Models\Person;
 use App\Models\PersonRole;
 use App\Services\Audit\AuditLogger;
+use App\Services\Auth\ActiveOrganization;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class PersonRoleController extends Controller
 {
-    public function create(Person $person): View
+    public function create(Request $request, Person $person, ActiveOrganization $activeOrganization): View
     {
-        $organizationIds = $person->memberships()
-            ->where('status', 'active')
-            ->whereNull('ended_at')
-            ->pluck('organization_id');
+        $organizationId = $activeOrganization->ensurePerson($request, $person, true);
 
         return view('people.roles.create', [
             'person' => $person,
             'organizations' => Organization::query()
-                ->whereIn('id', $organizationIds)
+                ->whereKey($organizationId)
                 ->where('status', 'active')
-                ->orderBy('name')
                 ->get(),
             'roleOptions' => StorePersonRoleRequest::ROLE_OPTIONS,
             'abilityOptions' => StorePersonRoleRequest::ABILITY_OPTIONS,
         ]);
     }
 
-    public function store(StorePersonRoleRequest $request, Person $person, AuditLogger $audit): RedirectResponse
-    {
+    public function store(
+        StorePersonRoleRequest $request,
+        Person $person,
+        AuditLogger $audit,
+        ActiveOrganization $activeOrganization,
+    ): RedirectResponse {
         $data = $request->validated();
+        $organizationId = $activeOrganization->ensurePerson($request, $person, true);
+        $activeOrganization->ensure($request, (int) $data['organization_id']);
 
         $hasMembership = $person->memberships()
-            ->where('organization_id', $data['organization_id'])
+            ->where('organization_id', $organizationId)
             ->where('status', 'active')
             ->whereNull('ended_at')
             ->exists();
@@ -50,7 +54,7 @@ class PersonRoleController extends Controller
 
         $alreadyActive = PersonRole::query()
             ->where('person_id', $person->id)
-            ->where('organization_id', $data['organization_id'])
+            ->where('organization_id', $organizationId)
             ->where('role', $data['role'])
             ->whereNull('revoked_at')
             ->exists();
@@ -63,14 +67,14 @@ class PersonRoleController extends Controller
 
         $role = PersonRole::create([
             'person_id' => $person->id,
-            'organization_id' => $data['organization_id'],
+            'organization_id' => $organizationId,
             'role' => $data['role'],
             'abilities' => $data['abilities'] ?? [],
             'granted_at' => now(),
             'notes' => $data['notes'] ?? null,
         ]);
 
-        $audit->record('person_role.granted', $role, (int) $data['organization_id'], [
+        $audit->record('person_role.granted', $role, $organizationId, [
             'person_id' => $person->id,
             'role' => $role->role,
             'abilities' => $role->abilities ?? [],
@@ -81,9 +85,16 @@ class PersonRoleController extends Controller
             ->with('success', 'Papel institucional atribuído com sucesso.');
     }
 
-    public function revoke(Person $person, PersonRole $role, AuditLogger $audit): RedirectResponse
-    {
+    public function revoke(
+        Request $request,
+        Person $person,
+        PersonRole $role,
+        AuditLogger $audit,
+        ActiveOrganization $activeOrganization,
+    ): RedirectResponse {
+        $activeOrganization->ensurePerson($request, $person);
         abort_unless($role->person_id === $person->id, 404);
+        $activeOrganization->ensure($request, $role->organization_id);
 
         if ($role->revoked_at === null) {
             $role->update(['revoked_at' => now()]);
@@ -91,7 +102,7 @@ class PersonRoleController extends Controller
             $audit->record('person_role.revoked', $role, $role->organization_id, [
                 'person_id' => $person->id,
                 'role' => $role->role,
-            ]);
+            ], $request);
         }
 
         return redirect()
