@@ -9,6 +9,7 @@ use App\Models\Person;
 use App\Models\PersonIdentifier;
 use App\Models\PersonRole;
 use App\Models\Unit;
+use App\Services\People\PersonSearch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
@@ -18,28 +19,25 @@ use Illuminate\View\View;
 
 class PersonController extends Controller
 {
-    public function index(): View
+    public function index(PersonSearch $personSearch): View
     {
         $search = trim((string) request('q'));
         $status = request('status');
-        $organizationId = request('organization_id');
+        $organizationId = request()->integer('organization_id') ?: null;
 
-        $people = Person::query()
+        $query = Person::query()
             ->with([
                 'memberships.organization',
                 'memberships.unit',
                 'roles',
-            ])
-            ->when($search !== '', function (Builder $query) use ($search): void {
-                $query->where(function (Builder $nested) use ($search): void {
-                    $nested
-                        ->where('display_name', 'like', "%{$search}%")
-                        ->orWhere('social_name', 'like', "%{$search}%");
-                });
-            })
-            ->when(in_array($status, ['active', 'incomplete', 'inactive', 'merged'], true), fn (Builder $query) => $query->where('status', $status))
-            ->when($organizationId, function (Builder $query) use ($organizationId): void {
-                $query->whereHas('memberships', fn (Builder $membership) => $membership->where('organization_id', $organizationId));
+            ]);
+
+        $personSearch->apply($query, $search, $organizationId);
+
+        $people = $query
+            ->when(in_array($status, ['active', 'incomplete', 'inactive', 'merged'], true), fn (Builder $builder) => $builder->where('status', $status))
+            ->when($organizationId, function (Builder $builder) use ($organizationId): void {
+                $builder->whereHas('memberships', fn (Builder $membership) => $membership->where('organization_id', $organizationId));
             })
             ->orderBy('display_name')
             ->paginate(15)
