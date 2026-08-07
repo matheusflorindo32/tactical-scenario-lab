@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreUnitRequest;
 use App\Models\Organization;
 use App\Models\Unit;
+use App\Services\Audit\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -18,7 +19,7 @@ class UnitController extends Controller
         return view('units.create', compact('organization', 'parents'));
     }
 
-    public function store(StoreUnitRequest $request): RedirectResponse
+    public function store(StoreUnitRequest $request, AuditLogger $audit): RedirectResponse
     {
         $data = $request->validated();
 
@@ -36,6 +37,18 @@ class UnitController extends Controller
         }
 
         $unit = Unit::create($data);
+
+        $audit->record(
+            'unit.created',
+            $unit,
+            $unit->organization_id,
+            [
+                'kind' => $unit->kind,
+                'status' => $unit->status,
+                'parent_unit_id' => $unit->parent_unit_id,
+            ],
+            $request,
+        );
 
         return redirect()
             ->route('organizations.show', $unit->organization)
