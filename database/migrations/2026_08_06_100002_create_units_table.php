@@ -5,10 +5,10 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * units — subdivisões de uma organização (batalhão, companhia, base, escola,
- * regional, filial). Hierárquicas via parent_unit_id.
+ * units — subdivisões hierárquicas de uma organização.
  *
- * Ver docs/EXPANSION_PLAN.md §14 e §17.
+ * O catálogo contempla estruturas civis, acadêmicas, clínicas, empresariais
+ * e militares sem amarrar a aplicação a uma única instituição.
  */
 return new class extends Migration
 {
@@ -30,14 +30,28 @@ return new class extends Migration
                 ->nullOnDelete();
             $table->string('name', 160);
             $table->enum('kind', [
-                'battalion', 'company', 'base', 'school',
-                'sector', 'team', 'regional', 'branch', 'other',
+                'headquarters',
+                'regional',
+                'department',
+                'division',
+                'battalion',
+                'company',
+                'platoon',
+                'station',
+                'base',
+                'school',
+                'clinic',
+                'sector',
+                'team',
+                'branch',
+                'other',
             ])->default('other');
             $table->enum('status', ['active', 'inactive'])->default('active');
             $table->text('notes')->nullable();
             $table->timestamps();
 
             $table->index(['organization_id', 'status']);
+            $table->index(['organization_id', 'parent_unit_id']);
         });
     }
 
