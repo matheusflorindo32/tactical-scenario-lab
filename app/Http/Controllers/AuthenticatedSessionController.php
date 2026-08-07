@@ -20,6 +20,17 @@ class AuthenticatedSessionController extends Controller
         $request->authenticate();
         $request->session()->regenerate();
 
+        $firstAccess = $request->user()
+            ?->activeOrganizationAccesses()
+            ->orderBy('id')
+            ->first();
+
+        if ($firstAccess) {
+            $request->session()->put('active_organization_id', $firstAccess->organization_id);
+        } else {
+            $request->session()->forget('active_organization_id');
+        }
+
         return redirect()->intended(route('dashboard'));
     }
 
