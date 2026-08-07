@@ -4,7 +4,6 @@ namespace Tests;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
-use Tests\Feature\ScenarioFlowTest;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -12,8 +11,20 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
-        if (static::class === ScenarioFlowTest::class) {
+        if ($this->legacyProtectedFlowNeedsAuthentication()) {
             $this->actingAs(User::factory()->create(['status' => 'active']));
         }
+    }
+
+    private function legacyProtectedFlowNeedsAuthentication(): bool
+    {
+        return in_array(class_basename(static::class), [
+            'InstitutionalAuditFlowTest',
+            'OrganizationManagementFlowTest',
+            'OrganizationPeopleFlowTest',
+            'ScenarioFlowTest',
+            'UnitFlowTest',
+            'UnitManagementFlowTest',
+        ], true);
     }
 }
