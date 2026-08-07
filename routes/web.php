@@ -65,6 +65,8 @@ Route::get('/people/{person}/memberships/create', [OrganizationMembershipControl
     ->name('people.memberships.create');
 Route::post('/people/{person}/memberships', [OrganizationMembershipController::class, 'store'])
     ->name('people.memberships.store');
+Route::patch('/people/{person}/memberships/{membership}/close', [OrganizationMembershipController::class, 'close'])
+    ->name('people.memberships.close');
 
 Route::get('/people/{person}/roles/create', [PersonRoleController::class, 'create'])
     ->name('people.roles.create');
