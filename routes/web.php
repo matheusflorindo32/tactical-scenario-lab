@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\OrganizationController;
+use App\Http\Controllers\PersonContactController;
 use App\Http\Controllers\PersonController;
 use App\Http\Controllers\PersonIdentifierController;
 use App\Http\Controllers\ScenarioController;
@@ -45,6 +46,11 @@ Route::get('/people/{person}/identifiers/create', [PersonIdentifierController::c
     ->name('people.identifiers.create');
 Route::post('/people/{person}/identifiers', [PersonIdentifierController::class, 'store'])
     ->name('people.identifiers.store');
+
+Route::get('/people/{person}/contacts/create', [PersonContactController::class, 'create'])
+    ->name('people.contacts.create');
+Route::post('/people/{person}/contacts', [PersonContactController::class, 'store'])
+    ->name('people.contacts.store');
 
 Route::resource('scenarios', ScenarioController::class)
     ->only(['index', 'create', 'store', 'show']);
