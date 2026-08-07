@@ -42,7 +42,9 @@ Route::get('/organizations/{organization}/units/create', [UnitController::class,
 Route::post('/units', [UnitController::class, 'store'])->name('units.store');
 
 Route::resource('people', PersonController::class)
-    ->only(['index', 'create', 'store', 'show']);
+    ->only(['index', 'create', 'store', 'show', 'edit', 'update']);
+Route::patch('/people/{person}/deactivate', [PersonController::class, 'deactivate'])
+    ->name('people.deactivate');
 
 Route::get('/people/{person}/identifiers/create', [PersonIdentifierController::class, 'create'])
     ->name('people.identifiers.create');
