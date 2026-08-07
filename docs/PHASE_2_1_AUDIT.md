@@ -1,67 +1,93 @@
 # Auditoria técnica — Fase 2.1
 
-Status: em execução  
+Status: validação final em andamento  
 Branch de trabalho: `feature/phase-2-1-elite`  
 Origem preservada: `backup/claude-phase-2-1-wip`
 
 ## Objetivo
 
-Concluir a fundação de organizações, unidades e pessoas sem quebrar o MVP de cenários, mantendo documentos opcionais, papéis contextuais, UUID público separado da chave interna e proteção realista de dados pessoais.
+Consolidar a fundação de organizações, unidades e pessoas sem quebrar o MVP de cenários, mantendo cadastro progressivo, documentos opcionais, papéis contextuais, UUID público separado da chave interna e proteção realista de dados pessoais.
 
-## Estado encontrado
+## Entregas consolidadas
 
-O trabalho parcial contém oito migrations, oito models, documentação de arquitetura, alterações amplas no fluxo de cenários e uma base visual relevante. A implementação ainda não contém o fluxo completo de pessoas, busca universal, requests, controllers, telas, prevenção de duplicidades e testes específicos da Fase 2.1.
+### Fundação institucional
 
-## Classificação inicial
+- organizações com criação, edição e inativação sem exclusão histórica;
+- unidades hierárquicas com proteção contra autorreferência e ciclos;
+- pessoas globais com cadastro mínimo válido;
+- vínculos institucionais múltiplos e encerramento histórico;
+- papéis contextuais por organização, com revogação preservada;
+- UUID público separado do `id` interno.
 
-| Área | Situação | Decisão |
-|---|---|---|
-| Plano de expansão | consistente como direção | APROVEITAR e atualizar conforme a implementação real |
-| Curadoria visual | útil, porém ainda conceitual | APROVEITAR com validação de licença e uso efetivo |
-| Migrations de organizações e unidades | base adequada | CORRIGIR detalhes de integridade e testar rollback |
-| Model `Organization` | geração manual de UUID correta, mas duplicada | REFACTOR para concern reutilizável |
-| Models `Unit` e `Person` | usavam `HasUuids` com PK BIGINT | CORRIGIR imediatamente |
-| Identificadores pessoais | valor bruto e normalizado em texto simples | REESCREVER estratégia antes de uso real |
-| Restrição única de documentos | conflita com duplicidade não bloqueante | CORRIGIR |
-| Escopo institucional | descrito, mas não implementado | BLOQUEADOR para produção multi-institucional |
-| Auditoria | model e migration iniciais | CORRIGIR para sanitizar PII e admitir ator nulo |
-| Alterações em cenários | extensas e misturadas ao incremento | AUDITAR antes de integrar |
-| Testes da Fase 2.1 | ausentes | IMPLEMENTAR |
+### Dados pessoais
 
-## Correções já iniciadas
+- identificadores e contatos armazenados de forma criptografada;
+- fingerprints HMAC pesquisáveis com chave dedicada;
+- máscaras para exibição;
+- busca exata por fingerprint e parcial apenas por nomes;
+- duplicidade supervisionada, sem mesclagem automática;
+- migration incremental para estruturas legadas;
+- fallback de chave permitido apenas em desenvolvimento e testes.
 
-1. Criada a trait `App\Models\Concerns\HasPublicUuid`.
-2. `Organization`, `Unit` e `Person` passaram a usar UUID público separado de `id`.
-3. Mantido `id` BIGINT autoincremental para relações internas.
-4. Criados testes de fundação para UUID, chave primária e cadastro de pessoa sem documento.
+### Integridade e auditoria
 
-## Riscos críticos
+- criação de pessoa, vínculo, papel, contato e documento auditada;
+- atualização e inativação de pessoa, organização e unidade auditada;
+- encerramento de vínculo e revogação de papel auditados;
+- payload de auditoria sanitizado para não copiar PII e textos livres;
+- troca de contato principal realizada em transação;
+- encerramento de vínculo e revogação contextual de papéis em transação;
+- ações repetidas de inativação, encerramento e revogação tratadas de forma idempotente.
 
-### PII pesquisável
+### Interface
 
-`person_identifiers.value_normalized` não deve guardar CPF ou RG integral em texto simples apenas para facilitar busca. A implementação será revisada para separar valor protegido, impressão digital determinística e exibição mascarada.
+- fluxo Blade + Alpine responsivo;
+- ficha operacional da pessoa com ações diretas;
+- estados ativo, incompleto, inativo, encerrado e revogado claramente diferenciados;
+- gestão institucional de organizações, unidades, vínculos e papéis;
+- identidade visual institucional clara, sem estética de jogo.
 
-### Duplicidade
+## Catálogo de papéis e habilidades
 
-A regra de negócio exige aviso e decisão humana. Um índice único rígido não pode ser a única proteção porque impediria a criação consciente de um novo registro em casos legítimos.
+Papéis e habilidades aceitos são definidos no backend e reutilizados pela interface. Habilidades arbitrárias enviadas manualmente são rejeitadas pela validação. Um papel só pode ser concedido quando existe vínculo ativo e sem data de encerramento com a organização.
 
-### Pessoa global
+## Estado de validação
 
-Sem autenticação, autorização e escopo institucional completo, a Fase 2.1 pode ser usada para desenvolvimento e homologação, mas não deve ser tratada como pronta para produção multi-institucional.
+O workflow do GitHub Actions executa:
 
-### Mistura de escopo
+1. Laravel Pint;
+2. instalação e build Vite;
+3. migrations;
+4. PHPUnit em PHP 8.4.
 
-O commit parcial também altera fortemente cenários, dashboard, landing e layouts. Essas mudanças serão mantidas apenas se os testes de regressão e a auditoria funcional demonstrarem que pertencem ao incremento e não degradam o MVP.
+O Pull Request deve permanecer em draft até o último commit concluir todos os checks com sucesso.
 
-## Próximos blocos
+## Limitação crítica ainda aberta
 
-1. Revisar todas as migrations e models.
-2. Corrigir a estratégia de PII e normalização.
-3. Implementar factories, requests, services e policies mínimas.
-4. Implementar cadastro rápido e progressivo.
-5. Implementar busca universal segura.
-6. Implementar detecção não bloqueante de duplicidades.
-7. Implementar interface Blade + Alpine responsiva.
-8. Ampliar testes de segurança e regressão.
-9. Atualizar documentação e roteiro manual.
-10. Manter Pull Request em draft até build e testes verdes.
+A aplicação ainda não possui autenticação de usuários nem resolução de organização ativa por sessão. Consequentemente:
+
+- não existe autorização institucional completa;
+- os `FormRequest::authorize()` permanecem permissivos;
+- não há garantia de isolamento multi-institucional baseada em usuário autenticado;
+- o sistema não deve ser classificado como pronto para produção multi-institucional.
+
+Essa limitação não é mascarada por filtros de formulário ou validações de relacionamento. A próxima fase deve implementar autenticação, associação usuário-pessoa, contexto institucional ativo, policies e testes de acesso cruzado antes da publicação com dados reais.
+
+## Critérios de fechamento da Fase 2.1
+
+- [x] cadastro progressivo de pessoas;
+- [x] organizações e unidades;
+- [x] documentos e contatos protegidos;
+- [x] busca universal segura;
+- [x] duplicidade supervisionada;
+- [x] vínculos e papéis contextuais;
+- [x] edição, inativação e encerramento histórico;
+- [x] auditoria sanitizada;
+- [x] testes automatizados dos fluxos implementados;
+- [ ] último commit com CI totalmente verde;
+- [ ] revisão final do Pull Request;
+- [ ] autenticação e policies, programadas para a fase seguinte.
+
+## Decisão de implantação
+
+Permitido para desenvolvimento e homologação com dados fictícios. Não autorizado para dados pessoais reais ou operação multi-institucional até que autenticação, autorização e isolamento por organização sejam concluídos e testados.
