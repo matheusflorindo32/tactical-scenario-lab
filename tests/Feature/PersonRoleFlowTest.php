@@ -39,6 +39,25 @@ class PersonRoleFlowTest extends TestCase
         $this->assertNull($role->revoked_at);
     }
 
+    public function test_role_rejects_unknown_or_malformed_abilities(): void
+    {
+        [$organization, $person] = $this->context();
+
+        $this->post(route('people.roles.store', $person), [
+            'organization_id' => $organization->id,
+            'role' => 'viewer',
+            'abilities' => ['system.root'],
+        ])->assertSessionHasErrors('abilities.0');
+
+        $this->post(route('people.roles.store', $person), [
+            'organization_id' => $organization->id,
+            'role' => 'viewer',
+            'abilities' => 'people.view',
+        ])->assertSessionHasErrors('abilities');
+
+        $this->assertDatabaseCount('person_roles', 0);
+    }
+
     public function test_role_requires_active_membership_with_selected_organization(): void
     {
         [$organization, $person] = $this->context();
@@ -46,6 +65,19 @@ class PersonRoleFlowTest extends TestCase
 
         $this->post(route('people.roles.store', $person), [
             'organization_id' => $foreign->id,
+            'role' => 'viewer',
+        ])->assertSessionHasErrors('organization_id');
+
+        $this->assertDatabaseCount('person_roles', 0);
+    }
+
+    public function test_ended_membership_cannot_receive_new_role(): void
+    {
+        [$organization, $person] = $this->context();
+        $person->memberships()->update(['ended_at' => now()->toDateString()]);
+
+        $this->post(route('people.roles.store', $person), [
+            'organization_id' => $organization->id,
             'role' => 'viewer',
         ])->assertSessionHasErrors('organization_id');
 
