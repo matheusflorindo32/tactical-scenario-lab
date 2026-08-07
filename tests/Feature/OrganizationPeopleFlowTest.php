@@ -120,6 +120,6 @@ class OrganizationPeopleFlowTest extends TestCase
         $this->get(route('people.show', $person))
             ->assertOk()
             ->assertDontSee('TMA-SECRET1')
-            ->assertSee('T*********T1');
+            ->assertSee('T********T1');
     }
 }
