@@ -25,7 +25,14 @@ abstract class TestCase extends BaseTestCase
                         'role' => 'legacy_test_manager',
                     ],
                     [
-                        'abilities' => ['people.view', 'people.manage'],
+                        'abilities' => [
+                            'people.view',
+                            'people.manage',
+                            'scenarios.view',
+                            'scenarios.manage',
+                            'evaluations.manage',
+                            'reports.view',
+                        ],
                         'granted_at' => now(),
                     ],
                 );
