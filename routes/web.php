@@ -42,7 +42,7 @@ Route::get('/dashboard', function () {
             ->sortDesc()
             ->take(4),
     ]);
-})->name('dashboard');
+})->middleware('auth')->name('dashboard');
 
 Route::resource('organizations', OrganizationController::class)
     ->only(['index', 'create', 'store', 'show', 'edit', 'update']);
