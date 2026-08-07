@@ -8,33 +8,43 @@ use App\Models\OrganizationMembership;
 use App\Models\Person;
 use App\Models\Unit;
 use App\Services\Audit\AuditLogger;
+use App\Services\Auth\ActiveOrganization;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class OrganizationMembershipController extends Controller
 {
-    public function create(Person $person): View
+    public function create(Request $request, Person $person, ActiveOrganization $activeOrganization): View
     {
+        $organizationId = $activeOrganization->ensurePerson($request, $person);
+
         $organizations = Organization::query()
+            ->whereKey($organizationId)
             ->where('status', 'active')
             ->with(['units' => fn ($query) => $query->where('status', 'active')->orderBy('name')])
-            ->orderBy('name')
             ->get();
 
         return view('people.memberships.create', compact('person', 'organizations'));
     }
 
-    public function store(StoreOrganizationMembershipRequest $request, Person $person, AuditLogger $audit): RedirectResponse
-    {
+    public function store(
+        StoreOrganizationMembershipRequest $request,
+        Person $person,
+        AuditLogger $audit,
+        ActiveOrganization $activeOrganization,
+    ): RedirectResponse {
         $data = $request->validated();
-        $this->ensureUnitBelongsToOrganization($data['unit_id'] ?? null, (int) $data['organization_id']);
-        $this->ensureNoEquivalentActiveMembership($person, (int) $data['organization_id'], $data['unit_id'] ?? null);
+        $organizationId = $activeOrganization->ensurePerson($request, $person);
+        $activeOrganization->ensure($request, (int) $data['organization_id']);
+        $this->ensureUnitBelongsToOrganization($data['unit_id'] ?? null, $organizationId);
+        $this->ensureNoEquivalentActiveMembership($person, $organizationId, $data['unit_id'] ?? null);
 
         $membership = OrganizationMembership::create([
             'person_id' => $person->id,
-            'organization_id' => $data['organization_id'],
+            'organization_id' => $organizationId,
             'unit_id' => $data['unit_id'] ?? null,
             'position' => $data['position'] ?? null,
             'started_at' => $data['started_at'] ?? null,
@@ -43,7 +53,7 @@ class OrganizationMembershipController extends Controller
             'notes' => $data['notes'] ?? null,
         ]);
 
-        $audit->record('organization_membership.created', $membership, $membership->organization_id, [
+        $audit->record('organization_membership.created', $membership, $organizationId, [
             'person_id' => $person->id,
             'unit_id' => $membership->unit_id,
             'status' => $membership->status,
@@ -55,19 +65,26 @@ class OrganizationMembershipController extends Controller
             ->with('success', 'Novo vínculo institucional adicionado.');
     }
 
-    public function close(Person $person, OrganizationMembership $membership, AuditLogger $audit): RedirectResponse
-    {
+    public function close(
+        Request $request,
+        Person $person,
+        OrganizationMembership $membership,
+        AuditLogger $audit,
+        ActiveOrganization $activeOrganization,
+    ): RedirectResponse {
+        $organizationId = $activeOrganization->ensurePerson($request, $person);
         abort_unless($membership->person_id === $person->id, 404);
+        $activeOrganization->ensure($request, $membership->organization_id);
 
         if ($membership->isActive()) {
-            DB::transaction(function () use ($person, $membership, $audit): void {
+            DB::transaction(function () use ($request, $person, $membership, $audit, $organizationId): void {
                 $membership->update([
                     'status' => 'inactive',
                     'ended_at' => now()->toDateString(),
                 ]);
 
                 $hasAnotherActiveMembership = $person->memberships()
-                    ->where('organization_id', $membership->organization_id)
+                    ->where('organization_id', $organizationId)
                     ->whereKeyNot($membership->id)
                     ->where('status', 'active')
                     ->whereNull('ended_at')
@@ -77,17 +94,17 @@ class OrganizationMembershipController extends Controller
 
                 if (! $hasAnotherActiveMembership) {
                     $revokedRoles = $person->roles()
-                        ->where('organization_id', $membership->organization_id)
+                        ->where('organization_id', $organizationId)
                         ->whereNull('revoked_at')
                         ->update(['revoked_at' => now()]);
                 }
 
-                $audit->record('organization_membership.closed', $membership, $membership->organization_id, [
+                $audit->record('organization_membership.closed', $membership, $organizationId, [
                     'person_id' => $person->id,
                     'unit_id' => $membership->unit_id,
                     'status' => 'inactive',
                     'roles_revoked' => $revokedRoles,
-                ]);
+                ], $request);
             });
         }
 
@@ -105,11 +122,12 @@ class OrganizationMembershipController extends Controller
         $valid = Unit::query()
             ->whereKey($unitId)
             ->where('organization_id', $organizationId)
+            ->where('status', 'active')
             ->exists();
 
         if (! $valid) {
             throw ValidationException::withMessages([
-                'unit_id' => 'A unidade selecionada não pertence à organização informada.',
+                'unit_id' => 'A unidade selecionada precisa estar ativa e pertencer à organização atual.',
             ]);
         }
     }
