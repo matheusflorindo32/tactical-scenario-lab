@@ -39,7 +39,7 @@ class User extends Authenticatable
     public function activeOrganizationAccesses(): HasMany
     {
         return $this->organizationAccesses()
-            ->whereNull('revoked_at')
+            ->currentlyValid()
             ->whereHas('organization', fn ($query) => $query->where('status', 'active'));
     }
 
