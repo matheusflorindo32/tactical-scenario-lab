@@ -7,30 +7,40 @@ use App\Models\Organization;
 use App\Models\Person;
 use App\Models\PersonIdentifier;
 use App\Services\Audit\AuditLogger;
+use App\Services\Auth\ActiveOrganization;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class PersonIdentifierController extends Controller
 {
-    public function create(Person $person): View
+    public function create(Request $request, Person $person, ActiveOrganization $activeOrganization): View
     {
+        $organizationId = $activeOrganization->ensurePerson($request, $person, true);
+
         $organizations = Organization::query()
-            ->whereHas('memberships', fn ($query) => $query->where('person_id', $person->id))
-            ->orderBy('name')
+            ->whereKey($organizationId)
+            ->where('status', 'active')
             ->get();
 
         return view('people.identifiers.create', compact('person', 'organizations'));
     }
 
-    public function store(StorePersonIdentifierRequest $request, Person $person, AuditLogger $audit): RedirectResponse
-    {
+    public function store(
+        StorePersonIdentifierRequest $request,
+        Person $person,
+        AuditLogger $audit,
+        ActiveOrganization $activeOrganization,
+    ): RedirectResponse {
         $data = $request->validated();
-        $this->ensurePersonBelongsToOrganization($person, (int) $data['organization_id']);
+        $organizationId = $activeOrganization->ensurePerson($request, $person, true);
+        $activeOrganization->ensure($request, (int) $data['organization_id']);
+        $this->ensurePersonBelongsToOrganization($person, $organizationId);
 
         $fingerprint = PersonIdentifier::fingerprintFor($data['type'], $data['value']);
         $duplicates = PersonIdentifier::query()
-            ->where('organization_id', $data['organization_id'])
+            ->where('organization_id', $organizationId)
             ->where('type', $data['type'])
             ->where('value_fingerprint', $fingerprint)
             ->where('person_id', '!=', $person->id)
@@ -45,13 +55,13 @@ class PersonIdentifierController extends Controller
 
         if ($data['is_primary'] ?? false) {
             $person->identifiers()
-                ->where('organization_id', $data['organization_id'])
+                ->where('organization_id', $organizationId)
                 ->where('type', $data['type'])
                 ->update(['is_primary' => false]);
         }
 
         $identifier = $person->identifiers()->create([
-            'organization_id' => $data['organization_id'],
+            'organization_id' => $organizationId,
             'type' => $data['type'],
             'value' => $data['value'],
             'issuer' => $data['issuer'] ?? null,
@@ -62,7 +72,7 @@ class PersonIdentifierController extends Controller
             'notes' => $data['notes'] ?? null,
         ]);
 
-        $audit->record('person_identifier.created', $identifier, (int) $data['organization_id'], [
+        $audit->record('person_identifier.created', $identifier, $organizationId, [
             'person_id' => $person->id,
             'type' => $identifier->type,
             'masked_value' => $identifier->masked_value,
@@ -78,11 +88,13 @@ class PersonIdentifierController extends Controller
     {
         $belongs = $person->memberships()
             ->where('organization_id', $organizationId)
+            ->where('status', 'active')
+            ->whereNull('ended_at')
             ->exists();
 
         if (! $belongs) {
             throw ValidationException::withMessages([
-                'organization_id' => 'A pessoa não possui vínculo com a organização selecionada.',
+                'organization_id' => 'A pessoa não possui vínculo ativo com a organização selecionada.',
             ]);
         }
     }
