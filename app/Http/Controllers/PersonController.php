@@ -25,9 +25,9 @@ class PersonController extends Controller
 {
     public function index(Request $request, PersonSearch $personSearch, ActiveOrganization $activeOrganization): View
     {
+        $organizationId = $activeOrganization->ensureAbility($request, 'people.view');
         $search = trim((string) $request->query('q'));
         $status = $request->query('status');
-        $organizationId = $activeOrganization->id($request);
 
         $query = Person::query()
             ->whereHas('memberships', fn (Builder $membership) => $membership->where('organization_id', $organizationId))
@@ -53,7 +53,7 @@ class PersonController extends Controller
 
     public function create(Request $request, ActiveOrganization $activeOrganization): View
     {
-        $organizationId = $activeOrganization->id($request);
+        $organizationId = $activeOrganization->ensureAbility($request, 'people.manage');
         $organizations = Organization::query()
             ->whereKey($organizationId)
             ->where('status', 'active')
@@ -66,10 +66,11 @@ class PersonController extends Controller
     public function store(StorePersonRequest $request, ActiveOrganization $activeOrganization): RedirectResponse
     {
         $data = $request->validated();
+        $organizationId = $activeOrganization->ensureAbility($request, 'people.manage');
         $activeOrganization->ensure($request, (int) $data['organization_id']);
-        $this->ensureUnitBelongsToOrganization($data['unit_id'] ?? null, (int) $data['organization_id']);
+        $this->ensureUnitBelongsToOrganization($data['unit_id'] ?? null, $organizationId);
 
-        $person = DB::transaction(function () use ($data): Person {
+        $person = DB::transaction(function () use ($data, $organizationId): Person {
             $person = Person::create([
                 'display_name' => $data['display_name'],
                 'social_name' => $data['social_name'] ?? null,
@@ -80,7 +81,7 @@ class PersonController extends Controller
 
             OrganizationMembership::create([
                 'person_id' => $person->id,
-                'organization_id' => $data['organization_id'],
+                'organization_id' => $organizationId,
                 'unit_id' => $data['unit_id'] ?? null,
                 'position' => $data['position'] ?? null,
                 'status' => 'active',
@@ -89,14 +90,14 @@ class PersonController extends Controller
 
             PersonRole::create([
                 'person_id' => $person->id,
-                'organization_id' => $data['organization_id'],
+                'organization_id' => $organizationId,
                 'role' => $data['role'],
                 'granted_at' => now(),
             ]);
 
             PersonIdentifier::create([
                 'person_id' => $person->id,
-                'organization_id' => $data['organization_id'],
+                'organization_id' => $organizationId,
                 'type' => 'temp_code',
                 'value' => $this->generateTemporaryCode(),
                 'is_primary' => true,
@@ -108,7 +109,7 @@ class PersonController extends Controller
         app(AuditLogger::class)->record(
             'person.created',
             $person,
-            (int) $data['organization_id'],
+            $organizationId,
             ['status' => $person->status, 'initial_role' => $data['role']],
             $request,
         );
@@ -120,7 +121,8 @@ class PersonController extends Controller
 
     public function show(Request $request, Person $person, ActiveOrganization $activeOrganization): View
     {
-        $organizationId = $this->ensurePersonInActiveOrganization($request, $person, $activeOrganization);
+        $organizationId = $activeOrganization->ensureAbility($request, 'people.view');
+        $activeOrganization->ensurePerson($request, $person);
 
         $person->load([
             'identifiers' => fn ($query) => $query->where('organization_id', $organizationId)->orderByDesc('is_primary')->orderBy('type'),
@@ -137,7 +139,8 @@ class PersonController extends Controller
 
     public function edit(Request $request, Person $person, ActiveOrganization $activeOrganization): View
     {
-        $this->ensurePersonInActiveOrganization($request, $person, $activeOrganization);
+        $activeOrganization->ensureAbility($request, 'people.manage');
+        $activeOrganization->ensurePerson($request, $person);
 
         return view('people.edit', compact('person'));
     }
@@ -147,7 +150,8 @@ class PersonController extends Controller
         Person $person,
         ActiveOrganization $activeOrganization,
     ): RedirectResponse {
-        $organizationId = $this->ensurePersonInActiveOrganization($request, $person, $activeOrganization);
+        $organizationId = $activeOrganization->ensureAbility($request, 'people.manage');
+        $activeOrganization->ensurePerson($request, $person);
         $before = $person->only(['display_name', 'social_name', 'birth_date', 'status', 'notes']);
         $person->update($request->validated());
 
@@ -179,7 +183,8 @@ class PersonController extends Controller
         Person $person,
         ActiveOrganization $activeOrganization,
     ): RedirectResponse {
-        $organizationId = $this->ensurePersonInActiveOrganization($request, $person, $activeOrganization);
+        $organizationId = $activeOrganization->ensureAbility($request, 'people.manage');
+        $activeOrganization->ensurePerson($request, $person);
 
         if ($person->status !== 'inactive') {
             $previousStatus = $person->status;
@@ -197,22 +202,6 @@ class PersonController extends Controller
         return redirect()
             ->route('people.show', $person)
             ->with('success', 'Pessoa inativada sem exclusão do histórico.');
-    }
-
-    private function ensurePersonInActiveOrganization(
-        Request $request,
-        Person $person,
-        ActiveOrganization $activeOrganization,
-    ): int {
-        $organizationId = $activeOrganization->id($request);
-
-        abort_unless(
-            $person->memberships()->where('organization_id', $organizationId)->exists(),
-            403,
-            'A pessoa solicitada não pertence à organização ativa.',
-        );
-
-        return $organizationId;
     }
 
     private function ensureUnitBelongsToOrganization(?int $unitId, int $organizationId): void
