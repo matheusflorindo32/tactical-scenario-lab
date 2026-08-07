@@ -1,5 +1,11 @@
 <?php
 
+$environment = env('APP_ENV', 'production');
+$dedicatedKey = env('PII_FINGERPRINT_KEY');
+$localFallback = in_array($environment, ['local', 'testing'], true)
+    ? env('APP_KEY')
+    : null;
+
 return [
     /*
     |--------------------------------------------------------------------------
@@ -11,8 +17,9 @@ return [
     | tornaria fingerprints existentes inutilizáveis para busca e duplicidade.
     |
     | Em desenvolvimento e testes, APP_KEY permanece como fallback para não
-    | bloquear instalações locais. Em produção, defina PII_FINGERPRINT_KEY.
+    | bloquear instalações locais. Em produção, PII_FINGERPRINT_KEY é
+    | obrigatória e a ausência da chave interrompe a operação de forma segura.
     |
     */
-    'fingerprint_key' => env('PII_FINGERPRINT_KEY', env('APP_KEY')),
+    'fingerprint_key' => $dedicatedKey ?: $localFallback,
 ];
