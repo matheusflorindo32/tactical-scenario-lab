@@ -9,8 +9,9 @@
                 <h1 class="mt-2 font-display text-3xl font-semibold tracking-tight text-navy-950">{{ $organization->name }}</h1>
                 <p class="mt-2 text-sm text-ink-500">{{ ucfirst(str_replace('_', ' ', $organization->kind)) }} · Código público {{ Str::limit($organization->uuid, 13, '…') }}</p>
             </div>
-            <div class="flex gap-3">
+            <div class="flex flex-wrap gap-3">
                 <x-button href="{{ route('people.create', ['organization_id' => $organization->id]) }}">Cadastrar pessoa</x-button>
+                <x-button href="{{ route('organizations.units.create', $organization) }}" variant="secondary">Nova unidade</x-button>
                 <x-button href="{{ route('organizations.index') }}" variant="secondary">Voltar</x-button>
             </div>
         </div>
@@ -28,11 +29,17 @@
                         <div>
                             <p class="font-semibold text-navy-950">{{ $unit->name }}</p>
                             <p class="mt-1 text-sm text-ink-500">{{ ucfirst(str_replace('_', ' ', $unit->kind)) }}</p>
+                            @if ($unit->parent)
+                                <p class="mt-1 text-xs text-ink-400">Vinculada a {{ $unit->parent->name }}</p>
+                            @endif
                         </div>
                         <span class="rounded-full bg-navy-50 px-2.5 py-1 text-xs font-medium text-navy-800">{{ $unit->status === 'active' ? 'Ativa' : 'Inativa' }}</span>
                     </div>
                 @empty
-                    <p class="py-8 text-center text-sm text-ink-500">Nenhuma unidade cadastrada nesta etapa.</p>
+                    <div class="py-8 text-center">
+                        <p class="text-sm text-ink-500">Nenhuma unidade cadastrada.</p>
+                        <div class="mt-4"><x-button href="{{ route('organizations.units.create', $organization) }}" variant="secondary">Cadastrar primeira unidade</x-button></div>
+                    </div>
                 @endforelse
             </div>
         </section>
