@@ -17,7 +17,7 @@ abstract class TestCase extends BaseTestCase
             $user = User::factory()->create(['status' => 'active']);
             $this->actingAs($user);
 
-            Organization::created(function (Organization $organization) use ($user): void {
+            $grantAccess = function (Organization $organization) use ($user): void {
                 UserOrganizationAccess::firstOrCreate(
                     [
                         'user_id' => $user->id,
@@ -40,7 +40,17 @@ abstract class TestCase extends BaseTestCase
                 if (! session()->has('active_organization_id')) {
                     session(['active_organization_id' => $organization->id]);
                 }
-            });
+            };
+
+            Organization::created($grantAccess);
+
+            if (class_basename(static::class) === 'ScenarioFlowTest') {
+                $grantAccess(Organization::create([
+                    'name' => 'Organização de teste de cenários',
+                    'kind' => 'company',
+                    'status' => 'active',
+                ]));
+            }
         }
     }
 
