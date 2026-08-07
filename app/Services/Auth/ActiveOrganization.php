@@ -26,6 +26,23 @@ class ActiveOrganization
         }
     }
 
+    public function ensureAbility(Request $request, string $ability, ?int $organizationId = null): int
+    {
+        $organizationId ??= $this->id($request);
+        $this->ensureAccess($request, $organizationId);
+
+        $access = $request->user()
+            ->activeOrganizationAccesses()
+            ->where('organization_id', $organizationId)
+            ->first();
+
+        if (! $access || ! in_array($ability, $access->abilities ?? [], true)) {
+            throw new HttpException(403, 'O usuário não possui a habilidade necessária para esta operação.');
+        }
+
+        return $organizationId;
+    }
+
     public function ensure(Request $request, int $organizationId): void
     {
         if ($this->id($request) !== $organizationId) {
