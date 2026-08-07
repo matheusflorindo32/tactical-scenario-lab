@@ -17,15 +17,19 @@ class PersonRoleController extends Controller
     {
         $organizationIds = $person->memberships()
             ->where('status', 'active')
+            ->whereNull('ended_at')
             ->pluck('organization_id');
 
-        $organizations = Organization::query()
-            ->whereIn('id', $organizationIds)
-            ->where('status', 'active')
-            ->orderBy('name')
-            ->get();
-
-        return view('people.roles.create', compact('person', 'organizations'));
+        return view('people.roles.create', [
+            'person' => $person,
+            'organizations' => Organization::query()
+                ->whereIn('id', $organizationIds)
+                ->where('status', 'active')
+                ->orderBy('name')
+                ->get(),
+            'roleOptions' => StorePersonRoleRequest::ROLE_OPTIONS,
+            'abilityOptions' => StorePersonRoleRequest::ABILITY_OPTIONS,
+        ]);
     }
 
     public function store(StorePersonRoleRequest $request, Person $person, AuditLogger $audit): RedirectResponse
@@ -35,6 +39,7 @@ class PersonRoleController extends Controller
         $hasMembership = $person->memberships()
             ->where('organization_id', $data['organization_id'])
             ->where('status', 'active')
+            ->whereNull('ended_at')
             ->exists();
 
         if (! $hasMembership) {
@@ -60,7 +65,7 @@ class PersonRoleController extends Controller
             'person_id' => $person->id,
             'organization_id' => $data['organization_id'],
             'role' => $data['role'],
-            'abilities' => array_values(array_unique($data['abilities'] ?? [])),
+            'abilities' => $data['abilities'] ?? [],
             'granted_at' => now(),
             'notes' => $data['notes'] ?? null,
         ]);
