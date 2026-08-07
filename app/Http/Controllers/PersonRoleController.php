@@ -37,7 +37,7 @@ class PersonRoleController extends Controller
         ActiveOrganization $activeOrganization,
     ): RedirectResponse {
         $data = $request->validated();
-        $organizationId = $activeOrganization->ensurePerson($request, $person, true);
+        $organizationId = $activeOrganization->ensurePerson($request, $person);
         $activeOrganization->ensure($request, (int) $data['organization_id']);
 
         $hasMembership = $person->memberships()
@@ -92,8 +92,8 @@ class PersonRoleController extends Controller
         AuditLogger $audit,
         ActiveOrganization $activeOrganization,
     ): RedirectResponse {
-        $activeOrganization->ensurePerson($request, $person);
         abort_unless($role->person_id === $person->id, 404);
+        $activeOrganization->ensurePerson($request, $person);
         $activeOrganization->ensure($request, $role->organization_id);
 
         if ($role->revoked_at === null) {
