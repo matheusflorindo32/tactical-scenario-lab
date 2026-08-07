@@ -6,14 +6,21 @@ use App\Http\Requests\StoreOrganizationRequest;
 use App\Http\Requests\UpdateOrganizationRequest;
 use App\Models\Organization;
 use App\Services\Audit\AuditLogger;
+use App\Services\Auth\ActiveOrganization;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class OrganizationController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
+        $organizationIds = $request->user()
+            ->activeOrganizationAccesses()
+            ->pluck('organization_id');
+
         $organizations = Organization::query()
+            ->whereIn('id', $organizationIds)
             ->withCount(['units', 'memberships'])
             ->orderBy('name')
             ->paginate(15);
@@ -46,8 +53,10 @@ class OrganizationController extends Controller
             ->with('success', 'Organização cadastrada com sucesso.');
     }
 
-    public function show(Organization $organization): View
+    public function show(Request $request, Organization $organization, ActiveOrganization $activeOrganization): View
     {
+        $activeOrganization->ensure($request, $organization->id);
+
         $organization->load([
             'units' => fn ($query) => $query->orderBy('name'),
             'memberships.person',
@@ -56,8 +65,10 @@ class OrganizationController extends Controller
         return view('organizations.show', compact('organization'));
     }
 
-    public function edit(Organization $organization): View
+    public function edit(Request $request, Organization $organization, ActiveOrganization $activeOrganization): View
     {
+        $activeOrganization->ensure($request, $organization->id);
+
         return view('organizations.edit', compact('organization'));
     }
 
@@ -65,7 +76,10 @@ class OrganizationController extends Controller
         UpdateOrganizationRequest $request,
         Organization $organization,
         AuditLogger $audit,
+        ActiveOrganization $activeOrganization,
     ): RedirectResponse {
+        $activeOrganization->ensure($request, $organization->id);
+
         $before = $organization->only(['kind', 'status']);
         $organization->update($request->validated());
 
@@ -89,9 +103,13 @@ class OrganizationController extends Controller
     }
 
     public function deactivate(
+        Request $request,
         Organization $organization,
         AuditLogger $audit,
+        ActiveOrganization $activeOrganization,
     ): RedirectResponse {
+        $activeOrganization->ensure($request, $organization->id);
+
         if ($organization->status !== 'inactive') {
             $organization->update(['status' => 'inactive']);
 
@@ -100,6 +118,7 @@ class OrganizationController extends Controller
                 $organization,
                 $organization->id,
                 ['status' => 'inactive'],
+                $request,
             );
         }
 
