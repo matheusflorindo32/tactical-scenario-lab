@@ -3,12 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StorePersonRequest;
+use App\Http\Requests\UpdatePersonRequest;
 use App\Models\Organization;
 use App\Models\OrganizationMembership;
 use App\Models\Person;
 use App\Models\PersonIdentifier;
 use App\Models\PersonRole;
 use App\Models\Unit;
+use App\Services\Audit\AuditLogger;
 use App\Services\People\PersonSearch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -100,6 +102,14 @@ class PersonController extends Controller
             return $person;
         });
 
+        app(AuditLogger::class)->record(
+            'person.created',
+            $person,
+            (int) $data['organization_id'],
+            ['status' => $person->status, 'initial_role' => $data['role']],
+            $request,
+        );
+
         return redirect()
             ->route('people.show', $person)
             ->with('success', 'Pessoa cadastrada. Documentos e contatos podem ser completados depois.');
@@ -116,6 +126,58 @@ class PersonController extends Controller
         ]);
 
         return view('people.show', compact('person'));
+    }
+
+    public function edit(Person $person): View
+    {
+        return view('people.edit', compact('person'));
+    }
+
+    public function update(UpdatePersonRequest $request, Person $person): RedirectResponse
+    {
+        $before = $person->only(['display_name', 'social_name', 'birth_date', 'status', 'notes']);
+        $person->update($request->validated());
+
+        $changedFields = collect($person->getChanges())
+            ->keys()
+            ->reject(fn (string $field) => $field === 'updated_at')
+            ->values()
+            ->all();
+
+        app(AuditLogger::class)->record(
+            'person.updated',
+            $person,
+            $person->memberships()->value('organization_id'),
+            [
+                'changed_fields' => $changedFields,
+                'previous_status' => $before['status'],
+                'current_status' => $person->status,
+            ],
+            $request,
+        );
+
+        return redirect()
+            ->route('people.show', $person)
+            ->with('success', 'Cadastro atualizado com sucesso.');
+    }
+
+    public function deactivate(Person $person): RedirectResponse
+    {
+        if ($person->status !== 'inactive') {
+            $previousStatus = $person->status;
+            $person->update(['status' => 'inactive']);
+
+            app(AuditLogger::class)->record(
+                'person.deactivated',
+                $person,
+                $person->memberships()->value('organization_id'),
+                ['previous_status' => $previousStatus, 'current_status' => 'inactive'],
+            );
+        }
+
+        return redirect()
+            ->route('people.show', $person)
+            ->with('success', 'Pessoa inativada sem exclusão do histórico.');
     }
 
     private function ensureUnitBelongsToOrganization(?int $unitId, int $organizationId): void
