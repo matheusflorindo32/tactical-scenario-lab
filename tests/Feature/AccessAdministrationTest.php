@@ -228,6 +228,70 @@ class AccessAdministrationTest extends TestCase
         $this->assertSame([AccessAbility::PEOPLE_VIEW], $externalAccess->fresh()->abilities);
     }
 
+    public function test_access_manager_can_deactivate_and_reactivate_exclusive_account_with_audit(): void
+    {
+        $organization = Organization::create(['name' => 'Organização Exclusiva', 'status' => 'active']);
+        $admin = User::factory()->create(['status' => 'active']);
+        $target = User::factory()->create(['status' => 'active']);
+        $this->grant($admin, $organization, 'access_manager', [AccessAbility::ACCESS_MANAGE]);
+        $this->grant($target, $organization, 'operator', [AccessAbility::PEOPLE_VIEW]);
+
+        $this->asAdmin($admin, $organization)
+            ->patch(route('access.accounts.deactivate', $target))
+            ->assertRedirect(route('access.index'));
+
+        $this->assertSame('inactive', $target->fresh()->status);
+        $this->assertTrue(AuditLog::query()->where('action', 'account.deactivated')->exists());
+
+        $this->asAdmin($admin, $organization)
+            ->patch(route('access.accounts.reactivate', $target))
+            ->assertRedirect(route('access.index'));
+
+        $this->assertSame('active', $target->fresh()->status);
+        $this->assertTrue(AuditLog::query()->where('action', 'account.reactivated')->exists());
+    }
+
+    public function test_account_with_active_grant_in_another_organization_cannot_be_globally_changed(): void
+    {
+        $organizationA = Organization::create(['name' => 'Organização A', 'status' => 'active']);
+        $organizationB = Organization::create(['name' => 'Organização B', 'status' => 'active']);
+        $admin = User::factory()->create(['status' => 'active']);
+        $target = User::factory()->create(['status' => 'active']);
+        $this->grant($admin, $organizationA, 'access_manager', [AccessAbility::ACCESS_MANAGE]);
+        $this->grant($target, $organizationA, 'operator', [AccessAbility::PEOPLE_VIEW]);
+        $this->grant($target, $organizationB, 'operator', [AccessAbility::SCENARIOS_VIEW]);
+
+        $this->asAdmin($admin, $organizationA)
+            ->patch(route('access.accounts.deactivate', $target))
+            ->assertSessionHasErrors('account');
+
+        $this->assertSame('active', $target->fresh()->status);
+    }
+
+    public function test_admin_cannot_deactivate_self_or_leave_organization_without_active_admin_user(): void
+    {
+        $organization = Organization::create(['name' => 'Organização Guardada', 'status' => 'active']);
+        $admin = User::factory()->create(['status' => 'active']);
+        $backupAdmin = User::factory()->create(['status' => 'inactive']);
+        $this->grant($admin, $organization, 'access_manager', [AccessAbility::ACCESS_MANAGE]);
+        $this->grant($backupAdmin, $organization, 'access_manager_backup', [AccessAbility::ACCESS_MANAGE]);
+
+        $this->asAdmin($admin, $organization)
+            ->patch(route('access.accounts.deactivate', $admin))
+            ->assertSessionHasErrors('account');
+
+        $this->assertSame('active', $admin->fresh()->status);
+
+        $operatorAdmin = User::factory()->create(['status' => 'active']);
+        $operatorAccess = $this->grant($operatorAdmin, $organization, 'access_manager_secondary', [AccessAbility::ACCESS_MANAGE]);
+
+        $this->asAdmin($admin, $organization)
+            ->patch(route('access.revoke', $operatorAccess))
+            ->assertRedirect(route('access.index'));
+
+        $this->assertNotNull($operatorAccess->fresh()->revoked_at);
+    }
+
     private function grant(User $user, Organization $organization, string $role, array $abilities): UserOrganizationAccess
     {
         return UserOrganizationAccess::create([
