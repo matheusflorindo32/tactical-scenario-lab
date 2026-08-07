@@ -80,6 +80,7 @@ class ScenarioAbilityAuthorizationTest extends TestCase
         ]);
 
         $scenario = Scenario::create([
+            'organization_id' => $organization->id,
             'title' => 'Cenário de autorização',
             'environment' => 'Ambiente urbano',
             'threat_level' => 'potencial',
