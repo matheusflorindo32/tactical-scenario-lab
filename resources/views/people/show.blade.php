@@ -8,7 +8,7 @@
                 <div class="min-w-0">
                     <div class="flex flex-wrap items-center gap-2">
                         <span class="rounded-full px-2.5 py-1 text-xs font-medium {{ $person->status === 'active' ? 'bg-clinical-50 text-clinical-800' : 'bg-alert-50 text-alert-800' }}">
-                            {{ $person->status === 'active' ? 'Ativo' : 'Cadastro mínimo válido' }}
+                            {{ $person->status === 'active' ? 'Ativo' : ($person->status === 'inactive' ? 'Inativo' : 'Cadastro mínimo válido') }}
                         </span>
                         <span class="text-xs text-ink-400">UUID {{ Str::limit($person->uuid, 13, '…') }}</span>
                     </div>
@@ -18,7 +18,10 @@
                     @endif
                 </div>
             </div>
-            <x-button href="{{ route('people.index') }}" variant="secondary">Voltar para pessoas</x-button>
+            <div class="flex flex-wrap gap-3">
+                <x-button href="{{ route('people.edit', $person) }}" variant="secondary">Editar dados gerais</x-button>
+                <x-button href="{{ route('people.index') }}" variant="secondary">Voltar para pessoas</x-button>
+            </div>
         </div>
     </x-slot:header>
 
@@ -53,12 +56,15 @@
             </section>
 
             <section class="rounded-2xl border border-ink-200 bg-white p-6 shadow-sm">
-                <div class="flex items-center justify-between gap-4">
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h2 class="text-lg font-semibold text-navy-950">Documentos e códigos</h2>
                         <p class="mt-1 text-sm text-ink-500">Valores integrais permanecem criptografados. Esta tela mostra somente máscaras.</p>
                     </div>
-                    <span class="rounded-full bg-navy-50 px-3 py-1 text-xs font-semibold text-navy-800">{{ $person->identifiers->count() }}</span>
+                    <div class="flex items-center gap-3">
+                        <span class="rounded-full bg-navy-50 px-3 py-1 text-xs font-semibold text-navy-800">{{ $person->identifiers->count() }}</span>
+                        <x-button href="{{ route('people.identifiers.create', $person) }}" variant="secondary">Adicionar documento</x-button>
+                    </div>
                 </div>
                 <div class="mt-5 divide-y divide-ink-100">
                     @forelse ($person->identifiers as $identifier)
@@ -78,12 +84,15 @@
             </section>
 
             <section class="rounded-2xl border border-ink-200 bg-white p-6 shadow-sm">
-                <div class="flex items-center justify-between gap-4">
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h2 class="text-lg font-semibold text-navy-950">Contatos</h2>
                         <p class="mt-1 text-sm text-ink-500">Canais protegidos e vinculados ao contexto institucional.</p>
                     </div>
-                    <span class="rounded-full bg-navy-50 px-3 py-1 text-xs font-semibold text-navy-800">{{ $person->contacts->count() }}</span>
+                    <div class="flex items-center gap-3">
+                        <span class="rounded-full bg-navy-50 px-3 py-1 text-xs font-semibold text-navy-800">{{ $person->contacts->count() }}</span>
+                        <x-button href="{{ route('people.contacts.create', $person) }}" variant="secondary">Adicionar contato</x-button>
+                    </div>
                 </div>
                 <div class="mt-5 divide-y divide-ink-100">
                     @forelse ($person->contacts as $contact)
@@ -105,7 +114,10 @@
 
         <aside class="space-y-6">
             <section class="rounded-2xl border border-ink-200 bg-white p-6 shadow-sm">
-                <h2 class="text-sm font-semibold uppercase tracking-[0.14em] text-ink-500">Vínculos institucionais</h2>
+                <div class="flex items-center justify-between gap-3">
+                    <h2 class="text-sm font-semibold uppercase tracking-[0.14em] text-ink-500">Vínculos institucionais</h2>
+                    <x-button href="{{ route('people.memberships.create', $person) }}" variant="secondary">Novo vínculo</x-button>
+                </div>
                 <div class="mt-5 space-y-4">
                     @forelse ($person->memberships as $membership)
                         <div class="rounded-xl border border-ink-100 bg-ink-50/60 p-4">
@@ -122,7 +134,10 @@
             </section>
 
             <section class="rounded-2xl border border-ink-200 bg-white p-6 shadow-sm">
-                <h2 class="text-sm font-semibold uppercase tracking-[0.14em] text-ink-500">Papéis contextuais</h2>
+                <div class="flex items-center justify-between gap-3">
+                    <h2 class="text-sm font-semibold uppercase tracking-[0.14em] text-ink-500">Papéis contextuais</h2>
+                    <x-button href="{{ route('people.roles.create', $person) }}" variant="secondary">Novo papel</x-button>
+                </div>
                 <div class="mt-4 flex flex-wrap gap-2">
                     @forelse ($person->roles as $role)
                         <span class="rounded-full bg-navy-50 px-3 py-1.5 text-xs font-medium text-navy-800">{{ ucfirst(str_replace('_', ' ', $role->role)) }}</span>
@@ -131,6 +146,18 @@
                     @endforelse
                 </div>
             </section>
+
+            @if ($person->status !== 'inactive')
+                <section class="rounded-2xl border border-emergency-200 bg-emergency-50 p-6">
+                    <h2 class="text-sm font-semibold uppercase tracking-[0.14em] text-emergency-800">Zona de controle</h2>
+                    <p class="mt-3 text-sm leading-6 text-emergency-800">A inativação preserva documentos, contatos, vínculos, papéis e histórico.</p>
+                    <form method="POST" action="{{ route('people.deactivate', $person) }}" class="mt-5" onsubmit="return confirm('Confirmar a inativação desta pessoa?');">
+                        @csrf
+                        @method('PATCH')
+                        <x-button type="submit" variant="danger">Inativar pessoa</x-button>
+                    </form>
+                </section>
+            @endif
 
             @if ($person->notes)
                 <section class="rounded-2xl border border-ink-200 bg-white p-6 shadow-sm">
