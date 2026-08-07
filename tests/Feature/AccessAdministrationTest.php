@@ -167,7 +167,7 @@ class AccessAdministrationTest extends TestCase
             [AccessAbility::PEOPLE_VIEW, AccessAbility::SCENARIOS_VIEW],
             $access->fresh()->abilities,
         );
-        $this->assertTrue(AuditLog::query()->where('action', 'access.abilities_updated')->exists());
+        $this->assertTrue(AuditLog::query()->where('action', 'access.updated')->exists());
 
         $this->asAdmin($admin, $organization)
             ->patch(route('access.revoke', $access))
