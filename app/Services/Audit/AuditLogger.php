@@ -10,6 +10,11 @@ use Illuminate\Support\Str;
 
 final class AuditLogger
 {
+    private const SAFE_MASK_KEYS = [
+        'masked_value',
+        'mask',
+    ];
+
     private const SENSITIVE_KEYS = [
         'value',
         'value_encrypted',
@@ -76,6 +81,10 @@ final class AuditLogger
 
     private function isSensitiveKey(string $key): bool
     {
+        if (in_array($key, self::SAFE_MASK_KEYS, true)) {
+            return false;
+        }
+
         return Arr::first(
             self::SENSITIVE_KEYS,
             fn (string $sensitive): bool => $key === $sensitive || str_contains($key, $sensitive),
