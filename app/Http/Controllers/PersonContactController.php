@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StorePersonContactRequest;
 use App\Models\Person;
 use App\Models\PersonContact;
+use App\Services\Audit\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -18,7 +19,7 @@ class PersonContactController extends Controller
         return view('people.contacts.create', compact('person'));
     }
 
-    public function store(StorePersonContactRequest $request, Person $person): RedirectResponse
+    public function store(StorePersonContactRequest $request, Person $person, AuditLogger $audit): RedirectResponse
     {
         $data = $request->validated();
         $this->ensureMembership($person, (int) $data['organization_id']);
@@ -44,7 +45,7 @@ class PersonContactController extends Controller
                 ->update(['is_primary' => false]);
         }
 
-        PersonContact::create([
+        $contact = PersonContact::create([
             'person_id' => $person->id,
             'organization_id' => $data['organization_id'],
             'type' => $data['type'],
@@ -53,6 +54,13 @@ class PersonContactController extends Controller
             'is_primary' => (bool) ($data['is_primary'] ?? false),
             'notes' => $data['notes'] ?? null,
         ]);
+
+        $audit->record('person_contact.created', $contact, (int) $data['organization_id'], [
+            'person_id' => $person->id,
+            'type' => $contact->type,
+            'masked_value' => $contact->masked_value,
+            'confirmed_duplicate' => (bool) ($data['confirmed_duplicate'] ?? false),
+        ], $request);
 
         return redirect()
             ->route('people.show', $person)
