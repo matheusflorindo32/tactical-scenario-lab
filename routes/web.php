@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\PersonController;
+use App\Http\Controllers\PersonIdentifierController;
 use App\Http\Controllers\ScenarioController;
 use App\Http\Controllers\UnitController;
 use App\Models\Scenario;
@@ -39,6 +40,11 @@ Route::post('/units', [UnitController::class, 'store'])->name('units.store');
 
 Route::resource('people', PersonController::class)
     ->only(['index', 'create', 'store', 'show']);
+
+Route::get('/people/{person}/identifiers/create', [PersonIdentifierController::class, 'create'])
+    ->name('people.identifiers.create');
+Route::post('/people/{person}/identifiers', [PersonIdentifierController::class, 'store'])
+    ->name('people.identifiers.store');
 
 Route::resource('scenarios', ScenarioController::class)
     ->only(['index', 'create', 'store', 'show']);
