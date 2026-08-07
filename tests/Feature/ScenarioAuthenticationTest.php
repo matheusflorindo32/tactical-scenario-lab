@@ -14,6 +14,7 @@ class ScenarioAuthenticationTest extends TestCase
     public function test_guest_cannot_access_scenario_workflow(): void
     {
         $scenario = Scenario::create([
+            'title' => 'Cenário protegido',
             'environment' => 'Ambiente urbano',
             'threat_level' => 'potencial',
             'casualties' => 1,
