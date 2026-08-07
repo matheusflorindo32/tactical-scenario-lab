@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\OrganizationController;
+use App\Http\Controllers\OrganizationMembershipController;
 use App\Http\Controllers\PersonContactController;
 use App\Http\Controllers\PersonController;
 use App\Http\Controllers\PersonIdentifierController;
@@ -51,6 +52,11 @@ Route::get('/people/{person}/contacts/create', [PersonContactController::class, 
     ->name('people.contacts.create');
 Route::post('/people/{person}/contacts', [PersonContactController::class, 'store'])
     ->name('people.contacts.store');
+
+Route::get('/people/{person}/memberships/create', [OrganizationMembershipController::class, 'create'])
+    ->name('people.memberships.create');
+Route::post('/people/{person}/memberships', [OrganizationMembershipController::class, 'store'])
+    ->name('people.memberships.store');
 
 Route::resource('scenarios', ScenarioController::class)
     ->only(['index', 'create', 'store', 'show']);
