@@ -29,6 +29,14 @@
                 @error('role') <p class="mt-2 text-sm text-emergency-700">{{ $message }}</p> @enderror
             </div>
 
+            <div>
+                <label for="expires_at" class="text-sm font-semibold text-navy-950">Validade do acesso</label>
+                <input id="expires_at" name="expires_at" type="datetime-local" value="{{ old('expires_at') }}"
+                    class="mt-2 w-full rounded-xl border border-ink-200 px-4 py-3 text-sm text-navy-950 outline-none transition focus:border-navy-600 focus:ring-2 focus:ring-navy-100">
+                <p class="mt-2 text-xs leading-5 text-ink-500">Opcional. Ao atingir esse horário, a concessão deixa de autorizar automaticamente sem apagar o histórico. Acessos com <span class="font-mono">access.manage</span> não podem ter expiração automática.</p>
+                @error('expires_at') <p class="mt-2 text-sm text-emergency-700">{{ $message }}</p> @enderror
+            </div>
+
             <fieldset>
                 <legend class="text-sm font-semibold text-navy-950">Habilidades</legend>
                 <div class="mt-3 grid gap-3 sm:grid-cols-2">
