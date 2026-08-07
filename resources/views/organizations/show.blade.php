@@ -10,8 +10,11 @@
                 <p class="mt-2 text-sm text-ink-500">{{ ucfirst(str_replace('_', ' ', $organization->kind)) }} · Código público {{ Str::limit($organization->uuid, 13, '…') }}</p>
             </div>
             <div class="flex flex-wrap gap-3">
-                <x-button href="{{ route('people.create', ['organization_id' => $organization->id]) }}">Cadastrar pessoa</x-button>
-                <x-button href="{{ route('organizations.units.create', $organization) }}" variant="secondary">Nova unidade</x-button>
+                @if ($organization->status === 'active')
+                    <x-button href="{{ route('people.create', ['organization_id' => $organization->id]) }}">Cadastrar pessoa</x-button>
+                    <x-button href="{{ route('organizations.units.create', $organization) }}" variant="secondary">Nova unidade</x-button>
+                @endif
+                <x-button href="{{ route('organizations.edit', $organization) }}" variant="secondary">Editar</x-button>
                 <x-button href="{{ route('organizations.index') }}" variant="secondary">Voltar</x-button>
             </div>
         </div>
@@ -38,7 +41,9 @@
                 @empty
                     <div class="py-8 text-center">
                         <p class="text-sm text-ink-500">Nenhuma unidade cadastrada.</p>
-                        <div class="mt-4"><x-button href="{{ route('organizations.units.create', $organization) }}" variant="secondary">Cadastrar primeira unidade</x-button></div>
+                        @if ($organization->status === 'active')
+                            <div class="mt-4"><x-button href="{{ route('organizations.units.create', $organization) }}" variant="secondary">Cadastrar primeira unidade</x-button></div>
+                        @endif
                     </div>
                 @endforelse
             </div>
@@ -53,6 +58,18 @@
                     <div class="flex items-center justify-between"><dt class="text-sm text-ink-500">Status</dt><dd class="font-semibold text-navy-950">{{ $organization->status === 'active' ? 'Ativa' : 'Inativa' }}</dd></div>
                 </dl>
             </section>
+
+            @if ($organization->status === 'active')
+                <section class="rounded-2xl border border-emergency-200 bg-emergency-50 p-6">
+                    <h2 class="text-sm font-semibold uppercase tracking-[0.14em] text-emergency-800">Zona de controle</h2>
+                    <p class="mt-3 text-sm leading-6 text-emergency-800">A inativação bloqueia novos cadastros neste contexto, mas preserva unidades, vínculos e histórico.</p>
+                    <form method="POST" action="{{ route('organizations.deactivate', $organization) }}" class="mt-5" onsubmit="return confirm('Confirmar a inativação desta organização?');">
+                        @csrf
+                        @method('PATCH')
+                        <x-button type="submit" variant="danger">Inativar organização</x-button>
+                    </form>
+                </section>
+            @endif
 
             @if ($organization->notes)
                 <section class="rounded-2xl border border-ink-200 bg-white p-6 shadow-sm">
