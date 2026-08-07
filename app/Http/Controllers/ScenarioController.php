@@ -15,10 +15,13 @@ class ScenarioController extends Controller
 {
     public function index(Request $request, ActiveOrganization $activeOrganization): View
     {
-        $activeOrganization->ensureAbility($request, 'scenarios.view');
+        $organizationId = $activeOrganization->ensureAbility($request, 'scenarios.view');
 
         return view('scenarios.index', [
-            'scenarios' => Scenario::latest()->paginate(10),
+            'scenarios' => Scenario::query()
+                ->where('organization_id', $organizationId)
+                ->latest()
+                ->paginate(10),
         ]);
     }
 
@@ -34,7 +37,7 @@ class ScenarioController extends Controller
         ScenarioGenerator $generator,
         ActiveOrganization $activeOrganization,
     ): RedirectResponse {
-        $activeOrganization->ensureAbility($request, 'scenarios.manage');
+        $organizationId = $activeOrganization->ensureAbility($request, 'scenarios.manage');
 
         $validated = $request->validate([
             'environment' => ['required', 'string', 'max:100'],
@@ -45,7 +48,10 @@ class ScenarioController extends Controller
             'resources.*' => ['string', 'max:80', 'distinct'],
         ]);
 
-        $scenario = Scenario::create($generator->generate($validated));
+        $scenario = Scenario::create([
+            ...$generator->generate($validated),
+            'organization_id' => $organizationId,
+        ]);
 
         return redirect()
             ->route('scenarios.show', $scenario)
@@ -57,7 +63,8 @@ class ScenarioController extends Controller
         Scenario $scenario,
         ActiveOrganization $activeOrganization,
     ): View {
-        $activeOrganization->ensureAbility($request, 'scenarios.view');
+        $organizationId = $activeOrganization->ensureAbility($request, 'scenarios.view');
+        $this->ensureScenarioInOrganization($scenario, $organizationId);
 
         return view('scenarios.show', compact('scenario'));
     }
@@ -72,7 +79,8 @@ class ScenarioController extends Controller
         Scenario $scenario,
         ActiveOrganization $activeOrganization,
     ): RedirectResponse {
-        $activeOrganization->ensureAbility($request, 'scenarios.manage');
+        $organizationId = $activeOrganization->ensureAbility($request, 'scenarios.manage');
+        $this->ensureScenarioInOrganization($scenario, $organizationId);
 
         if (! $scenario->canBeStarted()) {
             return back()->with('error', 'Este cenário não pode ser iniciado (status atual: '.$scenario->status.').');
@@ -103,7 +111,8 @@ class ScenarioController extends Controller
         Scenario $scenario,
         ActiveOrganization $activeOrganization,
     ): RedirectResponse {
-        $activeOrganization->ensureAbility($request, 'evaluations.manage');
+        $organizationId = $activeOrganization->ensureAbility($request, 'evaluations.manage');
+        $this->ensureScenarioInOrganization($scenario, $organizationId);
 
         if (! $scenario->canBeEvaluated()) {
             return back()->with('error', 'Inicie a execução antes de avaliar.');
@@ -129,5 +138,14 @@ class ScenarioController extends Controller
         });
 
         return back()->with('success', 'Avaliação registrada e cenário concluído.');
+    }
+
+    private function ensureScenarioInOrganization(Scenario $scenario, int $organizationId): void
+    {
+        abort_unless(
+            $scenario->organization_id === $organizationId,
+            403,
+            'O cenário solicitado pertence a outra organização.',
+        );
     }
 }
