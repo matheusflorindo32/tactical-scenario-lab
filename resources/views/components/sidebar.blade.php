@@ -5,16 +5,23 @@ $sections = [
     [
         'label' => 'Operação',
         'items' => [
-            ['label' => 'Painel',    'route' => 'scenarios.index', 'key' => 'dashboard',  'icon' => 'M3 12l9-9 9 9M5 10v10h14V10'],
-            ['label' => 'Cenários',  'route' => 'scenarios.index', 'key' => 'scenarios',  'icon' => 'M4 6h16M4 12h16M4 18h10'],
-            ['label' => 'Novo',      'route' => 'scenarios.create','key' => 'new',        'icon' => 'M12 5v14M5 12h14'],
+            ['label' => 'Painel', 'route' => 'dashboard', 'key' => 'dashboard', 'icon' => 'M3 12l9-9 9 9M5 10v10h14V10'],
+            ['label' => 'Cenários', 'route' => 'scenarios.index', 'key' => 'scenarios', 'icon' => 'M4 6h16M4 12h16M4 18h10'],
+            ['label' => 'Novo cenário', 'route' => 'scenarios.create', 'key' => 'new', 'icon' => 'M12 5v14M5 12h14'],
+        ],
+    ],
+    [
+        'label' => 'Gestão',
+        'items' => [
+            ['label' => 'Pessoas', 'route' => 'people.index', 'key' => 'people', 'icon' => 'M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM22 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75'],
+            ['label' => 'Organizações', 'route' => 'organizations.index', 'key' => 'organizations', 'icon' => 'M3 21h18M5 21V7l7-4 7 4v14M9 10h1M9 14h1M14 10h1M14 14h1'],
         ],
     ],
     [
         'label' => 'Documentação',
         'items' => [
-            ['label' => 'Guias',     'href'  => '#',               'key' => 'guides',     'icon' => 'M4 4h16v16H4zM4 9h16M9 4v16'],
-            ['label' => 'Referência','href'  => '#',               'key' => 'reference',  'icon' => 'M12 4v16m8-8H4'],
+            ['label' => 'Guias', 'href' => '#', 'key' => 'guides', 'icon' => 'M4 4h16v16H4zM4 9h16M9 4v16'],
+            ['label' => 'Referência', 'href' => '#', 'key' => 'reference', 'icon' => 'M12 4v16m8-8H4'],
         ],
     ],
 ];
@@ -43,7 +50,7 @@ $sections = [
                     @foreach ($section['items'] as $item)
                         @php
                             $active = $current === $item['key'];
-                            $href   = isset($item['route']) ? route($item['route']) : $item['href'];
+                            $href = isset($item['route']) ? route($item['route']) : $item['href'];
                         @endphp
                         <li>
                             <a
@@ -71,7 +78,6 @@ $sections = [
     </div>
 </aside>
 
-{{-- Overlay para drawer em mobile --}}
 <div
     x-data="{ open: false }"
     x-on:toggle-sidebar.window="open = ! open"
