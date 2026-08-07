@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreOrganizationRequest;
 use App\Models\Organization;
+use App\Services\Audit\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
@@ -24,9 +25,20 @@ class OrganizationController extends Controller
         return view('organizations.create');
     }
 
-    public function store(StoreOrganizationRequest $request): RedirectResponse
+    public function store(StoreOrganizationRequest $request, AuditLogger $audit): RedirectResponse
     {
         $organization = Organization::create($request->validated());
+
+        $audit->record(
+            'organization.created',
+            $organization,
+            $organization->id,
+            [
+                'kind' => $organization->kind,
+                'status' => $organization->status,
+            ],
+            $request,
+        );
 
         return redirect()
             ->route('organizations.show', $organization)
