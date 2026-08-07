@@ -16,6 +16,13 @@ class LoginRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'email' => Str::lower(trim((string) $this->input('email'))),
+        ]);
+    }
+
     public function rules(): array
     {
         return [
@@ -29,7 +36,7 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        $user = User::query()->where('email', Str::lower($this->string('email')->toString()))->first();
+        $user = User::query()->where('email', $this->string('email')->toString())->first();
 
         if (! $user || ! $user->isActive() || ! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
@@ -55,6 +62,6 @@ class LoginRequest extends FormRequest
 
     private function throttleKey(): string
     {
-        return Str::transliterate(Str::lower($this->string('email')->toString()).'|'.$this->ip());
+        return Str::transliterate($this->string('email')->toString().'|'.$this->ip());
     }
 }
