@@ -26,10 +26,9 @@ class InstitutionalAuditFlowTest extends TestCase
             'action' => 'organization.created',
             'subject_type' => Organization::class,
             'subject_id' => $organization->id,
-            'actor_type' => 'system',
+            'actor_type' => 'user',
         ]);
 
-        $payload = $organization->auditLogs ?? null;
         $stored = json_decode((string) \DB::table('audit_logs')->value('payload'), true);
 
         $this->assertSame('company', $stored['kind']);
@@ -56,6 +55,7 @@ class InstitutionalAuditFlowTest extends TestCase
             'action' => 'unit.created',
             'subject_type' => $unit::class,
             'subject_id' => $unit->id,
+            'actor_type' => 'user',
         ]);
 
         $stored = json_decode((string) \DB::table('audit_logs')->value('payload'), true);
