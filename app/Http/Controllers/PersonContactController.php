@@ -7,6 +7,7 @@ use App\Models\Person;
 use App\Models\PersonContact;
 use App\Services\Audit\AuditLogger;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -37,23 +38,25 @@ class PersonContactController extends Controller
                 ->with('duplicate_warning', 'Já existe um contato equivalente nesta organização. Confirme conscientemente para prosseguir sem mesclagem automática.');
         }
 
-        if ($data['is_primary'] ?? false) {
-            PersonContact::query()
-                ->where('person_id', $person->id)
-                ->where('organization_id', $data['organization_id'])
-                ->where('type', $data['type'])
-                ->update(['is_primary' => false]);
-        }
+        $contact = DB::transaction(function () use ($data, $person): PersonContact {
+            if ($data['is_primary'] ?? false) {
+                PersonContact::query()
+                    ->where('person_id', $person->id)
+                    ->where('organization_id', $data['organization_id'])
+                    ->where('type', $data['type'])
+                    ->update(['is_primary' => false]);
+            }
 
-        $contact = PersonContact::create([
-            'person_id' => $person->id,
-            'organization_id' => $data['organization_id'],
-            'type' => $data['type'],
-            'value' => $data['value'],
-            'label' => $data['label'] ?? null,
-            'is_primary' => (bool) ($data['is_primary'] ?? false),
-            'notes' => $data['notes'] ?? null,
-        ]);
+            return PersonContact::create([
+                'person_id' => $person->id,
+                'organization_id' => $data['organization_id'],
+                'type' => $data['type'],
+                'value' => $data['value'],
+                'label' => $data['label'] ?? null,
+                'is_primary' => (bool) ($data['is_primary'] ?? false),
+                'notes' => $data['notes'] ?? null,
+            ]);
+        });
 
         $audit->record('person_contact.created', $contact, (int) $data['organization_id'], [
             'person_id' => $person->id,
