@@ -28,15 +28,27 @@
             </div>
             <div class="mt-5 divide-y divide-ink-100">
                 @forelse ($organization->units as $unit)
-                    <div class="flex items-center justify-between gap-4 py-4 first:pt-0 last:pb-0">
+                    <div class="flex flex-col gap-4 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
                         <div>
-                            <p class="font-semibold text-navy-950">{{ $unit->name }}</p>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <p class="font-semibold text-navy-950">{{ $unit->name }}</p>
+                                <span class="rounded-full px-2.5 py-1 text-xs font-medium {{ $unit->status === 'active' ? 'bg-clinical-50 text-clinical-800' : 'bg-ink-100 text-ink-600' }}">{{ $unit->status === 'active' ? 'Ativa' : 'Inativa' }}</span>
+                            </div>
                             <p class="mt-1 text-sm text-ink-500">{{ ucfirst(str_replace('_', ' ', $unit->kind)) }}</p>
                             @if ($unit->parent)
                                 <p class="mt-1 text-xs text-ink-400">Vinculada a {{ $unit->parent->name }}</p>
                             @endif
                         </div>
-                        <span class="rounded-full bg-navy-50 px-2.5 py-1 text-xs font-medium text-navy-800">{{ $unit->status === 'active' ? 'Ativa' : 'Inativa' }}</span>
+                        <div class="flex flex-wrap gap-2">
+                            <x-button href="{{ route('units.edit', $unit) }}" variant="secondary">Editar</x-button>
+                            @if ($unit->status === 'active')
+                                <form method="POST" action="{{ route('units.deactivate', $unit) }}" onsubmit="return confirm('Confirmar a inativação desta unidade?');">
+                                    @csrf
+                                    @method('PATCH')
+                                    <x-button type="submit" variant="danger">Inativar</x-button>
+                                </form>
+                            @endif
+                        </div>
                     </div>
                 @empty
                     <div class="py-8 text-center">
