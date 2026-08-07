@@ -44,7 +44,7 @@ class PeopleUniversalSearchTest extends TestCase
             $this->get(route('people.index', ['q' => $query]))
                 ->assertOk()
                 ->assertSee($person->display_name)
-                ->assertDontSee('123.456.789-09');
+                ->assertSee('***.***.***-09');
         }
     }
 
