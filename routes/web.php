@@ -3,6 +3,7 @@
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\PersonController;
 use App\Http\Controllers\ScenarioController;
+use App\Http\Controllers\UnitController;
 use App\Models\Scenario;
 use Illuminate\Support\Facades\Route;
 
@@ -31,6 +32,10 @@ Route::get('/dashboard', function () {
 
 Route::resource('organizations', OrganizationController::class)
     ->only(['index', 'create', 'store', 'show']);
+
+Route::get('/organizations/{organization}/units/create', [UnitController::class, 'create'])
+    ->name('organizations.units.create');
+Route::post('/units', [UnitController::class, 'store'])->name('units.store');
 
 Route::resource('people', PersonController::class)
     ->only(['index', 'create', 'store', 'show']);
