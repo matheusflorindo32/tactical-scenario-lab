@@ -56,38 +56,36 @@ Route::middleware('auth')->group(function () {
     Route::get('/units/{unit}/edit', [UnitController::class, 'edit'])->name('units.edit');
     Route::put('/units/{unit}', [UnitController::class, 'update'])->name('units.update');
     Route::patch('/units/{unit}/deactivate', [UnitController::class, 'deactivate'])->name('units.deactivate');
-});
 
-Route::resource('people', PersonController::class)
-    ->only(['index', 'create', 'store', 'show', 'edit', 'update']);
-Route::patch('/people/{person}/deactivate', [PersonController::class, 'deactivate'])
-    ->name('people.deactivate');
+    Route::resource('people', PersonController::class)
+        ->only(['index', 'create', 'store', 'show', 'edit', 'update']);
+    Route::patch('/people/{person}/deactivate', [PersonController::class, 'deactivate'])
+        ->name('people.deactivate');
 
-Route::get('/people/{person}/identifiers/create', [PersonIdentifierController::class, 'create'])
-    ->name('people.identifiers.create');
-Route::post('/people/{person}/identifiers', [PersonIdentifierController::class, 'store'])
-    ->name('people.identifiers.store');
+    Route::get('/people/{person}/identifiers/create', [PersonIdentifierController::class, 'create'])
+        ->name('people.identifiers.create');
+    Route::post('/people/{person}/identifiers', [PersonIdentifierController::class, 'store'])
+        ->name('people.identifiers.store');
 
-Route::get('/people/{person}/contacts/create', [PersonContactController::class, 'create'])
-    ->name('people.contacts.create');
-Route::post('/people/{person}/contacts', [PersonContactController::class, 'store'])
-    ->name('people.contacts.store');
+    Route::get('/people/{person}/contacts/create', [PersonContactController::class, 'create'])
+        ->name('people.contacts.create');
+    Route::post('/people/{person}/contacts', [PersonContactController::class, 'store'])
+        ->name('people.contacts.store');
 
-Route::get('/people/{person}/memberships/create', [OrganizationMembershipController::class, 'create'])
-    ->name('people.memberships.create');
-Route::post('/people/{person}/memberships', [OrganizationMembershipController::class, 'store'])
-    ->name('people.memberships.store');
-Route::patch('/people/{person}/memberships/{membership}/close', [OrganizationMembershipController::class, 'close'])
-    ->name('people.memberships.close');
+    Route::get('/people/{person}/memberships/create', [OrganizationMembershipController::class, 'create'])
+        ->name('people.memberships.create');
+    Route::post('/people/{person}/memberships', [OrganizationMembershipController::class, 'store'])
+        ->name('people.memberships.store');
+    Route::patch('/people/{person}/memberships/{membership}/close', [OrganizationMembershipController::class, 'close'])
+        ->name('people.memberships.close');
 
-Route::get('/people/{person}/roles/create', [PersonRoleController::class, 'create'])
-    ->name('people.roles.create');
-Route::post('/people/{person}/roles', [PersonRoleController::class, 'store'])
-    ->name('people.roles.store');
-Route::patch('/people/{person}/roles/{role}/revoke', [PersonRoleController::class, 'revoke'])
-    ->name('people.roles.revoke');
+    Route::get('/people/{person}/roles/create', [PersonRoleController::class, 'create'])
+        ->name('people.roles.create');
+    Route::post('/people/{person}/roles', [PersonRoleController::class, 'store'])
+        ->name('people.roles.store');
+    Route::patch('/people/{person}/roles/{role}/revoke', [PersonRoleController::class, 'revoke'])
+        ->name('people.roles.revoke');
 
-Route::middleware('auth')->group(function () {
     Route::resource('scenarios', ScenarioController::class)
         ->only(['index', 'create', 'store', 'show']);
 
