@@ -41,7 +41,7 @@ class DemoSeeder extends Seeder
         DB::transaction(function (): void {
             $organization = Organization::create([
                 'name' => self::ORGANIZATION_NAME,
-                'kind' => 'training_center',
+                'kind' => 'school',
                 'status' => 'active',
                 'notes' => 'Dados integralmente fictícios para demonstração institucional do M5.',
             ]);
@@ -49,13 +49,13 @@ class DemoSeeder extends Seeder
             $commandUnit = Unit::create([
                 'organization_id' => $organization->id,
                 'name' => 'Núcleo Alfa',
-                'kind' => 'training_unit',
+                'kind' => 'department',
                 'status' => 'active',
             ]);
             $responseUnit = Unit::create([
                 'organization_id' => $organization->id,
                 'name' => 'Núcleo Bravo',
-                'kind' => 'training_unit',
+                'kind' => 'department',
                 'status' => 'active',
             ]);
 
