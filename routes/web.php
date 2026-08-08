@@ -1,14 +1,20 @@
 <?php
 
 use App\Http\Controllers\AccessAdministrationController;
+use App\Http\Controllers\ActionItemController;
 use App\Http\Controllers\ActiveOrganizationController;
+use App\Http\Controllers\AssessmentCriterionController;
+use App\Http\Controllers\AssessmentEvidenceController;
 use App\Http\Controllers\AuthenticatedSessionController;
+use App\Http\Controllers\CriticalErrorOccurrenceController;
+use App\Http\Controllers\DebriefEntryController;
 use App\Http\Controllers\ExecutionAssessmentController;
 use App\Http\Controllers\ExecutionEventController;
 use App\Http\Controllers\ExecutionInjectController;
 use App\Http\Controllers\ExecutionParticipantController;
 use App\Http\Controllers\ExecutionResourceController;
 use App\Http\Controllers\ExecutionTeamController;
+use App\Http\Controllers\KeyTimeRecordController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OrganizationMembershipController;
 use App\Http\Controllers\PersonContactController;
@@ -166,6 +172,39 @@ Route::middleware(['auth', 'account.active'])->group(function () {
         ->name('assessments.adjustment');
     Route::patch('/assessments/{assessment}/finalize', [ExecutionAssessmentController::class, 'finalize'])
         ->name('assessments.finalize');
+
+    Route::post('/assessments/{assessment}/criteria', [AssessmentCriterionController::class, 'store'])
+        ->name('assessment-criteria.store');
+    Route::patch('/assessment-criteria/{criterion}', [AssessmentCriterionController::class, 'update'])
+        ->name('assessment-criteria.update');
+    Route::delete('/assessment-criteria/{criterion}', [AssessmentCriterionController::class, 'destroy'])
+        ->name('assessment-criteria.destroy');
+    Route::post('/assessment-criteria/{criterion}/evidence', [AssessmentEvidenceController::class, 'store'])
+        ->name('assessment-evidence.store');
+    Route::delete('/assessment-evidence/{evidence}', [AssessmentEvidenceController::class, 'destroy'])
+        ->name('assessment-evidence.destroy');
+    Route::post('/assessments/{assessment}/critical-errors', [CriticalErrorOccurrenceController::class, 'store'])
+        ->name('critical-error-occurrences.store');
+    Route::delete('/critical-error-occurrences/{occurrence}', [CriticalErrorOccurrenceController::class, 'destroy'])
+        ->name('critical-error-occurrences.destroy');
+    Route::post('/assessments/{assessment}/key-times', [KeyTimeRecordController::class, 'store'])
+        ->name('key-times.store');
+    Route::delete('/key-times/{keyTime}', [KeyTimeRecordController::class, 'destroy'])
+        ->name('key-times.destroy');
+    Route::post('/assessments/{assessment}/debrief-entries', [DebriefEntryController::class, 'store'])
+        ->name('debrief-entries.store');
+    Route::patch('/debrief-entries/{entry}', [DebriefEntryController::class, 'update'])
+        ->name('debrief-entries.update');
+    Route::delete('/debrief-entries/{entry}', [DebriefEntryController::class, 'destroy'])
+        ->name('debrief-entries.destroy');
+    Route::post('/assessments/{assessment}/action-items', [ActionItemController::class, 'store'])
+        ->name('action-items.store');
+    Route::patch('/action-items/{actionItem}', [ActionItemController::class, 'update'])
+        ->name('action-items.update');
+    Route::delete('/action-items/{actionItem}', [ActionItemController::class, 'destroy'])
+        ->name('action-items.destroy');
+    Route::patch('/action-items/{actionItem}/status', [ActionItemController::class, 'transition'])
+        ->name('action-items.transition');
 
     Route::post('/scenarios/{scenario}/execute', [ScenarioController::class, 'execute'])
         ->name('scenarios.execute');
