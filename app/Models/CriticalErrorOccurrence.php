@@ -6,6 +6,7 @@ use App\Models\Concerns\HasPublicUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use InvalidArgumentException;
+use LogicException;
 
 class CriticalErrorOccurrence extends Model
 {
@@ -41,6 +42,10 @@ class CriticalErrorOccurrence extends Model
             $source = (string) ($occurrence->source ?: 'm4');
             $rule = (string) ($occurrence->rule ?: 'record');
             $penalty = (float) ($occurrence->penalty_points ?? 0);
+
+            if ($assessment->isFinalized()) {
+                throw new LogicException('Finalized critical error occurrences are immutable.');
+            }
 
             if (! in_array($source, ['m4', 'legacy'], true)) {
                 throw new InvalidArgumentException('Unknown critical error occurrence source.');
@@ -90,6 +95,12 @@ class CriticalErrorOccurrence extends Model
                 if ($event->scenario_execution_id !== $execution->id) {
                     throw new InvalidArgumentException('Critical error event must belong to the same execution.');
                 }
+            }
+        });
+
+        static::deleting(function (CriticalErrorOccurrence $occurrence): void {
+            if ($occurrence->assessment()->firstOrFail()->isFinalized()) {
+                throw new LogicException('Finalized critical error occurrences are immutable.');
             }
         });
     }
