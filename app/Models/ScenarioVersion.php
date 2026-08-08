@@ -6,6 +6,7 @@ use App\Models\Concerns\HasPublicUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use InvalidArgumentException;
 use LogicException;
 
 class ScenarioVersion extends Model
@@ -45,6 +46,12 @@ class ScenarioVersion extends Model
 
     protected static function booted(): void
     {
+        static::saving(function (ScenarioVersion $version): void {
+            if ((int) $version->estimated_casualty_count < 1) {
+                throw new InvalidArgumentException('Estimated casualty count must be at least 1.');
+            }
+        });
+
         static::updating(function (ScenarioVersion $version): void {
             $wasPublished = $version->getOriginal('publication_status') === 'published';
 
