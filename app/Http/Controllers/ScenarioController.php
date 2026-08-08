@@ -29,7 +29,7 @@ class ScenarioController extends Controller
     {
         $activeOrganization->ensureAbility($request, 'scenarios.manage');
 
-        return view('scenarios.create');
+        return view('scenarios.create-scalable');
     }
 
     public function store(
@@ -89,7 +89,11 @@ class ScenarioController extends Controller
         $organizationId = $activeOrganization->ensureAbility($request, 'scenarios.view');
         $this->ensureScenarioInOrganization($scenario, $organizationId);
 
-        return view('scenarios.show', compact('scenario'));
+        $version = $scenario->latestVersion()
+            ->withCount(['victims', 'cohorts'])
+            ->first();
+
+        return view('scenarios.show-scalable', compact('scenario', 'version'));
     }
 
     /**
