@@ -6,6 +6,7 @@ use App\Models\Concerns\HasPublicUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use InvalidArgumentException;
+use LogicException;
 
 class AssessmentEvidence extends Model
 {
@@ -35,7 +36,12 @@ class AssessmentEvidence extends Model
             $criterion = AssessmentCriterion::query()
                 ->with('assessment.execution')
                 ->findOrFail($evidence->assessment_criterion_id);
-            $execution = $criterion->assessment->execution;
+            $assessment = $criterion->assessment;
+            $execution = $assessment->execution;
+
+            if ($assessment->isFinalized()) {
+                throw new LogicException('Finalized assessment evidence is immutable.');
+            }
 
             if (trim((string) $evidence->statement) === '') {
                 throw new InvalidArgumentException('Assessment evidence statement is required.');
@@ -57,6 +63,12 @@ class AssessmentEvidence extends Model
                 if ($event->scenario_execution_id !== $execution->id) {
                     throw new InvalidArgumentException('Evidence event must belong to the same execution.');
                 }
+            }
+        });
+
+        static::deleting(function (AssessmentEvidence $evidence): void {
+            if ($evidence->criterion()->firstOrFail()->assessment()->firstOrFail()->isFinalized()) {
+                throw new LogicException('Finalized assessment evidence is immutable.');
             }
         });
     }
