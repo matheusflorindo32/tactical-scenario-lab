@@ -51,51 +51,65 @@ final class ScenarioExecutionManager
 
     public function start(ScenarioExecution $execution): ScenarioExecution
     {
-        if (! $execution->canStart()) {
-            throw new LogicException('Execution cannot be started from its current status.');
-        }
-
         return DB::transaction(function () use ($execution): ScenarioExecution {
-            $execution->update([
+            $locked = $this->lockExecution($execution);
+
+            if (! $locked->canStart()) {
+                throw new LogicException('Execution cannot be started from its current status.');
+            }
+
+            $locked->update([
                 'status' => 'running',
                 'started_at' => now(),
                 'completed_at' => null,
                 'cancelled_at' => null,
             ]);
 
-            return $execution->fresh();
+            return $locked->fresh();
         });
     }
 
     public function complete(ScenarioExecution $execution): ScenarioExecution
     {
-        if (! $execution->canComplete()) {
-            throw new LogicException('Execution cannot be completed from its current status.');
-        }
-
         return DB::transaction(function () use ($execution): ScenarioExecution {
-            $execution->update([
+            $locked = $this->lockExecution($execution);
+
+            if (! $locked->canComplete()) {
+                throw new LogicException('Execution cannot be completed from its current status.');
+            }
+
+            $locked->update([
                 'status' => 'completed',
                 'completed_at' => now(),
             ]);
 
-            return $execution->fresh();
+            return $locked->fresh();
         });
     }
 
     public function cancel(ScenarioExecution $execution): ScenarioExecution
     {
-        if (! $execution->canCancel()) {
-            throw new LogicException('Execution cannot be cancelled from its current status.');
-        }
-
         return DB::transaction(function () use ($execution): ScenarioExecution {
-            $execution->update([
+            $locked = $this->lockExecution($execution);
+
+            if (! $locked->canCancel()) {
+                throw new LogicException('Execution cannot be cancelled from its current status.');
+            }
+
+            $locked->update([
                 'status' => 'cancelled',
                 'cancelled_at' => now(),
             ]);
 
-            return $execution->fresh();
+            return $locked->fresh();
         });
+    }
+
+    private function lockExecution(ScenarioExecution $execution): ScenarioExecution
+    {
+        return ScenarioExecution::query()
+            ->whereKey($execution->id)
+            ->lockForUpdate()
+            ->firstOrFail();
     }
 }
