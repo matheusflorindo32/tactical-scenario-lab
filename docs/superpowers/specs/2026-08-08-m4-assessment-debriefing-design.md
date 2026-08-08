@@ -5,7 +5,7 @@
 **Milestone:** M4 — Assessment & Debriefing  
 **Branch:** `feature/m4-assessment-debriefing`  
 **Base:** `main` after M3 merge (`c135cd12ef2415d91b7e2ba4636bfbd23dac8759`)  
-**Status:** approved design, implementation pending written-spec review
+**Status:** design approved; written specification pending final user review
 
 ---
 
@@ -22,17 +22,15 @@ M4 must provide:
 - key-time records;
 - hybrid final scoring;
 - structured debriefing separating fact, interpretation and recommendation;
-- action plan;
-- immutable finalized assessment;
-- controlled migration of legacy evaluation data.
+- structured action plan;
+- immutable finalized assessment content;
+- controlled migration of legacy evaluation data without inventing semantics.
 
-The milestone ends when the active application no longer writes new assessment/debriefing data to the legacy fields on `Scenario`.
+M4 ends when the active application no longer writes new assessment/debriefing data to the legacy fields on `Scenario`.
 
 ---
 
 ## 2. Architectural boundary
-
-The M4 core domain is:
 
 ```text
 Scenario
@@ -50,34 +48,17 @@ Scenario
 
 `ScenarioVersion` remains the immutable training definition. `ScenarioExecution` remains the concrete run. `ExecutionAssessment` becomes the single evaluation aggregate for that run.
 
-No assessment mutation may alter `ScenarioVersion` or execution history.
+Assessment mutation never changes scenario definition or execution history.
 
 ---
 
 ## 3. Chosen approach
 
-### Selected: normalized assessment domain
+M4 uses a **normalized relational assessment domain**, not one opaque JSON document.
 
-M4 will use normalized relational entities rather than a single JSON assessment payload.
+This is preferred because it gives stronger referential integrity, tenant isolation, reproducible calculations, explicit immutable finalization and a clean foundation for M5 reporting.
 
-Reasons:
-
-- stronger referential integrity;
-- easier tenant isolation;
-- easier auditing;
-- reliable scoring calculations;
-- explicit immutable finalization;
-- future M5 reporting without parsing opaque blobs;
-- easier validation of event/evidence references;
-- better separation of fact, interpretation and recommendation.
-
-### Rejected: JSON-only assessment
-
-JSON would reduce initial migration count, but would make cross-reference integrity, reporting and controlled evolution weaker.
-
-### Deferred: full institutional rubric-template engine
-
-Reusable rubric templates, rubric catalogs, template versioning and organization-wide policy configuration are useful future product capabilities, but are not required to finish M4. M4 evaluates an execution with a concrete rubric snapshot.
+A reusable organization-wide rubric-template engine is deliberately deferred. M4 works with a concrete rubric snapshot for one execution.
 
 ---
 
@@ -94,45 +75,47 @@ Rules:
 
 1. one assessment per `ScenarioExecution`;
 2. assessment may be created while execution is `draft`, `running` or `completed`;
-3. criteria may be prepared before the execution starts;
+3. criteria may be prepared before execution starts;
 4. evidence, critical-error occurrences and key times may be collected while execution is `running` or after it is `completed`;
-5. assessment may be finalized only when the execution is `completed`;
-6. finalized assessment is immutable through the M4 application domain;
-7. no edit/delete HTTP routes exist for a finalized assessment or its children;
-8. reopening/amendment of a finalized assessment is explicitly out of scope for M4.
+5. normal M4 finalization is allowed only when execution is `completed`;
+6. cancelled execution cannot be finalized;
+7. finalized assessment content is immutable;
+8. no reopening/amendment workflow is introduced in M4.
 
-A cancelled execution cannot be finalized as an assessment.
+Legacy import is a controlled migration path and does not use the normal M4 finalization rules to reinterpret old data.
 
 ---
 
 ## 5. ExecutionAssessment
 
-Proposed fields:
+Fields:
 
-- `id` internal primary key;
-- `uuid` public unique identifier;
+- internal `id`;
+- public `uuid`;
 - `organization_id`;
-- `scenario_execution_id` unique;
+- unique `scenario_execution_id`;
+- `source` = `m4|legacy`;
 - `status` = `draft|finalized`;
-- `pass_threshold` decimal, snapshot default `70.00`;
-- `base_score` nullable decimal;
-- `penalty_points` nullable decimal;
-- `evaluator_adjustment` integer default `0`;
-- `adjustment_justification` nullable text;
-- `final_score` nullable decimal;
-- `result` = `pending|passed|failed`;
+- nullable `pass_threshold` decimal;
+- nullable `base_score` decimal;
+- nullable `penalty_points` decimal;
+- `evaluator_adjustment` integer default 0;
+- nullable `adjustment_justification`;
+- nullable `final_score` decimal;
+- nullable `result` = `passed|failed`;
 - `automatic_fail` boolean default false;
-- `finalized_at` nullable timestamp;
-- `finalized_by_user_id` nullable FK;
-- `legacy_imported_at` nullable timestamp;
+- nullable `finalized_at`;
+- nullable `finalized_by_user_id`;
+- nullable `legacy_imported_at`;
 - timestamps.
 
-Constraints:
+Rules:
 
-- unique assessment per execution;
+- one assessment per execution;
 - organization must match execution organization;
-- finalized scoring snapshot cannot be modified afterward;
-- `pass_threshold` is fixed at 70.00 for M4-created assessments. Policy configuration is deferred.
+- new M4 assessments use `source=m4` and snapshot `pass_threshold=70.00`;
+- legacy imports use `source=legacy`; threshold/result remain null unless they were explicitly represented by legacy source data, which the current legacy model does not provide;
+- finalized scoring snapshot cannot be rewritten.
 
 ---
 
@@ -142,42 +125,35 @@ Constraints:
 
 - public UUID;
 - `execution_assessment_id`;
-- `code` optional stable short identifier;
+- optional `code`;
 - `label`;
-- `description` nullable;
+- nullable `description`;
 - `weight` decimal percentage;
-- `score` nullable decimal from 0 to 100;
-- `evaluator_notes` nullable;
+- nullable `score` decimal 0..100;
+- nullable `evaluator_notes`;
 - `position` integer;
 - timestamps.
 
 ### Initialization
 
-When an assessment is first created:
+When a new M4 assessment is created:
 
 - each nonblank `ScenarioVersion.learning_objectives` entry seeds one criterion;
-- weights are distributed as evenly as possible to two decimal places;
-- the final criterion receives any rounding remainder so the total is exactly `100.00`;
-- if there are no learning objectives, assessment starts with no criteria and the evaluator must add criteria before finalization.
+- weights are distributed evenly to two decimals;
+- the last criterion absorbs rounding remainder so total is exactly `100.00`;
+- if no learning objectives exist, assessment starts with no criteria and the evaluator must add them.
 
 ### Draft editing
 
-While assessment is draft, an evaluator with `evaluations.manage` may:
+With `evaluations.manage`, while assessment is draft, evaluator may add/edit/remove/reorder criteria and set scores.
 
-- add criteria;
-- edit label/description/weight/score/notes;
-- remove criteria;
-- reorder criteria.
-
-### Finalization invariants
-
-Finalization requires:
+### Normal M4 finalization requires
 
 - at least one criterion;
 - every criterion scored;
-- every score in 0..100;
+- score in 0..100;
 - every weight > 0;
-- total criterion weight exactly `100.00`;
+- total weight exactly `100.00`;
 - at least one evidence record per criterion.
 
 ---
@@ -189,47 +165,45 @@ Finalization requires:
 - public UUID;
 - `assessment_criterion_id`;
 - optional `execution_event_id`;
-- `statement` objective text;
-- `observed_at` timestamp;
+- required objective `statement`;
+- `observed_at`;
 - `created_by_user_id`;
 - timestamps.
 
 Rules:
 
-- evidence belongs indirectly to exactly one execution through its criterion/assessment;
-- an optional linked `ExecutionEvent` must belong to the same execution;
-- cross-execution event references are rejected before mutation;
+- evidence belongs to the same execution as its assessment;
+- linked `ExecutionEvent`, if present, must belong to that same execution;
+- cross-execution references are rejected before mutation;
 - statement is required and length-limited;
-- evidence may be created only while assessment is draft;
-- evidence timestamps must not precede execution start when `started_at` exists;
-- for completed executions, evidence timestamps must not exceed `completed_at`;
+- new evidence can be added only while assessment is draft;
+- when execution has started, `observed_at` cannot precede `started_at`;
+- when completed, `observed_at` cannot exceed `completed_at`;
 - finalized evidence is immutable.
 
-Evidence is intentionally textual plus an optional trusted timeline reference. File attachments are out of scope for M4.
+File/media attachments are outside M4.
 
 ---
 
 ## 8. Weighted score
 
-Each criterion score is 0..100 and each criterion weight is a percentage.
-
-The base score is:
+Base score:
 
 ```text
 base_score = Σ(criterion_score × criterion_weight) / 100
 ```
 
-The result is rounded to two decimal places using one centralized calculator service.
+The score is rounded to two decimals by one centralized `AssessmentScoreCalculator`.
 
-No controller or Blade view may implement an independent scoring formula.
+Controllers and Blade views do not duplicate the formula.
 
 ---
 
 ## 9. Critical-error catalog vs occurrence
 
-`ScenarioVersion.critical_errors` remains the immutable catalog of errors that should be monitored.
+`ScenarioVersion.critical_errors` remains the immutable monitoring catalog.
 
-M4 introduces `CriticalErrorOccurrence` to represent what was actually observed in one execution.
+`CriticalErrorOccurrence` records what actually happened in one execution assessment.
 
 Fields:
 
@@ -240,99 +214,90 @@ Fields:
 - `penalty_points` decimal default 0;
 - optional `execution_event_id`;
 - `observed_at`;
-- `notes` nullable;
+- nullable `notes`;
 - `source` = `m4|legacy`;
 - timestamps.
 
-### New M4 occurrences
+For new M4 records:
 
-For `source=m4`:
+- label must exist in the execution version's critical-error catalog;
+- optional event must belong to same execution;
+- `record` has zero penalty;
+- `penalty` requires points > 0 and <= 100;
+- `automatic_fail` forces failed result without rewriting numerical score;
+- duplicate occurrence of the same catalog item is rejected in M4.
 
-- `catalog_label_snapshot` must match a value in the execution's `ScenarioVersion.critical_errors` catalog;
-- optional event must belong to the same execution;
-- `record` requires zero penalty;
-- `penalty` requires `penalty_points > 0` and `<= 100`;
-- `automatic_fail` sets the assessment automatic-fail flag regardless of numerical score;
-- duplicate occurrence of the same catalog item is rejected unless a later design explicitly introduces repeated occurrences.
-
-### Legacy occurrences
-
-Legacy import may preserve an old observed label even if it no longer matches the current catalog. Such records are marked `source=legacy`, use `rule=record`, apply no inferred penalty, and preserve the original text without inventing semantics.
+Legacy import preserves old observed strings even when catalog drift exists. Such records use `source=legacy`, `rule=record`, zero penalty and no inferred meaning.
 
 ---
 
 ## 10. Hybrid scoring model
 
-M4 uses the approved hybrid model.
-
-### Step 1 — base score
+### Base
 
 Weighted rubric produces `base_score` in 0..100.
 
-### Step 2 — penalties
+### Penalties
 
-`penalty_points` is the sum of all `CriticalErrorOccurrence` records with `rule=penalty`.
+`penalty_points` is the sum of occurrences with `rule=penalty`.
 
-### Step 3 — evaluator adjustment
+### Evaluator adjustment
 
-Evaluator may apply an integer adjustment from `-10` to `+10` points.
+Evaluator may apply integer adjustment from `-10` through `+10`.
 
-Rules:
+- zero requires no justification;
+- nonzero requires a length-limited justification;
+- adjustment and justification freeze at finalization.
 
-- adjustment `0` requires no justification;
-- any nonzero adjustment requires a human-readable justification;
-- justification is length-limited and stored on the assessment;
-- the adjustment is included in the finalized score snapshot;
-- finalized adjustment cannot be changed.
-
-### Step 4 — final numerical score
+### Numerical result
 
 ```text
 final_score = clamp(base_score - penalty_points + evaluator_adjustment, 0, 100)
 ```
 
-### Step 5 — pass/fail
+### Pass/fail for new M4 assessments
 
 ```text
 if any automatic_fail occurrence:
     result = failed
-else if final_score >= 70.00:
+else if final_score >= pass_threshold:
     result = passed
 else:
     result = failed
 ```
 
-An automatic fail does not rewrite the numerical score; it changes the result and is displayed explicitly as the reason numerical score did not determine approval.
+For new M4 assessments, `pass_threshold=70.00`.
 
-The calculator returns both score components and result so the UI can explain the outcome transparently.
+An automatic fail changes the result but preserves the numerical score for transparency.
+
+Legacy imports do not receive a synthetic threshold or pass/fail classification.
 
 ---
 
 ## 11. Key times
 
-`KeyTimeRecord` represents an assessment-relevant timing observation.
-
-Fields:
+`KeyTimeRecord` fields:
 
 - public UUID;
 - `execution_assessment_id`;
 - `label`;
 - `occurred_at`;
-- `elapsed_seconds` integer;
-- optional `reference_seconds` integer;
+- server-derived `elapsed_seconds`;
+- optional `reference_seconds`;
 - optional `notes`;
 - timestamps.
 
 Rules:
 
-- execution must have `started_at` before a key time can be recorded;
-- `elapsed_seconds` is calculated by the backend from `execution.started_at` and `occurred_at`; clients do not submit the authoritative elapsed value;
-- `occurred_at` cannot precede execution start;
-- if execution is completed, `occurred_at` cannot exceed completion;
+- execution must have `started_at`;
+- client never supplies authoritative elapsed value;
+- backend derives elapsed seconds from execution start;
+- time cannot precede start;
+- completed execution time cannot exceed completion;
 - reference is optional and nonnegative;
 - finalized key times are immutable.
 
-No advanced SLA/statistical analytics are introduced in M4.
+Advanced SLA/statistical analytics are outside M4.
 
 ---
 
@@ -340,13 +305,13 @@ No advanced SLA/statistical analytics are introduced in M4.
 
 Each assessment has at most one `ExecutionDebrief`.
 
-`ExecutionDebrief` fields:
+`ExecutionDebrief`:
 
 - public UUID;
-- `execution_assessment_id` unique;
+- unique `execution_assessment_id`;
 - timestamps.
 
-`DebriefEntry` fields:
+`DebriefEntry`:
 
 - public UUID;
 - `execution_debrief_id`;
@@ -356,33 +321,17 @@ Each assessment has at most one `ExecutionDebrief`.
 - `created_by_user_id`;
 - timestamps.
 
-### New M4 entries
+Public M4 HTTP flows allow only:
 
-HTTP creation permits only:
+- `fact` — what objectively happened;
+- `interpretation` — what that means;
+- `recommendation` — what should be maintained or changed.
 
-- `fact`;
-- `interpretation`;
-- `recommendation`.
+`legacy_unstructured` is migration-only.
 
-`legacy_unstructured` is reserved exclusively for migration code.
+Normal M4 finalization requires at least one fact, one interpretation and one recommendation.
 
-### Finalization requirement
-
-A nonlegacy M4 assessment must have at least:
-
-- one fact;
-- one interpretation;
-- one recommendation.
-
-This prevents debriefing from collapsing back into one ambiguous free-text note.
-
-### Semantic intent
-
-- **fact:** what objectively happened;
-- **interpretation:** what the event/result means;
-- **recommendation:** what should be maintained or changed.
-
-The application must not automatically classify evaluator prose between these categories.
+The system never automatically classifies evaluator prose between these categories.
 
 ---
 
@@ -392,67 +341,73 @@ The application must not automatically classify evaluator prose between these ca
 
 - public UUID;
 - `execution_debrief_id`;
-- `action`;
+- required `action`;
 - optional `responsible_person_id`;
 - optional `responsible_label`;
-- optional `due_date`;
+- required `due_date`;
 - `status` = `open|in_progress|completed|cancelled`;
-- optional `notes`;
+- nullable `notes`;
+- nullable `status_changed_at`;
+- nullable `status_changed_by_user_id`;
 - timestamps.
 
 Rules:
 
-- at least one of `responsible_person_id` or `responsible_label` must be provided when a responsible party is assigned;
-- if a person is used, the person must belong to the same active organization context;
-- action plan items may exist without a due date;
-- status transitions remain simple in M4; workflow automation/reminders are not part of this milestone;
-- assessment finalization freezes action-item content for the M4 historical record.
+- every action item must have a responsible party: either a same-organization person or a responsible free-text label;
+- every action item has a deadline;
+- before assessment finalization, action-plan content may be edited by `evaluations.manage`;
+- after finalization, historical content (`action`, responsible, deadline, notes) is immutable;
+- after finalization, **only operational status** may transition with `evaluations.manage`;
+- post-finalization status changes update actor/time and must follow repository audit/sanitization conventions;
+- allowed simple transitions: `open -> in_progress|completed|cancelled`, `in_progress -> completed|cancelled`;
+- completed/cancelled are terminal in M4.
 
-Action items are available but are not mandatory for finalization because a completed exercise may legitimately produce no corrective action.
+This is the sole deliberate exception to full aggregate immutability: evaluation content remains frozen while action follow-up can progress operationally.
+
+Action items are available but not mandatory for finalization, because an exercise may legitimately yield no corrective action.
 
 ---
 
-## 14. Authorization model
+## 14. Authorization
 
 Existing abilities are reused.
 
 ### Read
 
-`scenarios.view` may view assessment/debriefing for an execution in the active organization.
+`scenarios.view` may view assessment/debriefing within active organization.
 
-### Write
+### Mutate assessment/debrief
 
-`evaluations.manage` is required for all M4 mutations:
+`evaluations.manage` is required for:
 
-- create assessment;
-- add/edit/remove criteria;
-- score criteria;
-- add evidence;
-- add/remove observed critical errors;
-- record key times;
-- add/edit/remove debrief entries;
-- add/edit/remove action items;
-- set evaluator adjustment;
-- finalize assessment.
+- assessment creation;
+- criterion CRUD/scoring;
+- evidence;
+- critical-error occurrence;
+- key time;
+- debrief entries;
+- action-item content before finalization;
+- evaluator adjustment;
+- finalization;
+- post-finalization action-item status transitions.
 
-`scenarios.manage` alone does not grant evaluation-write access.
+`scenarios.manage` alone is insufficient.
 
 ### Tenant isolation
 
-Before every mutation:
+Every mutation:
 
-- resolve active organization through `ActiveOrganization`;
-- require `evaluations.manage`;
-- verify `ExecutionAssessment.organization_id === active organization`;
-- verify referenced execution/event/person belongs to the same allowed context.
-
-No organization identifier is trusted from request payloads.
+1. resolves active organization through `ActiveOrganization`;
+2. requires `evaluations.manage`;
+3. verifies assessment/execution organization matches active organization;
+4. validates referenced event/person belongs to same allowed context;
+5. ignores/rejects organization identifiers supplied by clients.
 
 ---
 
 ## 15. Public identifiers
 
-Every new externally addressable M4 aggregate uses `HasPublicUuid`:
+All new externally addressable M4 aggregates use `HasPublicUuid`:
 
 - `ExecutionAssessment`;
 - `AssessmentCriterion`;
@@ -463,46 +418,40 @@ Every new externally addressable M4 aggregate uses `HasPublicUuid`:
 - `DebriefEntry`;
 - `ActionItem`.
 
-Instructor-facing routes/forms use UUID route model binding or UUID form values. Numeric database IDs remain internal implementation details.
+Instructor-facing routes/forms use UUIDs. Numeric IDs stay internal.
 
 ---
 
 ## 16. Finalization service
 
-Finalization belongs in a dedicated domain service, not the controller.
+Finalization belongs in `ExecutionAssessmentManager`, not a controller.
 
-Suggested boundary:
+`finalize(ExecutionAssessment $assessment, User $evaluator)` runs in one transaction and:
 
-`ExecutionAssessmentManager::finalize(ExecutionAssessment $assessment, User $evaluator)`
+1. reloads assessment with row lock;
+2. rejects already-finalized assessment;
+3. reloads execution and requires `completed`;
+4. rejects cancelled/noncompleted execution;
+5. validates rubric completeness and exact total weight;
+6. validates evidence requirement;
+7. validates structured debrief requirement;
+8. validates adjustment/justification;
+9. calculates base score;
+10. calculates penalties;
+11. detects automatic fail;
+12. calculates final score;
+13. derives pass/fail;
+14. persists all score components/result;
+15. persists finalizer and timestamp;
+16. returns fresh finalized assessment.
 
-Within one transaction it must:
-
-1. reload assessment with row lock;
-2. reject already-finalized assessment;
-3. reload and validate execution state;
-4. require execution `completed`;
-5. validate rubric invariants;
-6. validate evidence requirement;
-7. validate structured debrief requirement;
-8. validate evaluator adjustment and justification;
-9. calculate base score;
-10. calculate penalties;
-11. detect automatic fail;
-12. calculate final numerical score;
-13. derive result;
-14. persist the scoring snapshot;
-15. persist `finalized_at` and evaluator;
-16. return the fresh finalized assessment.
-
-This is the single authoritative finalization path.
+This is the only normal M4 finalization path.
 
 ---
 
 ## 17. Immutability
 
-After finalization, application-level mutation of the assessment aggregate is blocked.
-
-At minimum, model/service guards must prevent update/delete of:
+After finalization, application-domain update/delete is blocked for:
 
 - assessment scoring fields;
 - criteria;
@@ -510,71 +459,64 @@ At minimum, model/service guards must prevent update/delete of:
 - critical-error occurrences;
 - key times;
 - debrief entries;
-- action items.
+- action-item historical content.
 
-No HTTP mutation routes should succeed after finalization.
+The only allowed post-finalization mutation is the controlled operational `ActionItem.status` transition described above.
 
-Database-level immutable-history enforcement may be considered in M6, but M4 must have strong application-domain protection and tests.
+No HTTP route may reopen or rewrite finalized assessment content.
+
+Database-level immutable-history enforcement may be considered in M6; M4 requires strong application guards and tests.
 
 ---
 
-## 18. Legacy migration strategy
+## 18. Legacy migration
 
-Current legacy fields on `Scenario` include:
+Legacy `Scenario` fields include:
 
 - `score`;
 - `debrief_notes`;
 - `observed_critical_errors`;
-- lifecycle fields historically used by legacy execution/evaluation.
+- historical scenario lifecycle fields.
 
-### Migration target
+For each scenario with legacy assessment data:
 
-For each legacy scenario with assessment data:
+1. resolve historical/backfilled execution sequence 1;
+2. if mapping is absent, do not guess; leave source untouched and report case in M4 audit;
+3. if mapped and no M4 assessment exists, create `ExecutionAssessment(source=legacy, status=finalized, legacy_imported_at=...)`;
+4. do **not** assign a synthetic `pass_threshold` or `result`;
+5. if legacy score exists, preserve it as `base_score` and `final_score` and create one 100%-weight criterion `Avaliação legada importada` with that score;
+6. if score exists, create provenance evidence stating only that the numerical value was imported from the legacy assessment record;
+7. import each legacy observed-error string as `CriticalErrorOccurrence(source=legacy, rule=record, penalty_points=0)`;
+8. import nonblank legacy debrief text as one `DebriefEntry(kind=legacy_unstructured)`;
+9. never reclassify legacy prose into fact/interpretation/recommendation;
+10. preserve legacy database columns for rollback/audit compatibility;
+11. stop all new application writes to those legacy assessment fields after M4 activation.
 
-1. resolve its historical/backfilled `ScenarioExecution` sequence 1;
-2. if that execution has no M4 assessment, create one marked with `legacy_imported_at`;
-3. create one criterion labeled `Avaliação legada importada`, weight `100.00`, score equal to the legacy score when available;
-4. create one evidence statement indicating the score was imported from the legacy assessment record; this is provenance text, not a fabricated observation;
-5. import each observed critical-error string as `CriticalErrorOccurrence(source=legacy, rule=record, penalty_points=0)`;
-6. import nonblank `debrief_notes` as exactly one `DebriefEntry(kind=legacy_unstructured)` without reclassifying the prose as fact/interpretation/recommendation;
-7. preserve the legacy fields in the database for rollback/audit compatibility during Institutional Edition 1.0 work;
-8. stop all new application writes to the legacy assessment fields after M4 activation.
-
-### Migration safety
-
-If a scenario with legacy assessment data cannot be mapped to an execution, the migration must not guess. It must leave the legacy source untouched and surface/document the unresolved case for the M4 audit.
-
-No data is silently discarded or semantically reinterpreted.
+Legacy imported assessments are read-only historical snapshots and are exempt from new-M4 rubric/debrief finalization requirements because imposing those rules would invent missing historical semantics.
 
 ---
 
 ## 19. Legacy endpoint retirement
 
-`ScenarioController::evaluate` and the active `scenarios.evaluate` form/route are transitional debt from pre-M4 architecture.
+`ScenarioController::evaluate` and `scenarios.evaluate` are transitional debt.
 
 M4 completion requires:
 
-- no new UI path writing assessment data to `Scenario`;
-- execution cockpit links to M4 assessment page;
-- new assessment operations target `ScenarioExecution`/`ExecutionAssessment`;
-- legacy route may be removed once migration and regression tests prove compatibility;
-- legacy database columns are not dropped in M4.
+- execution cockpit links to the M4 assessment page;
+- active assessment writes target `ScenarioExecution`/`ExecutionAssessment`;
+- no active UI posts new data to `scenarios.evaluate`;
+- legacy route is removed once migration/regression tests prove safe compatibility;
+- legacy columns remain in the database during M4.
 
-Dropping old columns is deferred until later release-hardening once rollback confidence exists.
+Column removal is deferred to later release hardening.
 
 ---
 
-## 20. UX structure
+## 20. UX
 
-M4 adds a dedicated assessment page rather than turning the operational cockpit into one oversized form.
+M4 adds a dedicated **Avaliação & Debriefing** page linked from the execution cockpit.
 
-Entry point from execution cockpit:
-
-```text
-Avaliação & Debriefing
-```
-
-Page hierarchy:
+Hierarchy:
 
 ```text
 Execution context
@@ -605,161 +547,142 @@ Structured debrief
   - recommendations
   ↓
 Action plan
+  - action
+  - responsible
+  - deadline
+  - status
 ```
 
-### UI principles
+Principles:
 
 - preserve M3 institutional visual language;
-- show formula components rather than only final score;
-- clearly distinguish catalog from observed occurrence;
-- use red only for real critical failure/risk states;
-- finalized assessments render as read-only historical records;
-- draft vs finalized state must be visually unmistakable;
-- empty states explain what is required next;
-- no PDF/CSV controls in M4.
+- show calculation components, not only final score;
+- distinguish critical-error catalog from observed occurrence;
+- use red only for actual critical/failure states;
+- finalized assessment is visibly read-only;
+- action-plan operational status remains visibly followable;
+- empty states explain next required step;
+- no PDF/CSV in M4.
 
 ---
 
-## 21. Suggested HTTP boundaries
+## 21. HTTP/service boundaries
 
-Exact naming may be refined in the implementation plan, but responsibilities should remain separated.
-
-Possible controllers:
+Suggested thin controllers:
 
 - `ExecutionAssessmentController` — create/show/finalize/adjustment;
-- `AssessmentCriterionController` — criterion CRUD while draft;
-- `AssessmentEvidenceController` — append evidence;
-- `CriticalErrorOccurrenceController` — record/remove occurrence while draft;
-- `KeyTimeRecordController` — record/remove key time while draft;
-- `ExecutionDebriefController` — ensure/load debrief;
-- `DebriefEntryController` — structured debrief entries;
-- `ActionItemController` — action-plan CRUD while draft.
+- `AssessmentCriterionController` — draft criterion CRUD;
+- `AssessmentEvidenceController` — evidence append/remove while draft;
+- `CriticalErrorOccurrenceController` — observed error add/remove while draft;
+- `KeyTimeRecordController` — key time add/remove while draft;
+- `DebriefEntryController` — structured debrief CRUD while draft;
+- `ActionItemController` — content CRUD while draft + controlled status transition after finalization.
 
-Controllers remain thin: authorization + validation + service/model delegation.
+Suggested services:
 
----
-
-## 22. Scoring calculator boundary
-
-Suggested stateless service:
-
-`AssessmentScoreCalculator`
-
-Inputs:
-
-- criteria collection;
-- critical-error occurrences;
-- evaluator adjustment;
-- threshold.
-
-Output value object/array:
-
-- `base_score`;
-- `penalty_points`;
-- `evaluator_adjustment`;
-- `final_score`;
-- `automatic_fail`;
-- `result`.
-
-The calculation must be deterministic and covered by unit tests independent of HTTP.
+- `AssessmentScoreCalculator` — deterministic scoring;
+- `ExecutionAssessmentManager` — assessment creation/finalization/lifecycle invariants;
+- migration/backfill logic isolated from public HTTP paths.
 
 ---
 
-## 23. Error handling
+## 22. Error handling
 
-Expected domain errors use deterministic validation/domain exceptions and never partially mutate the assessment.
+Deterministic validation/domain errors include:
 
-Examples:
-
-- weights do not total 100;
-- criterion missing score;
-- criterion missing evidence;
-- linked timeline event belongs to another execution;
-- critical error not in catalog;
-- invalid penalty rule/points;
+- duplicate assessment per execution;
+- weights not totaling 100;
+- unscored criterion;
+- criterion without evidence;
+- foreign execution event reference;
+- unknown new critical-error label;
+- invalid penalty rule/value;
 - adjustment outside -10..+10;
-- adjustment missing justification;
-- finalization before execution completion;
-- mutation after finalization;
-- cross-org resource reference;
-- duplicate assessment for execution.
+- nonzero adjustment without justification;
+- key time outside execution window;
+- missing fact/interpretation/recommendation;
+- finalization before completed execution;
+- finalization of cancelled execution;
+- mutation of finalized historical content;
+- invalid post-finalization action status transition;
+- cross-org execution/event/person reference.
 
 Finalization is transactional.
 
 ---
 
-## 24. Testing strategy
+## 23. Testing strategy
 
-M4 implementation must follow RED → GREEN cycles.
+Implementation follows TDD RED -> GREEN.
 
 ### Unit tests
 
-At least:
-
-- weighted score calculation;
+- weighted score;
 - penalty aggregation;
 - clamp to 0..100;
 - automatic-fail precedence;
-- evaluator adjustment behavior;
+- adjustment behavior;
 - threshold result.
 
 ### Feature/domain tests
 
-At least:
-
 - one assessment per execution;
-- default rubric seeding from learning objectives;
+- rubric seeding from learning objectives;
 - exact 100.00 weight distribution;
-- manual criteria when no objectives exist;
-- finalization rejects incomplete rubric;
-- finalization rejects criterion without evidence;
+- manual criteria when no objectives;
+- incomplete rubric cannot finalize;
+- criterion without evidence cannot finalize;
 - same-execution event evidence accepted;
 - cross-execution evidence rejected;
-- catalog error occurrence accepted;
-- unknown new error occurrence rejected;
-- penalty occurrence affects score;
-- automatic fail overrides pass result;
+- catalog error accepted;
+- unknown new error rejected;
+- penalty changes final score;
+- automatic fail overrides numerical pass;
 - nonzero adjustment requires justification;
-- adjustment bounded to -10..+10;
-- key-time elapsed value calculated server-side;
-- invalid key-time window rejected;
-- fact/interpretation/recommendation required for new assessment finalization;
-- legacy unstructured entry cannot be created through public HTTP flow;
-- action plan ownership checks;
-- `scenarios.view` can read;
-- `evaluations.manage` required to mutate;
-- `scenarios.manage` alone cannot mutate assessment;
-- cross-org assessment read/write blocked;
-- finalized aggregate immutable;
-- stale concurrent finalization is safe under row lock;
-- legacy import preserves score/error strings/debrief text without semantic invention;
+- adjustment limited to -10..+10;
+- server-derived key-time elapsed value;
+- invalid time window rejected;
+- structured debrief categories required;
+- `legacy_unstructured` cannot be created by public HTTP;
+- action item requires responsible party and deadline;
+- post-finalization action content immutable;
+- valid action status transition after finalization;
+- terminal action status cannot reopen in M4;
+- `scenarios.view` reads;
+- `evaluations.manage` mutates;
+- `scenarios.manage` alone cannot mutate;
+- cross-org read/write blocked;
+- finalized assessment content immutable;
+- stale concurrent finalization safe under row lock;
+- legacy import preserves numeric score without synthetic pass/fail;
+- legacy error strings preserved without inferred penalty;
+- legacy debrief preserved without semantic reclassification;
 - active UI no longer posts to `scenarios.evaluate`.
 
-### Regression gate
-
-Full existing M1-M3 suite must remain green.
+Full M1-M3 regression suite must remain green.
 
 ---
 
-## 25. Auditability
+## 24. Auditability and privacy
 
-M4 must leave clear provenance for high-value decisions:
+M4 preserves provenance for:
 
 - who finalized;
 - when finalized;
-- numerical components of final score;
+- score components;
 - adjustment justification;
-- critical-error rule and penalty snapshot;
+- critical-error rule/penalty snapshot;
 - evidence author;
-- legacy import marker.
+- legacy import marker;
+- post-finalization action status actor/time.
 
-Sensitive free text must not be unnecessarily duplicated into generic logs/audit metadata. Existing repository sanitization conventions remain applicable.
+Free-text evidence/debrief content must not be unnecessarily duplicated into generic logs. Existing sanitization conventions remain applicable.
 
 ---
 
-## 26. Performance and query boundaries
+## 25. Performance
 
-M4 pages should eager-load the assessment graph needed for rendering and avoid N+1 behavior for:
+Assessment page should eager-load the graph needed to render:
 
 - criteria/evidence;
 - critical-error occurrences/events;
@@ -767,80 +690,80 @@ M4 pages should eager-load the assessment graph needed for rendering and avoid N
 - debrief entries/action items;
 - responsible people where applicable.
 
-No large analytics query belongs in M4.
+Avoid N+1 queries. Advanced analytics belong to M5.
 
 ---
 
-## 27. Explicit non-goals
+## 26. Explicit non-goals
 
 Not M4:
 
-- reusable organization-wide rubric template library;
+- reusable rubric-template library;
 - rubric template versioning;
-- PDF/CSV executive reports;
-- dashboards/benchmark analytics;
-- cohort comparison;
+- PDF/CSV reports;
+- executive dashboards/benchmark analytics;
 - AI-generated feedback;
-- automatic NLP classification of debrief text;
-- file/media evidence upload;
+- NLP debrief classification;
+- evidence file uploads;
 - electronic signatures;
-- amendment workflow for finalized assessments;
+- amendment/reopen workflow for finalized assessment;
 - external API;
-- mobile-native application;
+- mobile-native app;
 - M5 product/reporting work;
 - M6 production hardening;
-- M7 design-system final audit;
+- M7 final design-system audit;
 - M8 Wiki overhaul;
 - M9 release/tag work.
 
 ---
 
-## 28. M4 completion checklist
+## 27. Completion checklist
 
-M4 is complete only when all of the following are demonstrated:
+M4 is complete only when:
 
 - [ ] assessment belongs to `ScenarioExecution`;
 - [ ] one assessment per execution;
-- [ ] criteria are normalized and weighted;
-- [ ] criterion weights total exactly 100.00 at finalization;
-- [ ] all criteria are scored before finalization;
-- [ ] evidence exists per criterion;
-- [ ] evidence cross-execution reference is blocked;
-- [ ] catalog critical errors remain definition data;
-- [ ] observed critical errors are execution-assessment records;
-- [ ] penalty rule is explicit;
-- [ ] automatic fail is explicit;
-- [ ] key times are server-derived relative to execution start;
-- [ ] hybrid score is deterministic and centralized;
-- [ ] evaluator adjustment is limited to -10..+10;
-- [ ] nonzero adjustment requires justification;
-- [ ] pass threshold is explicit and snapshot at 70.00;
+- [ ] criteria normalized and weighted;
+- [ ] weights total exactly 100.00 at normal finalization;
+- [ ] all normal-M4 criteria scored;
+- [ ] evidence exists per normal-M4 criterion;
+- [ ] cross-execution evidence blocked;
+- [ ] catalog remains definition data;
+- [ ] observed critical errors are assessment records;
+- [ ] penalty rule explicit;
+- [ ] automatic fail explicit;
+- [ ] key times server-derived from execution start;
+- [ ] scoring deterministic and centralized;
+- [ ] adjustment limited to -10..+10;
+- [ ] nonzero adjustment justified;
+- [ ] new M4 threshold snapshot is 70.00;
 - [ ] debrief separates fact/interpretation/recommendation;
-- [ ] action plan exists as structured domain;
-- [ ] `evaluations.manage` protects all mutations;
+- [ ] action plan has action/responsible/deadline/status;
+- [ ] finalized action content immutable while status remains operationally followable;
+- [ ] `evaluations.manage` protects mutations;
 - [ ] `scenarios.manage` alone does not authorize assessment mutation;
-- [ ] cross-org access is blocked;
-- [ ] public UUID boundary is maintained;
-- [ ] finalization requires completed execution;
+- [ ] cross-org access blocked;
+- [ ] public UUID boundary maintained;
+- [ ] normal finalization requires completed execution;
 - [ ] cancelled execution cannot finalize;
-- [ ] finalized assessment aggregate is immutable;
-- [ ] legacy score is preserved through controlled import;
-- [ ] legacy error strings are preserved without inferred penalties;
-- [ ] legacy debrief is preserved without semantic reclassification;
-- [ ] active UI no longer writes new legacy Scenario assessment fields;
-- [ ] old DB columns remain available for rollback compatibility;
-- [ ] full PHPUnit suite passes;
+- [ ] finalized historical assessment content immutable;
+- [ ] legacy score preserved without invented pass/fail;
+- [ ] legacy error strings preserved without invented penalties;
+- [ ] legacy debrief preserved without semantic reclassification;
+- [ ] active UI stops writing legacy Scenario assessment fields;
+- [ ] old DB columns remain for rollback compatibility;
+- [ ] PHPUnit full suite passes;
 - [ ] Pint passes;
 - [ ] migrations pass;
 - [ ] Vite build passes;
-- [ ] `docs/PHASE_M4_AUDIT.md` is created;
+- [ ] `docs/PHASE_M4_AUDIT.md` exists;
 - [ ] exact final HEAD receives green CI;
 - [ ] PR has no unresolved review threads before integration.
 
 ---
 
-## 29. Definition of done
+## 28. Definition of done
 
-M4 is ready for integration when a completed `ScenarioExecution` can produce a fully structured, explainable and immutable institutional assessment whose numerical result can be reproduced from persisted rubric scores, critical penalties and justified evaluator adjustment; whose evidence and references cannot cross execution/organization boundaries; whose debrief separates facts, interpretations and recommendations; whose action plan is structured; and whose legacy predecessor data has been preserved without inventing semantics.
+M4 is ready for integration when a completed `ScenarioExecution` can produce a structured, explainable and immutable institutional assessment whose numerical result is reproducible from rubric scores, critical penalties and justified evaluator adjustment; whose evidence and references cannot cross execution/organization boundaries; whose debrief separates facts, interpretations and recommendations; whose action plan preserves historical content while allowing controlled operational status follow-up; and whose legacy predecessor data has been preserved without invented semantics.
 
 Only after this state is audited and green should M5 — Institutional Product begin.
