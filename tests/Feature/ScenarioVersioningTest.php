@@ -7,9 +7,11 @@ use App\Models\Scenario;
 use App\Models\ScenarioVersion;
 use App\Models\User;
 use App\Models\UserOrganizationAccess;
+use App\Services\ScenarioVersionManager;
 use App\Support\Auth\AccessAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
+use LogicException;
 use Tests\TestCase;
 
 class ScenarioVersioningTest extends TestCase
@@ -40,19 +42,7 @@ class ScenarioVersioningTest extends TestCase
 
     public function test_new_scenario_creates_version_one_with_scalable_definition(): void
     {
-        $organization = $this->authenticateScenarioManager();
-
-        $this->post(route('scenarios.store'), [
-            'environment' => 'Terminal intermodal',
-            'threat_level' => 'potencial',
-            'estimated_casualty_count' => 1000,
-            'mechanism' => 'Colisão em cadeia com múltiplas vítimas',
-            'resources' => ['Kit IFAK', 'Rádio'],
-        ])->assertSessionHasNoErrors();
-
-        $scenario = Scenario::query()
-            ->where('organization_id', $organization->id)
-            ->firstOrFail();
+        [$scenario, $version] = $this->createScenarioWithVersion(1000);
 
         $this->assertDatabaseHas('scenario_versions', [
             'scenario_id' => $scenario->id,
@@ -61,12 +51,75 @@ class ScenarioVersioningTest extends TestCase
             'publication_status' => 'draft',
         ]);
 
-        $version = ScenarioVersion::query()->where('scenario_id', $scenario->id)->firstOrFail();
-
         $this->assertNotEmpty($version->uuid);
         $this->assertSame(1000, $version->estimated_casualty_count);
         $this->assertSame('Terminal intermodal', $version->environment);
         $this->assertTrue($scenario->latestVersion()->first()->is($version));
+    }
+
+    public function test_published_version_definition_is_immutable(): void
+    {
+        [, $version] = $this->createScenarioWithVersion(1000);
+        $manager = app(ScenarioVersionManager::class);
+
+        $manager->publish($version);
+        $version->refresh();
+
+        $this->assertSame('published', $version->publication_status);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('Published scenario versions are immutable. Create a new version instead.');
+
+        $version->update(['environment' => 'Ambiente alterado indevidamente']);
+    }
+
+    public function test_revision_of_published_version_creates_next_draft_without_mutating_history(): void
+    {
+        [$scenario, $versionOne] = $this->createScenarioWithVersion(1000);
+        $manager = app(ScenarioVersionManager::class);
+        $manager->publish($versionOne);
+
+        $versionTwo = $manager->revise($versionOne->fresh(), [
+            'environment' => 'Terminal intermodal ampliado',
+            'estimated_casualty_count' => 2000,
+        ]);
+
+        $this->assertSame(2, $versionTwo->version_number);
+        $this->assertSame('draft', $versionTwo->publication_status);
+        $this->assertSame(2000, $versionTwo->estimated_casualty_count);
+        $this->assertSame('Terminal intermodal ampliado', $versionTwo->environment);
+        $this->assertSame($scenario->id, $versionTwo->scenario_id);
+        $this->assertNotSame($versionOne->uuid, $versionTwo->uuid);
+
+        $versionOne->refresh();
+        $this->assertSame('published', $versionOne->publication_status);
+        $this->assertSame(1000, $versionOne->estimated_casualty_count);
+        $this->assertSame('Terminal intermodal', $versionOne->environment);
+        $this->assertCount(2, $scenario->fresh()->versions);
+        $this->assertTrue($scenario->fresh()->latestVersion()->first()->is($versionTwo));
+    }
+
+    private function createScenarioWithVersion(int $estimatedCasualtyCount): array
+    {
+        $organization = $this->authenticateScenarioManager();
+
+        $this->post(route('scenarios.store'), [
+            'environment' => 'Terminal intermodal',
+            'threat_level' => 'potencial',
+            'estimated_casualty_count' => $estimatedCasualtyCount,
+            'mechanism' => 'Colisão em cadeia com múltiplas vítimas',
+            'resources' => ['Kit IFAK', 'Rádio'],
+        ])->assertSessionHasNoErrors();
+
+        $scenario = Scenario::query()
+            ->where('organization_id', $organization->id)
+            ->firstOrFail();
+        $version = ScenarioVersion::query()
+            ->where('scenario_id', $scenario->id)
+            ->where('version_number', 1)
+            ->firstOrFail();
+
+        return [$scenario, $version];
     }
 
     private function authenticateScenarioManager(): Organization
