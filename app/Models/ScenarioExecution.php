@@ -64,6 +64,11 @@ class ScenarioExecution extends Model
         return $this->hasMany(ExecutionInject::class)->orderBy('id');
     }
 
+    public function resources(): HasMany
+    {
+        return $this->hasMany(ExecutionResource::class)->orderBy('name');
+    }
+
     public function isDraft(): bool
     {
         return $this->status === 'draft';
