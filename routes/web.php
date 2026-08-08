@@ -10,6 +10,7 @@ use App\Http\Controllers\CriticalErrorOccurrenceController;
 use App\Http\Controllers\DebriefEntryController;
 use App\Http\Controllers\ExecutionAssessmentController;
 use App\Http\Controllers\ExecutionEventController;
+use App\Http\Controllers\ExecutionHistoryController;
 use App\Http\Controllers\ExecutionInjectController;
 use App\Http\Controllers\ExecutionParticipantController;
 use App\Http\Controllers\ExecutionResourceController;
@@ -48,6 +49,8 @@ Route::get('/dashboard/executive', ExecutiveDashboardController::class)
     ->name('dashboard.executive');
 
 Route::middleware(['auth', 'account.active'])->group(function () {
+    Route::get('/history/executions', ExecutionHistoryController::class)->name('execution-history.index');
+
     Route::get('/access', [AccessAdministrationController::class, 'index'])->name('access.index');
     Route::get('/access/create', [AccessAdministrationController::class, 'create'])->name('access.create');
     Route::post('/access', [AccessAdministrationController::class, 'store'])->name('access.store');
