@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\ActionItem;
+use App\Models\ExecutionDebrief;
 use App\Models\Organization;
 use App\Models\Scenario;
 use App\Models\ScenarioExecution;
@@ -47,6 +49,64 @@ class AssessmentCockpitTest extends TestCase
             ->assertSee('Plano de ação');
     }
 
+    public function test_draft_assessment_page_exposes_all_structured_mutation_forms(): void
+    {
+        [$organization, $execution] = $this->context();
+        $assessment = app(ExecutionAssessmentManager::class)->createForExecution($execution);
+        $criterion = $assessment->criteria()->firstOrFail();
+        $this->authenticate($organization);
+
+        $response = $this->get(route('assessments.show', $assessment))->assertOk();
+
+        foreach ([
+            route('assessment-criteria.store', $assessment),
+            route('assessment-criteria.update', $criterion),
+            route('assessment-evidence.store', $criterion),
+            route('critical-error-occurrences.store', $assessment),
+            route('key-times.store', $assessment),
+            route('debrief-entries.store', $assessment),
+            route('action-items.store', $assessment),
+            route('assessments.adjustment', $assessment),
+            route('assessments.finalize', $assessment),
+        ] as $action) {
+            $response->assertSee($action, false);
+        }
+    }
+
+    public function test_finalized_assessment_hides_content_edit_forms_but_keeps_action_status_follow_up(): void
+    {
+        [$organization, $execution] = $this->context();
+        $assessment = app(ExecutionAssessmentManager::class)->createForExecution($execution);
+        $criterion = $assessment->criteria()->firstOrFail();
+        $debrief = ExecutionDebrief::create(['execution_assessment_id' => $assessment->id]);
+        $action = ActionItem::create([
+            'execution_debrief_id' => $debrief->id,
+            'action' => 'Revisar protocolo de comunicação.',
+            'responsible_label' => 'Coordenação',
+            'due_date' => now()->addWeek()->toDateString(),
+        ]);
+        $assessment->update(['status' => 'finalized']);
+        $this->authenticate($organization);
+
+        $response = $this->get(route('assessments.show', $assessment))->assertOk();
+
+        foreach ([
+            route('assessment-criteria.store', $assessment),
+            route('assessment-criteria.update', $criterion),
+            route('assessment-evidence.store', $criterion),
+            route('critical-error-occurrences.store', $assessment),
+            route('key-times.store', $assessment),
+            route('debrief-entries.store', $assessment),
+            route('action-items.store', $assessment),
+            route('assessments.adjustment', $assessment),
+            route('assessments.finalize', $assessment),
+        ] as $actionUrl) {
+            $response->assertDontSee($actionUrl, false);
+        }
+
+        $response->assertSee(route('action-items.transition', $action), false);
+    }
+
     private function authenticate(Organization $organization): void
     {
         $user = User::factory()->create(['status' => 'active']);
@@ -65,7 +125,7 @@ class AssessmentCockpitTest extends TestCase
     private function context(): array
     {
         $organization = Organization::create([
-            'name' => 'Centro M4 Cockpit',
+            'name' => 'Centro M4 Cockpit '.fake()->uuid(),
             'kind' => 'company',
             'status' => 'active',
         ]);
