@@ -9,6 +9,7 @@ use App\Models\ScenarioExecution;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
+use InvalidArgumentException;
 use Tests\TestCase;
 
 class ExecutionAssessmentTest extends TestCase
@@ -89,6 +90,26 @@ class ExecutionAssessmentTest extends TestCase
 
         ExecutionAssessment::create([
             'organization_id' => $execution->organization_id,
+            'scenario_execution_id' => $execution->id,
+            'source' => 'm4',
+            'status' => 'draft',
+            'pass_threshold' => 70.00,
+        ]);
+    }
+
+    public function test_assessment_organization_must_match_execution_organization(): void
+    {
+        $execution = $this->execution();
+        $foreignOrganization = Organization::create([
+            'name' => 'Outra organização M4',
+            'kind' => 'company',
+            'status' => 'active',
+        ]);
+
+        $this->expectException(InvalidArgumentException::class);
+
+        ExecutionAssessment::create([
+            'organization_id' => $foreignOrganization->id,
             'scenario_execution_id' => $execution->id,
             'source' => 'm4',
             'status' => 'draft',
