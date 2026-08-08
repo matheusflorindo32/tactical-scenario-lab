@@ -8,12 +8,14 @@ use App\Http\Controllers\AssessmentEvidenceController;
 use App\Http\Controllers\AuthenticatedSessionController;
 use App\Http\Controllers\CriticalErrorOccurrenceController;
 use App\Http\Controllers\DebriefEntryController;
+use App\Http\Controllers\ExecutiveDashboardController;
 use App\Http\Controllers\ExecutionAssessmentController;
 use App\Http\Controllers\ExecutionEventController;
 use App\Http\Controllers\ExecutionInjectController;
 use App\Http\Controllers\ExecutionParticipantController;
 use App\Http\Controllers\ExecutionResourceController;
 use App\Http\Controllers\ExecutionTeamController;
+use App\Http\Controllers\InstructorDashboardController;
 use App\Http\Controllers\KeyTimeRecordController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OrganizationMembershipController;
@@ -25,9 +27,6 @@ use App\Http\Controllers\ScenarioController;
 use App\Http\Controllers\ScenarioExecutionController;
 use App\Http\Controllers\ScenarioVersionController;
 use App\Http\Controllers\UnitController;
-use App\Models\Scenario;
-use App\Services\Auth\ActiveOrganization;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
@@ -41,27 +40,12 @@ Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
     ->middleware('auth')
     ->name('logout');
 
-Route::get('/dashboard', function (Request $request, ActiveOrganization $activeOrganization) {
-    $organizationId = $activeOrganization->id($request);
-    $scenarioQuery = Scenario::query()->where('organization_id', $organizationId);
-    $recent = (clone $scenarioQuery)->latest()->limit(6)->get();
-    $all = (clone $scenarioQuery)->get(['status', 'score', 'critical_errors']);
-
-    return view('dashboard', [
-        'recent' => $recent,
-        'total' => $all->count(),
-        'drafts' => $all->where('status', 'draft')->count(),
-        'running' => $all->where('status', 'running')->count(),
-        'completed' => $all->where('status', 'completed')->count(),
-        'avgScore' => optional($all->where('status', 'completed'))->avg('score'),
-        'topErrors' => $all->pluck('critical_errors')
-            ->filter(fn ($value) => is_array($value))
-            ->flatten()
-            ->countBy()
-            ->sortDesc()
-            ->take(4),
-    ]);
-})->middleware(['auth', 'account.active'])->name('dashboard');
+Route::get('/dashboard', InstructorDashboardController::class)
+    ->middleware(['auth', 'account.active'])
+    ->name('dashboard');
+Route::get('/dashboard/executive', ExecutiveDashboardController::class)
+    ->middleware(['auth', 'account.active'])
+    ->name('dashboard.executive');
 
 Route::middleware(['auth', 'account.active'])->group(function () {
     Route::get('/access', [AccessAdministrationController::class, 'index'])->name('access.index');
