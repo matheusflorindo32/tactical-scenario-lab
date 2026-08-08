@@ -54,6 +54,24 @@ class ExecutionTimelineTest extends TestCase
         $this->assertSame(['source' => 'instructor'], $event->metadata);
     }
 
+    public function test_unapproved_or_sensitive_event_metadata_keys_are_rejected(): void
+    {
+        [$organization, $execution] = $this->executionContext('running');
+        $this->authenticate($organization);
+
+        $this->post(route('execution-events.store', $execution), [
+            'kind' => 'observation',
+            'occurred_at' => now()->toDateTimeString(),
+            'summary' => 'Tentativa de metadata sensível.',
+            'metadata' => [
+                'source' => 'instructor',
+                'password' => 'segredo-nao-deve-ser-persistido',
+            ],
+        ])->assertSessionHasErrors('metadata');
+
+        $this->assertDatabaseCount('execution_events', 0);
+    }
+
     public function test_timeline_writes_are_rejected_outside_running_state(): void
     {
         foreach (['draft', 'completed', 'cancelled'] as $status) {
