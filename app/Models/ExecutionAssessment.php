@@ -6,6 +6,7 @@ use App\Models\Concerns\HasPublicUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class ExecutionAssessment extends Model
 {
@@ -74,6 +75,11 @@ class ExecutionAssessment extends Model
         return $this->hasMany(KeyTimeRecord::class)
             ->orderBy('occurred_at')
             ->orderBy('id');
+    }
+
+    public function debrief(): HasOne
+    {
+        return $this->hasOne(ExecutionDebrief::class);
     }
 
     public function isDraft(): bool
