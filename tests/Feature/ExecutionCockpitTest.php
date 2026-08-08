@@ -54,6 +54,22 @@ class ExecutionCockpitTest extends TestCase
             ->assertSee('Recursos');
     }
 
+    public function test_legacy_evaluation_ui_preserves_observed_critical_error_selection_until_m4(): void
+    {
+        [$organization, $scenario] = $this->scenarioWithVersion('published');
+        $this->authenticate($organization);
+        $scenario->update([
+            'status' => 'running',
+            'started_at' => now(),
+        ]);
+
+        $this->get(route('scenarios.show', $scenario->fresh()))
+            ->assertOk()
+            ->assertSee('Erros observados nesta execução')
+            ->assertSee('name="observed_critical_errors[]"', false)
+            ->assertSee('Entrada em área insegura');
+    }
+
     private function scenarioWithVersion(string $publicationStatus): array
     {
         $organization = Organization::create([
