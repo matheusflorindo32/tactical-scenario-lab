@@ -29,7 +29,7 @@ class ScenarioController extends Controller
     {
         $activeOrganization->ensureAbility($request, 'scenarios.manage');
 
-        return view('scenarios.create');
+        return view('scenarios.create-scalable');
     }
 
     public function store(
@@ -42,16 +42,39 @@ class ScenarioController extends Controller
         $validated = $request->validate([
             'environment' => ['required', 'string', 'max:100'],
             'threat_level' => ['required', Rule::in(['controlada', 'potencial', 'ativa'])],
-            'casualties' => ['required', 'integer', 'min:1', 'max:10'],
+            'casualties' => ['nullable', 'integer', 'min:1', 'required_without:estimated_casualty_count'],
+            'estimated_casualty_count' => ['nullable', 'integer', 'min:1', 'required_without:casualties'],
             'mechanism' => ['required', 'string', 'max:150'],
             'resources' => ['nullable', 'array', 'max:20'],
             'resources.*' => ['string', 'max:80', 'distinct'],
         ]);
 
-        $scenario = Scenario::create([
-            ...$generator->generate($validated),
-            'organization_id' => $organizationId,
-        ]);
+        $estimatedCasualtyCount = (int) ($validated['estimated_casualty_count'] ?? $validated['casualties']);
+        $validated['casualties'] = $estimatedCasualtyCount;
+        $validated['estimated_casualty_count'] = $estimatedCasualtyCount;
+        $definition = $generator->generate($validated);
+
+        $scenario = DB::transaction(function () use ($definition, $organizationId): Scenario {
+            $scenario = Scenario::create([
+                ...$definition,
+                'organization_id' => $organizationId,
+            ]);
+
+            $scenario->versions()->create([
+                'version_number' => 1,
+                'environment' => $definition['environment'],
+                'threat_level' => $definition['threat_level'],
+                'mechanism' => $definition['mechanism'],
+                'estimated_casualty_count' => $definition['estimated_casualty_count'],
+                'resources' => $definition['resources'],
+                'learning_objectives' => $definition['learning_objectives'],
+                'expected_actions' => $definition['expected_actions'],
+                'critical_errors' => $definition['critical_errors'],
+                'publication_status' => 'draft',
+            ]);
+
+            return $scenario;
+        });
 
         return redirect()
             ->route('scenarios.show', $scenario)
@@ -66,7 +89,11 @@ class ScenarioController extends Controller
         $organizationId = $activeOrganization->ensureAbility($request, 'scenarios.view');
         $this->ensureScenarioInOrganization($scenario, $organizationId);
 
-        return view('scenarios.show', compact('scenario'));
+        $version = $scenario->latestVersion()
+            ->withCount(['victims', 'cohorts'])
+            ->first();
+
+        return view('scenarios.show-scalable', compact('scenario', 'version'));
     }
 
     /**
