@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\UserOrganizationAccess;
 use App\Support\Auth\AccessAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class ScenarioCasualtyScaleTest extends TestCase
@@ -52,7 +53,7 @@ class ScenarioCasualtyScaleTest extends TestCase
 
         $this->assertDatabaseCount('scenarios', 1);
 
-        if (\Illuminate\Support\Facades\Schema::hasTable('scenario_victims')) {
+        if (Schema::hasTable('scenario_victims')) {
             $this->assertDatabaseCount('scenario_victims', 0);
         }
     }
