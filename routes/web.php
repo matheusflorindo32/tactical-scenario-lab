@@ -3,6 +3,8 @@
 use App\Http\Controllers\AccessAdministrationController;
 use App\Http\Controllers\ActiveOrganizationController;
 use App\Http\Controllers\AuthenticatedSessionController;
+use App\Http\Controllers\ExecutionParticipantController;
+use App\Http\Controllers\ExecutionTeamController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OrganizationMembershipController;
 use App\Http\Controllers\PersonContactController;
@@ -137,6 +139,10 @@ Route::middleware(['auth', 'account.active'])->group(function () {
         ->name('executions.complete');
     Route::patch('/executions/{execution}/cancel', [ScenarioExecutionController::class, 'cancel'])
         ->name('executions.cancel');
+    Route::post('/executions/{execution}/teams', [ExecutionTeamController::class, 'store'])
+        ->name('execution-teams.store');
+    Route::post('/executions/{execution}/participants', [ExecutionParticipantController::class, 'store'])
+        ->name('execution-participants.store');
 
     Route::post('/scenarios/{scenario}/execute', [ScenarioController::class, 'execute'])
         ->name('scenarios.execute');
