@@ -58,7 +58,35 @@ Filtros e relatórios não tentam reconstruir a unidade atual da pessoa. A atrib
 - `unit_name_snapshot` preserva o rótulo histórico;
 - `position_snapshot` preserva a posição institucional naquele momento.
 
-Renomeações posteriores da unidade não reescrevem o histórico já capturado.
+Renomeações posteriores da unidade ou mudanças posteriores de posição não reescrevem o histórico já capturado.
+
+### Regra para novas atribuições
+
+Ao adicionar um participante, o vínculo precisa pertencer à organização ativa, estar ativo e apontar para a mesma pessoa selecionada. Quando o vínculo possui unidade, essa unidade também precisa pertencer à organização ativa.
+
+Se a requisição antiga informar apenas a pessoa, o sistema procura vínculos ativos dessa pessoa no tenant atual. A inferência só é permitida quando existe **exatamente um** vínculo candidato. Se houver mais de um, a operação falha e exige seleção explícita de `organization_membership_uuid`. Isso impede que um vínculo institucional ambíguo seja congelado no histórico.
+
+### Regra de backfill histórico: anchor/candidate
+
+A migration M5 preenche atribuição histórica de registros legados de forma conservadora:
+
+1. o **anchor** é `execution.started_at`; se ausente, usa `execution.created_at`;
+2. somente vínculos da mesma pessoa **e da mesma organização da execução** podem ser candidatos;
+3. o vínculo precisa ter começado até a data do anchor;
+4. não pode ter terminado antes da data do anchor;
+5. não pode ter sido excluído antes do instante do anchor;
+6. o snapshot só é preenchido quando existe **exatamente um candidato**.
+
+Zero candidatos ou múltiplos candidatos deixam o legado sem atribuição inventada. O M5 prefere ausência explícita a reconstrução histórica incerta.
+
+### Semântica multi-unidade
+
+Uma execução pode conter participantes historicamente vinculados a várias unidades.
+
+- O filtro por unidade usa `whereHas` nos participantes e considera a execução compatível quando **ao menos um participante** possui aquele `unit_id_snapshot`.
+- A execução continua sendo uma única execução no histórico; não é duplicada por quantidade de participantes/unidades.
+- O CSV agrega os UUIDs e nomes históricos distintos das unidades da execução, remove duplicatas e os serializa em uma única célula separados por `;`.
+- Quando não existe rótulo histórico, o CSV usa `Sem unidade histórica` em vez de consultar o nome atual da pessoa/unidade.
 
 ## Histórico institucional
 
@@ -188,6 +216,9 @@ A suíte M5 mantém testes para:
 - exclusão de resultado legado desconhecido da taxa de aprovação;
 - erros críticos baseados em ocorrências observadas;
 - atribuição histórica de unidade;
+- rejeição de membership cross-org;
+- rejeição de atribuição ambígua;
+- preservação de snapshots após renomeações;
 - histórico paginado;
 - CSV tenant-safe;
 - ordem estável das colunas;
