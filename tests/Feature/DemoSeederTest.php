@@ -48,7 +48,7 @@ class DemoSeederTest extends TestCase
         try {
             $this->expectException(LogicException::class);
             $this->expectExceptionMessage('DemoSeeder cannot run in production.');
-            $this->seed(DemoSeeder::class);
+            (new DemoSeeder)->run();
         } finally {
             app()->detectEnvironment(fn (): string => 'testing');
         }
