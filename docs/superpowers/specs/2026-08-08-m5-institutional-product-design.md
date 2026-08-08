@@ -138,7 +138,7 @@ This satisfies the product requirement for organization filtering through the al
 
 ## 6. InstitutionalFilter
 
-M5 centralizes dashboard/history/export filtering in an immutable value object, provisionally named `InstitutionalFilter`.
+M5 centralizes dashboard/history/export filtering in one immutable value object named `InstitutionalFilter`.
 
 Supported fields:
 
@@ -163,6 +163,10 @@ When no period is provided, dashboards use the last 90 calendar days through the
 ### Unit
 
 `unit_uuid`, when supplied, must belong to the active organization. Cross-org or unknown units are rejected before query execution.
+
+An execution matches a unit filter when **at least one execution participant** has a historical `unit_id_snapshot` equal to the selected unit. The execution appears once even when multiple participants match.
+
+Executions without historical unit attribution do not match a specific unit filter.
 
 ### Scenario
 
@@ -205,9 +209,9 @@ The report/unit-filter layer uses snapshot fields, not a person's current member
 
 ## 8. Instructor dashboard
 
-The existing `/dashboard` becomes the instructor-oriented product dashboard.
+The existing `/dashboard` route (`dashboard`) becomes the instructor-oriented product dashboard.
 
-It is backed by `InstructorDashboardQuery` rather than a route closure.
+It is backed by `InstructorDashboardController` + `InstructorDashboardQuery` rather than a route closure.
 
 ### Core cards
 
@@ -246,7 +250,12 @@ No metric uses legacy `Scenario.score`.
 
 ## 9. Executive dashboard
 
-M5 adds an executive dashboard, for example `/dashboard/executive`, guarded by `reports.view`.
+M5 adds exactly:
+
+- `GET /dashboard/executive`
+- route name `dashboard.executive`
+- controller `ExecutiveDashboardController`
+- authorization `reports.view`
 
 It is backed by `ExecutiveDashboardQuery`.
 
@@ -282,14 +291,21 @@ No predictive, risk-scoring or scientific statistical analytics enter M5.
 
 ## 10. Execution history
 
-M5 adds an institutional history page backed by `ExecutionHistoryQuery`.
+M5 adds exactly:
+
+- `GET /history/executions`
+- route name `execution-history.index`
+- authorization `reports.view`
+- controller `ExecutionHistoryController`
+
+The page is backed by `ExecutionHistoryQuery`.
 
 Columns include:
 
 - execution public UUID/sequence;
 - scenario title;
 - scenario version;
-- historical unit when available;
+- historical unit summary;
 - execution status;
 - started/completed timestamps;
 - assessment status;
@@ -298,6 +314,10 @@ Columns include:
 - automatic-fail marker;
 - count of observed critical errors;
 - count of open actions.
+
+### Multiple units
+
+An execution may contain participants from multiple historical units. The history UI displays distinct unit names as a compact list. It never selects one arbitrary unit as the execution's single unit.
 
 ### Pagination
 
@@ -313,7 +333,7 @@ Allowlisted sort options only; arbitrary query-column sorting is rejected.
 
 ## 11. Report data builder
 
-`ExecutionReportDataBuilder` is the single source of report/export presentation data for one execution.
+`ExecutionReportDataBuilder` is the single source of report presentation data for one execution.
 
 It loads only data belonging to the active organization and returns a presentation-safe structure containing:
 
@@ -339,15 +359,17 @@ The builder does not expose arbitrary model serialization.
 
 ## 12. PDF report
 
-M5 provides a downloadable institutional PDF for one execution.
+M5 adds exactly:
 
-### Authorization
+- `GET /reports/executions/{execution}/pdf`
+- route name `reports.executions.pdf`
+- authorization `reports.view`
 
-Requires `reports.view` and same active organization.
+`{execution}` uses the existing public UUID route binding.
 
 ### Rendering
 
-The implementation uses `dompdf/dompdf` 3.1-compatible stable release through a small application adapter so PDF generation is not spread across controllers.
+The implementation uses the current stable `dompdf/dompdf` 3.1-compatible line through a small application adapter so PDF generation is not spread across controllers.
 
 The PDF is rendered from a dedicated server-side Blade/HTML report view.
 
@@ -374,17 +396,21 @@ The PDF includes:
 9. corrective-action plan;
 10. generation timestamp and public execution reference.
 
+A report for an execution without a finalized assessment still renders execution context and explicitly labels assessment/debriefing as unavailable or pending.
+
 M5 does not implement digital signatures or legally binding document certification.
 
 ---
 
 ## 13. CSV export
 
-M5 provides a CSV export for the filtered execution-history dataset.
+M5 adds exactly:
 
-### Authorization
+- `GET /reports/executions.csv`
+- route name `reports.executions.csv`
+- authorization `reports.view`
 
-Requires `reports.view`.
+The endpoint exports the same filtered execution population defined by `InstitutionalFilter` and `ExecutionHistoryQuery`.
 
 ### Stable schema
 
@@ -395,8 +421,8 @@ The first M5 schema is fixed and documented in this order:
 3. `scenario_uuid`
 4. `scenario_title`
 5. `scenario_version`
-6. `unit_uuid`
-7. `unit_name`
+6. `unit_uuids`
+7. `unit_names`
 8. `execution_status`
 9. `started_at`
 10. `completed_at`
@@ -407,15 +433,15 @@ The first M5 schema is fixed and documented in this order:
 15. `critical_error_count`
 16. `open_action_count`
 
-Dates use ISO 8601. Boolean uses `0|1`. Null remains an empty field.
+For an execution with multiple historical units, `unit_uuids` and `unit_names` contain distinct values joined by `;` in deterministic sorted order. Unknown attribution does not invent a UUID; if every participant lacks attribution, the UUID field is empty and the name field is `Sem unidade histórica`.
+
+Dates use ISO 8601. Boolean uses `0|1`. Other null values remain empty fields.
 
 ### CSV injection protection
 
 Text cells beginning with spreadsheet formula-control characters (`=`, `+`, `-`, `@`) are neutralized before output.
 
 The exporter streams records instead of building an unbounded full-file string in memory.
-
-The same `InstitutionalFilter` semantics used by history apply to CSV.
 
 ---
 
@@ -434,6 +460,17 @@ Fields:
 - `status = active|archived`;
 - `created_by_user_id`;
 - timestamps.
+
+### Web routes
+
+The M5 route family is:
+
+- `GET /scenario-templates` → `scenario-templates.index`;
+- `POST /scenario-versions/{scenarioVersion}/templates` → `scenario-templates.store`;
+- `POST /scenario-templates/{scenarioTemplate}/use` → `scenario-templates.use`;
+- `PATCH /scenario-templates/{scenarioTemplate}/archive` → `scenario-templates.archive`.
+
+All public model parameters use UUID route binding.
 
 ### Creation
 
@@ -472,7 +509,7 @@ It creates a deterministic fictional organization graph sufficient to demonstrat
 - refuses to run when application environment is `production`;
 - uses clearly fictional names and synthetic contact/identifier data only when such fields are required;
 - does not read or transform real production records;
-- is idempotent enough for a fresh demo database workflow;
+- is designed for a fresh/demo database and uses deterministic natural keys/known emails to avoid uncontrolled duplicates on an intentional second run;
 - is never automatically run by production migrations.
 
 ### Demo organization
@@ -538,7 +575,7 @@ M5 preserves existing HTTP/domain conventions.
 - invalid filters return validation errors;
 - cross-org UUIDs return 403/404 according to the existing resource-boundary convention and never leak foreign data;
 - report for execution without assessment still renders available execution context and explicitly indicates absence of finalized assessment;
-- CSV cells with missing values remain empty, not invented;
+- CSV cells with missing values remain empty except the explicit historical-unit label rule above;
 - ambiguous historical-unit backfill remains unknown, never guessed;
 - archived template use is rejected;
 - PDF rendering failures produce a controlled application error and do not expose stack traces in production configuration.
@@ -551,13 +588,13 @@ M5 improves information architecture enough to demonstrate the product but does 
 
 The UI reuses existing components, colors, typography and spacing tokens.
 
-New pages:
+New/changed pages are exactly:
 
 - instructor dashboard refresh at `/dashboard`;
-- executive dashboard;
-- execution history;
-- scenario templates list/detail/create-from-version flow;
-- print-specific execution report view.
+- executive dashboard at `/dashboard/executive`;
+- execution history at `/history/executions`;
+- scenario template list and actions under `/scenario-templates`;
+- print-specific execution report Blade view used by the PDF adapter.
 
 ### UX principles
 
@@ -583,6 +620,7 @@ Must prove:
 - active-organization isolation;
 - date filtering;
 - unit filtering through snapshots;
+- multi-unit execution appears only once under a matching unit filter;
 - scenario filtering;
 - M4 `final_score` drives averages rather than `Scenario.score`;
 - pass-rate denominator excludes unknown legacy results;
@@ -605,7 +643,7 @@ Must prove:
 
 - reports require `reports.view`;
 - cross-org execution report is blocked;
-- PDF response has expected content type and filename;
+- PDF response has expected content type and generated filename;
 - generated data omits sensitive identifiers/contact fields;
 - report data comes from M4 aggregate;
 - remote/user-controlled asset fetching is not enabled.
@@ -615,6 +653,7 @@ Must prove:
 Must prove:
 
 - stable header order;
+- multi-unit aggregation is deterministic;
 - tenant/filter isolation;
 - ISO date serialization;
 - null representation;
@@ -638,8 +677,9 @@ Must prove:
 
 - seeder refuses production;
 - fresh database receives complete fictitious demo graph;
+- second intentional demo seed does not create uncontrolled duplicate institutional graphs;
 - key walkthrough routes can render from seeded data;
-- no fixture uses known real-person PII.
+- fixtures use reserved/example domains and obviously fictional identities rather than real-person PII.
 
 ---
 
@@ -699,10 +739,10 @@ If a PDF later becomes too large for synchronous generation, job queues are eval
 M5 is complete only when all are true:
 
 - [ ] active `/dashboard` no longer derives assessment metrics from legacy `Scenario.score`;
-- [ ] instructor dashboard uses dedicated query layer;
-- [ ] executive dashboard exists and requires `reports.view`;
-- [ ] execution history exists with server pagination;
-- [ ] common period/scenario/unit filters are centralized;
+- [ ] instructor dashboard uses dedicated controller/query layer;
+- [ ] executive dashboard exists at `/dashboard/executive` and requires `reports.view`;
+- [ ] execution history exists at `/history/executions` with server pagination;
+- [ ] common period/scenario/unit filters are centralized in `InstitutionalFilter`;
 - [ ] active organization is never accepted as arbitrary client filter;
 - [ ] execution participants snapshot institutional attribution for new links;
 - [ ] ambiguous historical attribution is not guessed;
@@ -710,12 +750,13 @@ M5 is complete only when all are true:
 - [ ] pass rate excludes legacy assessments without result;
 - [ ] top errors use `CriticalErrorOccurrence` observations;
 - [ ] open/overdue action indicators work;
-- [ ] execution PDF report exists;
+- [ ] execution PDF exists at `/reports/executions/{execution}/pdf`;
 - [ ] PDF requires `reports.view` and tenant match;
 - [ ] PDF does not expose unnecessary PII;
 - [ ] PDF remote asset fetching is disabled;
-- [ ] filtered CSV export exists;
+- [ ] filtered CSV exists at `/reports/executions.csv`;
 - [ ] CSV schema/order is stable and documented;
+- [ ] CSV handles multiple execution units without inventing a primary unit;
 - [ ] CSV formula injection is neutralized;
 - [ ] CSV export is streamed;
 - [ ] scenario templates can be created from published versions;
