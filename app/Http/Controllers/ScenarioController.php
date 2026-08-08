@@ -52,11 +52,29 @@ class ScenarioController extends Controller
         $estimatedCasualtyCount = (int) ($validated['estimated_casualty_count'] ?? $validated['casualties']);
         $validated['casualties'] = $estimatedCasualtyCount;
         $validated['estimated_casualty_count'] = $estimatedCasualtyCount;
+        $definition = $generator->generate($validated);
 
-        $scenario = Scenario::create([
-            ...$generator->generate($validated),
-            'organization_id' => $organizationId,
-        ]);
+        $scenario = DB::transaction(function () use ($definition, $organizationId): Scenario {
+            $scenario = Scenario::create([
+                ...$definition,
+                'organization_id' => $organizationId,
+            ]);
+
+            $scenario->versions()->create([
+                'version_number' => 1,
+                'environment' => $definition['environment'],
+                'threat_level' => $definition['threat_level'],
+                'mechanism' => $definition['mechanism'],
+                'estimated_casualty_count' => $definition['estimated_casualty_count'],
+                'resources' => $definition['resources'],
+                'learning_objectives' => $definition['learning_objectives'],
+                'expected_actions' => $definition['expected_actions'],
+                'critical_errors' => $definition['critical_errors'],
+                'publication_status' => 'draft',
+            ]);
+
+            return $scenario;
+        });
 
         return redirect()
             ->route('scenarios.show', $scenario)
