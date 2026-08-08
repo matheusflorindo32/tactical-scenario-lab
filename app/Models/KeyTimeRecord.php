@@ -6,6 +6,7 @@ use App\Models\Concerns\HasPublicUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use InvalidArgumentException;
+use LogicException;
 
 class KeyTimeRecord extends Model
 {
@@ -37,6 +38,10 @@ class KeyTimeRecord extends Model
                 ->findOrFail($record->execution_assessment_id);
             $execution = $assessment->execution;
 
+            if ($assessment->isFinalized()) {
+                throw new LogicException('Finalized key time records are immutable.');
+            }
+
             if (trim((string) $record->label) === '') {
                 throw new InvalidArgumentException('Key time label is required.');
             }
@@ -63,6 +68,12 @@ class KeyTimeRecord extends Model
                 'elapsed_seconds',
                 (int) $execution->started_at->diffInSeconds($occurredAt),
             );
+        });
+
+        static::deleting(function (KeyTimeRecord $record): void {
+            if ($record->assessment()->firstOrFail()->isFinalized()) {
+                throw new LogicException('Finalized key time records are immutable.');
+            }
         });
     }
 
