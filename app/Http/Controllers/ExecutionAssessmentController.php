@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ExecutionAssessment;
+use App\Models\Person;
 use App\Models\ScenarioExecution;
 use App\Services\Auth\ActiveOrganization;
 use App\Services\ExecutionAssessmentManager;
@@ -54,10 +55,34 @@ class ExecutionAssessmentController extends Controller
             ->first();
         $canEvaluate = in_array(AccessAbility::EVALUATIONS_MANAGE, $access?->abilities ?? [], true);
 
+        $people = $canEvaluate
+            ? Person::query()
+                ->where('status', 'active')
+                ->whereHas('memberships', fn ($query) => $query
+                    ->where('organization_id', $organizationId)
+                    ->where('status', 'active')
+                    ->whereNull('ended_at'))
+                ->orderBy('display_name')
+                ->get(['id', 'uuid', 'display_name', 'social_name'])
+            : collect();
+
+        $events = $canEvaluate
+            ? $assessment->execution->events()
+                ->orderBy('occurred_at')
+                ->get(['id', 'uuid', 'kind', 'occurred_at', 'summary'])
+            : collect();
+
+        $criticalCatalog = is_array($assessment->execution->scenarioVersion->critical_errors)
+            ? $assessment->execution->scenarioVersion->critical_errors
+            : [];
+
         return view('assessments.show', [
             'assessment' => $assessment,
             'execution' => $assessment->execution,
             'canEvaluate' => $canEvaluate,
+            'people' => $people,
+            'events' => $events,
+            'criticalCatalog' => $criticalCatalog,
         ]);
     }
 
