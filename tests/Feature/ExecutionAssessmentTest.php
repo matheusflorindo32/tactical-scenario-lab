@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\ExecutionAssessment;
+use App\Models\ScenarioExecution;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
@@ -34,5 +36,11 @@ class ExecutionAssessmentTest extends TestCase
             'created_at',
             'updated_at',
         ]));
+    }
+
+    public function test_execution_assessment_domain_model_and_execution_relation_exist(): void
+    {
+        $this->assertTrue(class_exists(ExecutionAssessment::class));
+        $this->assertTrue(method_exists(ScenarioExecution::class, 'assessment'));
     }
 }
