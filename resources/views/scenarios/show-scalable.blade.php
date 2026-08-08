@@ -4,21 +4,7 @@ $observed = is_array($scenario->observed_critical_errors) ? $scenario->observed_
 $estimate = $version?->estimated_casualty_count ?? $scenario->estimated_casualty_count ?? $scenario->casualties;
 $individualCount = (int) ($version?->victims_count ?? 0);
 $cohortCount = (int) ($version?->cohorts_count ?? 0);
-$statusLabel = match ($scenario->status) {
-    'running' => 'Em execução',
-    'completed' => 'Concluído',
-    default => 'Rascunho',
-};
-$statusVariant = match ($scenario->status) {
-    'running' => 'alert',
-    'completed' => 'clinical',
-    default => 'neutral',
-};
-$threatVariant = match ($scenario->threat_level) {
-    'ativa' => 'emergency',
-    'potencial' => 'alert',
-    default => 'neutral',
-};
+$versionStatus = $version?->publication_status ?? 'draft';
 @endphp
 
 <x-layouts.app :current="'scenarios'" :title="$scenario->title . ' · Tactical Scenario Lab'">
@@ -30,18 +16,19 @@ $threatVariant = match ($scenario->threat_level) {
         <x-breadcrumb :items="[
             ['label' => 'Painel', 'href' => route('dashboard')],
             ['label' => 'Cenários', 'href' => route('scenarios.index')],
-            ['label' => 'Cenário #' . $scenario->id],
+            ['label' => 'Detalhes'],
         ]" />
     </x-slot:breadcrumbs>
 
     <x-slot:header>
-        <div class="flex flex-wrap items-end justify-between gap-4">
+        <div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div class="min-w-0 flex-1">
                 <div class="flex flex-wrap items-center gap-2">
-                    <x-badge :variant="$statusVariant" size="sm" dot>{{ $statusLabel }}</x-badge>
-                    <x-badge :variant="$threatVariant" size="sm">Ameaça {{ $scenario->threat_level }}</x-badge>
+                    <x-badge variant="navy" size="sm" dot>Scenario Core</x-badge>
                     @if ($version)
-                        <x-badge variant="navy" size="sm">Versão {{ $version->version_number }}</x-badge>
+                        <x-badge :variant="$versionStatus === 'published' ? 'clinical' : 'alert'" size="sm">
+                            Versão {{ $version->version_number }} · {{ $versionStatus === 'published' ? 'publicada' : 'rascunho' }}
+                        </x-badge>
                     @endif
                 </div>
                 <h1 class="mt-3 font-display text-3xl font-semibold tracking-tight text-navy-950">{{ $scenario->title }}</h1>
@@ -50,27 +37,96 @@ $threatVariant = match ($scenario->threat_level) {
                 </p>
             </div>
 
-            <div class="flex flex-wrap gap-2">
-                @if ($scenario->isDraft())
-                    <form method="POST" action="{{ route('scenarios.execute', $scenario) }}">
-                        @csrf
-                        <x-button type="submit" variant="danger">Iniciar execução</x-button>
-                    </form>
-                @endif
-                <x-button href="{{ route('scenarios.index') }}" variant="secondary">Voltar</x-button>
-            </div>
+            <x-button href="{{ route('scenarios.index') }}" variant="secondary">Voltar aos cenários</x-button>
         </div>
     </x-slot:header>
 
     @if (session('error'))
-        <div class="mb-6">
-            <x-alert variant="danger" title="Ação não permitida">{{ session('error') }}</x-alert>
-        </div>
+        <div class="mb-6"><x-alert variant="danger" title="Ação não permitida">{{ session('error') }}</x-alert></div>
+    @endif
+    @if (session('success'))
+        <div class="mb-6"><x-alert variant="success" title="Operação concluída">{{ session('success') }}</x-alert></div>
+    @endif
+    @if ($errors->any())
+        <div class="mb-6"><x-alert variant="danger" title="Revise os dados">{{ $errors->first() }}</x-alert></div>
     @endif
 
-    @if (session('success'))
+    @if ($version)
         <div class="mb-6">
-            <x-alert variant="success" title="Operação concluída">{{ session('success') }}</x-alert>
+            <x-card title="Controle de versão e execuções" subtitle="Uma definição publicada pode originar múltiplos treinamentos independentes" accent="navy">
+                <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                    <div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <x-badge :variant="$versionStatus === 'published' ? 'clinical' : 'alert'" dot>
+                                {{ $versionStatus === 'published' ? 'Pronta para execução' : 'Aguardando publicação' }}
+                            </x-badge>
+                            <span class="text-sm text-ink-500">Versão {{ $version->version_number }}</span>
+                        </div>
+                        <p class="mt-3 max-w-3xl text-sm leading-6 text-ink-600">
+                            @if ($versionStatus === 'published')
+                                A definição está congelada como referência histórica. Cada nova execução terá seu próprio estado, participantes, timeline, injects e recursos.
+                            @else
+                                Revise a definição antes de publicar. Após a publicação, alterações de conteúdo devem gerar uma nova versão em vez de reescrever o histórico.
+                            @endif
+                        </p>
+                    </div>
+
+                    @if ($canManage)
+                        @if ($versionStatus === 'draft')
+                            <form method="POST" action="{{ route('scenario-versions.publish', $version) }}">
+                                @csrf
+                                @method('PATCH')
+                                <x-button type="submit">Publicar versão</x-button>
+                            </form>
+                        @elseif ($versionStatus === 'published')
+                            <form method="POST" action="{{ route('executions.store', $version) }}">
+                                @csrf
+                                <x-button type="submit">Nova execução</x-button>
+                            </form>
+                        @endif
+                    @endif
+                </div>
+
+                <div class="mt-6 border-t border-stone-100 pt-5">
+                    <div class="flex items-center justify-between gap-4">
+                        <h3 class="text-sm font-semibold text-navy-950">Histórico de execuções</h3>
+                        <span class="text-xs font-medium text-ink-500">{{ $version->executions->count() }} registro(s)</span>
+                    </div>
+
+                    @if ($version->executions->isEmpty())
+                        <div class="mt-3 rounded-lg border border-dashed border-stone-300 bg-stone-50 px-5 py-6 text-center">
+                            <p class="text-sm font-semibold text-ink-700">Nenhuma execução desta versão.</p>
+                            <p class="mt-1 text-xs text-ink-500">Publique a definição e crie a primeira execução quando o treinamento estiver planejado.</p>
+                        </div>
+                    @else
+                        <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                            @foreach ($version->executions as $execution)
+                                @php
+                                $executionLabel = match ($execution->status) {
+                                    'running' => 'Em execução',
+                                    'completed' => 'Concluída',
+                                    'cancelled' => 'Cancelada',
+                                    default => 'Rascunho',
+                                };
+                                $executionVariant = match ($execution->status) {
+                                    'running' => 'alert',
+                                    'completed' => 'clinical',
+                                    'cancelled' => 'emergency',
+                                    default => 'navy',
+                                };
+                                @endphp
+                                <a href="{{ route('executions.show', $execution) }}" class="rounded-lg border border-stone-200 bg-white p-4 shadow-sm transition hover:border-navy-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy-500">
+                                    <div class="flex items-center justify-between gap-3">
+                                        <span class="text-sm font-semibold text-navy-950">Execução #{{ $execution->sequence_number }}</span>
+                                        <x-badge :variant="$executionVariant" size="sm" dot>{{ $executionLabel }}</x-badge>
+                                    </div>
+                                    <p class="mt-2 text-xs text-ink-500">Criada em {{ $execution->created_at->format('d/m/Y H:i') }}</p>
+                                </a>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+            </x-card>
         </div>
     @endif
 
@@ -83,7 +139,6 @@ $threatVariant = match ($scenario->threat_level) {
                         <p class="mt-2 font-display text-4xl font-semibold tabular-nums text-navy-950">{{ number_format((int) $estimate, 0, ',', '.') }}</p>
                         <p class="mt-2 text-sm leading-5 text-ink-600">Escala estimada do incidente. Este valor não equivale à quantidade de registros individuais.</p>
                     </div>
-
                     <div class="rounded-lg border border-stone-200 bg-white p-5">
                         <p class="text-xs font-semibold uppercase tracking-[0.13em] text-ink-500">Representações detalhadas</p>
                         <div class="mt-3 flex flex-wrap gap-2">
@@ -96,49 +151,43 @@ $threatVariant = match ($scenario->threat_level) {
             </x-card>
 
             <x-card title="Objetivos de aprendizagem" subtitle="Resultados esperados para a versão atual" accent="clinical">
-                @if (is_array($scenario->learning_objectives) && count($scenario->learning_objectives))
-                    <ol class="space-y-3">
-                        @foreach ($scenario->learning_objectives as $index => $objective)
-                            <li class="flex gap-3 rounded-md bg-stone-25 p-3 ring-1 ring-inset ring-stone-100">
-                                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-clinical-600 text-xs font-semibold text-white">{{ $index + 1 }}</span>
-                                <span class="text-sm leading-6 text-ink-800">{{ $objective }}</span>
-                            </li>
-                        @endforeach
-                    </ol>
-                @else
-                    <p class="text-sm text-ink-500">Nenhum objetivo definido.</p>
-                @endif
+                <ol class="space-y-3">
+                    @forelse (($version?->learning_objectives ?? $scenario->learning_objectives ?? []) as $index => $objective)
+                        <li class="flex gap-3 rounded-md bg-stone-25 p-3 ring-1 ring-inset ring-stone-100">
+                            <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-clinical-600 text-xs font-semibold text-white">{{ $index + 1 }}</span>
+                            <span class="text-sm leading-6 text-ink-800">{{ $objective }}</span>
+                        </li>
+                    @empty
+                        <li class="text-sm text-ink-500">Nenhum objetivo definido.</li>
+                    @endforelse
+                </ol>
             </x-card>
 
             <x-card title="Ações esperadas" subtitle="Sequência operacional sugerida" accent="navy">
-                @if (is_array($scenario->expected_actions) && count($scenario->expected_actions))
-                    <ol class="space-y-3">
-                        @foreach ($scenario->expected_actions as $index => $action)
-                            <li class="flex gap-3">
-                                <span class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-navy-900 text-xs font-semibold text-white">{{ $index + 1 }}</span>
-                                <span class="text-sm leading-6 text-ink-800">{{ $action }}</span>
-                            </li>
-                        @endforeach
-                    </ol>
-                @else
-                    <p class="text-sm text-ink-500">Nenhuma ação esperada definida.</p>
-                @endif
+                <ol class="space-y-3">
+                    @forelse (($version?->expected_actions ?? $scenario->expected_actions ?? []) as $index => $action)
+                        <li class="flex gap-3">
+                            <span class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-navy-900 text-xs font-semibold text-white">{{ $index + 1 }}</span>
+                            <span class="text-sm leading-6 text-ink-800">{{ $action }}</span>
+                        </li>
+                    @empty
+                        <li class="text-sm text-ink-500">Nenhuma ação esperada definida.</li>
+                    @endforelse
+                </ol>
             </x-card>
 
-            <x-card title="Erros críticos a monitorar" subtitle="Catálogo previsto; erros observados permanecem separados" accent="emergency">
-                @if (count($catalog))
-                    <ul class="space-y-2.5">
-                        @foreach ($catalog as $error)
-                            <li class="rounded-md border border-emergency-100 bg-emergency-50/50 px-3 py-2.5 text-sm leading-6 text-ink-800">{{ $error }}</li>
-                        @endforeach
-                    </ul>
-                @else
-                    <p class="text-sm text-ink-500">Nenhum erro crítico catalogado.</p>
-                @endif
+            <x-card title="Erros críticos a monitorar" subtitle="Catálogo previsto; ocorrências observadas permanecem separadas" accent="emergency">
+                <ul class="space-y-2.5">
+                    @forelse (($version?->critical_errors ?? $catalog) as $error)
+                        <li class="rounded-md border border-emergency-100 bg-emergency-50/50 px-3 py-2.5 text-sm leading-6 text-ink-800">{{ $error }}</li>
+                    @empty
+                        <li class="text-sm text-ink-500">Nenhum erro crítico catalogado.</li>
+                    @endforelse
+                </ul>
             </x-card>
 
             @if ($scenario->isCompleted() && count($observed))
-                <x-card title="Erros observados" subtitle="Ocorrências efetivamente marcadas durante a execução" accent="alert">
+                <x-card title="Erros observados" subtitle="Fluxo legado preservado até o M4" accent="alert">
                     <ul class="space-y-2.5">
                         @foreach ($observed as $error)
                             <li class="rounded-md border border-alert-100 bg-alert-50/60 px-3 py-2.5 text-sm leading-6 text-ink-800">{{ $error }}</li>
@@ -148,7 +197,7 @@ $threatVariant = match ($scenario->threat_level) {
             @endif
 
             @if ($scenario->canBeEvaluated())
-                <x-card title="Avaliação e debriefing" subtitle="Fluxo legado preservado até o M4" accent="clinical">
+                <x-card title="Avaliação e debriefing legado" subtitle="Compatibilidade temporária até o Assessment/Debriefing estruturado do M4" accent="clinical">
                     @if ($scenario->isCompleted())
                         <div class="mb-6 rounded-lg border border-clinical-200 bg-clinical-50/70 p-4">
                             <p class="text-xs font-semibold uppercase tracking-[0.13em] text-clinical-700">Pontuação final</p>
@@ -161,57 +210,36 @@ $threatVariant = match ($scenario->threat_level) {
 
                     <form method="POST" action="{{ route('scenarios.evaluate', $scenario) }}" class="space-y-5">
                         @csrf
-
-                        <x-input
-                            label="Nota da execução (0 a 100)"
-                            name="score"
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="1"
-                            required
-                            :value="old('score', $scenario->score)"
-                            :error="$errors->first('score')"
-                            hint="Avalie a execução; a separação estrutural completa será feita no M4."
-                        />
+                        <x-input label="Nota da execução (0 a 100)" name="score" type="number" min="0" max="100" step="1" required :value="old('score', $scenario->score)" :error="$errors->first('score')" />
+                        <x-textarea label="Notas do debriefing" name="debrief_notes" rows="6" placeholder="Pontos fortes, oportunidades de melhoria e decisões-chave." :value="old('debrief_notes', $scenario->debrief_notes)" :error="$errors->first('debrief_notes')" />
 
                         @if (count($catalog))
-                            <fieldset>
-                                <legend class="mb-1 text-sm font-medium text-ink-900">Erros observados nesta execução</legend>
-                                <p class="mb-3 text-xs leading-5 text-ink-500">Marque somente itens do catálogo que realmente ocorreram.</p>
-                                <div class="grid gap-2 md:grid-cols-2">
+                            @php $selectedObserved = old('observed_critical_errors', $observed); @endphp
+                            <fieldset class="rounded-lg border border-stone-200 bg-stone-50/70 p-4">
+                                <legend class="px-1 text-sm font-semibold text-navy-950">Erros observados nesta execução</legend>
+                                <p class="mt-1 text-xs leading-5 text-ink-500">Marque somente ocorrências efetivamente observadas. O catálogo previsto permanece separado e não será sobrescrito.</p>
+                                <div class="mt-4 space-y-3">
                                     @foreach ($catalog as $index => $error)
-                                        @php
-                                            $id = 'observed-error-' . $index;
-                                            $checked = in_array($error, old('observed_critical_errors', $observed), true);
-                                        @endphp
-                                        <label for="{{ $id }}" class="flex cursor-pointer items-start gap-3 rounded-md border border-stone-200 bg-white px-3 py-3 text-sm text-ink-800 hover:border-alert-300 has-[:checked]:border-alert-500 has-[:checked]:bg-alert-50">
-                                            <input id="{{ $id }}" type="checkbox" name="observed_critical_errors[]" value="{{ $error }}" @checked($checked) class="mt-0.5 h-4 w-4 shrink-0 accent-alert-600">
+                                        <label for="observed_error_{{ $index }}" class="flex cursor-pointer items-start gap-3 rounded-md border border-stone-200 bg-white px-3 py-3 text-sm leading-5 text-ink-800">
+                                            <input id="observed_error_{{ $index }}" name="observed_critical_errors[]" type="checkbox" value="{{ $error }}" @checked(in_array($error, $selectedObserved, true)) class="mt-0.5 rounded border-stone-300 text-navy-700 focus:ring-navy-500">
                                             <span>{{ $error }}</span>
                                         </label>
                                     @endforeach
                                 </div>
+                                @error('observed_critical_errors')
+                                    <p class="mt-2 text-xs font-medium text-emergency-700">{{ $message }}</p>
+                                @enderror
+                                @error('observed_critical_errors.*')
+                                    <p class="mt-2 text-xs font-medium text-emergency-700">{{ $message }}</p>
+                                @enderror
                             </fieldset>
                         @endif
-
-                        <x-textarea
-                            label="Notas do debriefing"
-                            name="debrief_notes"
-                            rows="6"
-                            placeholder="Pontos fortes, oportunidades de melhoria e decisões-chave."
-                            :value="old('debrief_notes', $scenario->debrief_notes)"
-                            :error="$errors->first('debrief_notes')"
-                        />
 
                         <div class="flex justify-end border-t border-stone-100 pt-4">
                             <x-button type="submit" variant="success">{{ $scenario->isCompleted() ? 'Atualizar avaliação' : 'Finalizar avaliação' }}</x-button>
                         </div>
                     </form>
                 </x-card>
-            @else
-                <x-alert variant="info" title="Avaliação bloqueada">
-                    Inicie a execução para liberar a avaliação deste cenário.
-                </x-alert>
             @endif
         </div>
 
@@ -239,21 +267,21 @@ $threatVariant = match ($scenario->threat_level) {
 
             <x-card title="Recursos declarados" accent="navy">
                 @php $resources = $version?->resources ?? $scenario->resources ?? []; @endphp
-                @if (is_array($resources) && count($resources))
-                    <div class="flex flex-wrap gap-2">
-                        @foreach ($resources as $resource)
-                            <x-badge variant="neutral" size="sm">{{ $resource }}</x-badge>
-                        @endforeach
-                    </div>
-                @else
-                    <p class="text-sm text-ink-500">Nenhum recurso declarado.</p>
-                @endif
+                <div class="flex flex-wrap gap-2">
+                    @forelse ($resources as $resource)
+                        <x-badge variant="neutral" size="sm">{{ $resource }}</x-badge>
+                    @empty
+                        <p class="text-sm text-ink-500">Nenhum recurso declarado.</p>
+                    @endforelse
+                </div>
             </x-card>
 
-            <x-card title="Fronteira do M2" accent="clinical">
-                <p class="text-sm leading-6 text-ink-700">
-                    Esta fase versiona a definição e a escala das vítimas. Execuções independentes, equipes, timeline e injects entram no M3; assessment estruturado e debriefing avançado entram no M4.
-                </p>
+            <x-card title="Arquitetura ativa" accent="clinical">
+                <ol class="space-y-3 text-sm leading-6 text-ink-700">
+                    <li><span class="font-semibold text-navy-950">1. Scenario</span> · identidade institucional.</li>
+                    <li><span class="font-semibold text-navy-950">2. ScenarioVersion</span> · definição histórica imutável após publicação.</li>
+                    <li><span class="font-semibold text-navy-950">3. ScenarioExecution</span> · realização concreta, repetível e independente.</li>
+                </ol>
             </x-card>
         </aside>
     </div>
