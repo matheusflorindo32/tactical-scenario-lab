@@ -105,8 +105,8 @@ class ScenarioController extends Controller
     }
 
     /**
-     * Fluxo legado preservado temporariamente até a migração completa para
-     * ScenarioExecution. O M3 deixa de apresentá-lo como caminho primário.
+     * Compatibility-only legacy execution endpoint. New runs use ScenarioExecution.
+     * Assessment/debrief writes were retired in M4 and are execution-scoped.
      */
     public function execute(
         Request $request,
@@ -128,44 +128,6 @@ class ScenarioController extends Controller
         });
 
         return back()->with('success', 'Execução iniciada.');
-    }
-
-    /**
-     * Fluxo de avaliação legado preservado até o M4, quando assessment e
-     * debriefing serão separados por execução.
-     */
-    public function evaluate(
-        Request $request,
-        Scenario $scenario,
-        ActiveOrganization $activeOrganization,
-    ): RedirectResponse {
-        $organizationId = $activeOrganization->ensureAbility($request, 'evaluations.manage');
-        $this->ensureScenarioInOrganization($scenario, $organizationId);
-
-        if (! $scenario->canBeEvaluated()) {
-            return back()->with('error', 'Inicie a execução antes de avaliar.');
-        }
-
-        $catalog = is_array($scenario->critical_errors) ? $scenario->critical_errors : [];
-
-        $validated = $request->validate([
-            'score' => ['required', 'integer', 'min:0', 'max:100'],
-            'debrief_notes' => ['nullable', 'string', 'max:5000'],
-            'observed_critical_errors' => ['nullable', 'array'],
-            'observed_critical_errors.*' => ['string', 'distinct', Rule::in($catalog)],
-        ]);
-
-        DB::transaction(function () use ($scenario, $validated) {
-            $scenario->update([
-                'score' => $validated['score'],
-                'debrief_notes' => $validated['debrief_notes'] ?? null,
-                'observed_critical_errors' => $validated['observed_critical_errors'] ?? [],
-                'status' => 'completed',
-                'completed_at' => $scenario->completed_at ?? now(),
-            ]);
-        });
-
-        return back()->with('success', 'Avaliação registrada e cenário concluído.');
     }
 
     private function ensureScenarioInOrganization(Scenario $scenario, int $organizationId): void

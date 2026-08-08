@@ -6,6 +6,7 @@ use App\Models\Concerns\HasPublicUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class ScenarioExecution extends Model
 {
@@ -40,6 +41,11 @@ class ScenarioExecution extends Model
     public function scenarioVersion(): BelongsTo
     {
         return $this->belongsTo(ScenarioVersion::class);
+    }
+
+    public function assessment(): HasOne
+    {
+        return $this->hasOne(ExecutionAssessment::class);
     }
 
     public function teams(): HasMany

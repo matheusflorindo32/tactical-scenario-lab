@@ -54,7 +54,7 @@ class ExecutionCockpitTest extends TestCase
             ->assertSee('Recursos');
     }
 
-    public function test_legacy_evaluation_ui_preserves_observed_critical_error_selection_until_m4(): void
+    public function test_scenario_page_does_not_expose_retired_legacy_evaluation_form(): void
     {
         [$organization, $scenario] = $this->scenarioWithVersion('published');
         $this->authenticate($organization);
@@ -65,9 +65,10 @@ class ExecutionCockpitTest extends TestCase
 
         $this->get(route('scenarios.show', $scenario->fresh()))
             ->assertOk()
-            ->assertSee('Erros observados nesta execução')
-            ->assertSee('name="observed_critical_errors[]"', false)
-            ->assertSee('Entrada em área insegura');
+            ->assertSee('Erros críticos a monitorar')
+            ->assertDontSee('name="observed_critical_errors[]"', false)
+            ->assertDontSee('name="score"', false)
+            ->assertDontSee('name="debrief_notes"', false);
     }
 
     private function scenarioWithVersion(string $publicationStatus): array

@@ -33,27 +33,16 @@ class ScenarioIsolationTest extends TestCase
         $this->get(route('scenarios.show', $legacy))->assertForbidden();
     }
 
-    public function test_cross_organization_execution_and_evaluation_are_forbidden_without_mutation(): void
+    public function test_cross_organization_legacy_execution_is_forbidden_without_mutation(): void
     {
         [$activeOrganization, $externalOrganization] = $this->organizations();
         $this->authenticate($activeOrganization);
 
         $externalDraft = $this->scenario($externalOrganization, 'Rascunho externo');
-        $externalRunning = $this->scenario($externalOrganization, 'Execução externa', 'running');
 
         $this->post(route('scenarios.execute', $externalDraft))->assertForbidden();
         $this->assertSame('draft', $externalDraft->refresh()->status);
         $this->assertNull($externalDraft->started_at);
-
-        $this->post(route('scenarios.evaluate', $externalRunning), [
-            'score' => 91,
-            'observed_critical_errors' => [],
-        ])->assertForbidden();
-
-        $externalRunning->refresh();
-        $this->assertSame('running', $externalRunning->status);
-        $this->assertNull($externalRunning->score);
-        $this->assertNull($externalRunning->completed_at);
     }
 
     public function test_new_scenario_is_owned_by_active_organization(): void

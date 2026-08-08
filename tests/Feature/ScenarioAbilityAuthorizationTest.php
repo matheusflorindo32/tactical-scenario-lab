@@ -13,7 +13,7 @@ class ScenarioAbilityAuthorizationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_view_only_access_can_read_but_cannot_manage_or_evaluate(): void
+    public function test_view_only_access_can_read_but_cannot_manage_scenarios(): void
     {
         [$organization, $scenario] = $this->context();
         $this->authenticate($organization, ['scenarios.view']);
@@ -23,10 +23,9 @@ class ScenarioAbilityAuthorizationTest extends TestCase
         $this->get(route('scenarios.create'))->assertForbidden();
         $this->post(route('scenarios.store'), [])->assertForbidden();
         $this->post(route('scenarios.execute', $scenario))->assertForbidden();
-        $this->post(route('scenarios.evaluate', $scenario), ['score' => 80])->assertForbidden();
     }
 
-    public function test_scenario_manager_can_create_and_execute_but_cannot_evaluate_without_evaluation_ability(): void
+    public function test_scenario_manager_can_create_and_execute_scenario(): void
     {
         [$organization, $scenario] = $this->context();
         $this->authenticate($organization, ['scenarios.view', 'scenarios.manage']);
@@ -36,24 +35,17 @@ class ScenarioAbilityAuthorizationTest extends TestCase
 
         $scenario->refresh();
         $this->assertSame('running', $scenario->status);
-
-        $this->post(route('scenarios.evaluate', $scenario), ['score' => 90])->assertForbidden();
-        $this->assertSame('running', $scenario->refresh()->status);
     }
 
-    public function test_evaluator_can_complete_running_scenario_with_evaluation_ability(): void
+    public function test_evaluation_ability_does_not_grant_scenario_management(): void
     {
-        [$organization, $scenario] = $this->context('running');
+        [$organization, $scenario] = $this->context();
         $this->authenticate($organization, ['scenarios.view', 'evaluations.manage']);
 
-        $this->post(route('scenarios.evaluate', $scenario), [
-            'score' => 95,
-            'observed_critical_errors' => [],
-        ])->assertRedirect();
-
-        $scenario->refresh();
-        $this->assertSame('completed', $scenario->status);
-        $this->assertSame(95, $scenario->score);
+        $this->get(route('scenarios.show', $scenario))->assertOk();
+        $this->get(route('scenarios.create'))->assertForbidden();
+        $this->post(route('scenarios.execute', $scenario))->assertForbidden();
+        $this->assertSame('draft', $scenario->fresh()->status);
     }
 
     private function authenticate(Organization $organization, array $abilities): void

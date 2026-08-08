@@ -33,7 +33,6 @@ class ScenarioAuthenticationTest extends TestCase
         $this->get(route('scenarios.show', $scenario))->assertRedirect(route('login'));
         $this->post(route('scenarios.store'), [])->assertRedirect(route('login'));
         $this->post(route('scenarios.execute', $scenario))->assertRedirect(route('login'));
-        $this->post(route('scenarios.evaluate', $scenario))->assertRedirect(route('login'));
     }
 
     public function test_authenticated_active_user_can_access_scenario_workflow(): void
