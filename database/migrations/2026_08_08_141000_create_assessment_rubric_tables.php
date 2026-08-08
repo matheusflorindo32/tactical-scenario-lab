@@ -31,7 +31,7 @@ return new class extends Migration
             $table->foreignId('execution_event_id')->nullable()->constrained('execution_events')->nullOnDelete();
             $table->text('statement');
             $table->timestamp('observed_at');
-            $table->foreignId('created_by_user_id')->constrained('users')->restrictOnDelete();
+            $table->foreignId('created_by_user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
         });
     }
