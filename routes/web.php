@@ -9,6 +9,7 @@ use App\Http\Controllers\AuthenticatedSessionController;
 use App\Http\Controllers\CriticalErrorOccurrenceController;
 use App\Http\Controllers\DebriefEntryController;
 use App\Http\Controllers\ExecutionAssessmentController;
+use App\Http\Controllers\ExecutionCsvController;
 use App\Http\Controllers\ExecutionEventController;
 use App\Http\Controllers\ExecutionHistoryController;
 use App\Http\Controllers\ExecutionInjectController;
@@ -50,6 +51,7 @@ Route::get('/dashboard/executive', ExecutiveDashboardController::class)
 
 Route::middleware(['auth', 'account.active'])->group(function () {
     Route::get('/history/executions', ExecutionHistoryController::class)->name('execution-history.index');
+    Route::get('/reports/executions.csv', ExecutionCsvController::class)->name('reports.executions.csv');
 
     Route::get('/access', [AccessAdministrationController::class, 'index'])->name('access.index');
     Route::get('/access/create', [AccessAdministrationController::class, 'create'])->name('access.create');
