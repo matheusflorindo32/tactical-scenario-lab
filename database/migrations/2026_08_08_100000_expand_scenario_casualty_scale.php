@@ -22,7 +22,7 @@ return new class extends Migration
     public function down(): void
     {
         if (DB::table('scenarios')->where('casualties', '>', 255)->exists()) {
-            throw new \RuntimeException('Cannot safely downgrade scenarios.casualties to TINYINT while values above 255 exist.');
+            throw new RuntimeException('Cannot safely downgrade scenarios.casualties to TINYINT while values above 255 exist.');
         }
 
         Schema::table('scenarios', function (Blueprint $table): void {
