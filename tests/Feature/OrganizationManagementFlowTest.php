@@ -58,7 +58,7 @@ class OrganizationManagementFlowTest extends TestCase
         $this->assertSame('school', $log->payload['current_kind']);
     }
 
-    public function test_inactivation_preserves_memberships_and_is_idempotent(): void
+    public function test_inactivation_preserves_memberships_and_repeated_request_fails_closed(): void
     {
         $organization = Organization::create([
             'name' => 'Organização Alfa',
@@ -75,8 +75,9 @@ class OrganizationManagementFlowTest extends TestCase
 
         $this->patch(route('organizations.deactivate', $organization))
             ->assertRedirect(route('organizations.show', $organization));
+
         $this->patch(route('organizations.deactivate', $organization))
-            ->assertRedirect(route('organizations.show', $organization));
+            ->assertForbidden();
 
         $this->assertSame('inactive', $organization->fresh()->status);
         $this->assertDatabaseHas('organization_memberships', [

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AccessAdministrationController;
 use App\Http\Controllers\ActiveOrganizationController;
 use App\Http\Controllers\AuthenticatedSessionController;
 use App\Http\Controllers\OrganizationController;
@@ -58,6 +59,23 @@ Route::get('/dashboard', function (Request $request, ActiveOrganization $activeO
 })->middleware(['auth', 'account.active'])->name('dashboard');
 
 Route::middleware(['auth', 'account.active'])->group(function () {
+    Route::get('/access', [AccessAdministrationController::class, 'index'])
+        ->name('access.index');
+    Route::get('/access/create', [AccessAdministrationController::class, 'create'])
+        ->name('access.create');
+    Route::post('/access', [AccessAdministrationController::class, 'store'])
+        ->name('access.store');
+    Route::get('/access/{access}/edit', [AccessAdministrationController::class, 'edit'])
+        ->name('access.edit');
+    Route::put('/access/{access}', [AccessAdministrationController::class, 'update'])
+        ->name('access.update');
+    Route::patch('/access/{access}/revoke', [AccessAdministrationController::class, 'revoke'])
+        ->name('access.revoke');
+    Route::patch('/access/accounts/{user}/deactivate', [AccessAdministrationController::class, 'deactivateAccount'])
+        ->name('access.accounts.deactivate');
+    Route::patch('/access/accounts/{user}/reactivate', [AccessAdministrationController::class, 'reactivateAccount'])
+        ->name('access.accounts.reactivate');
+
     Route::post('/organizations/{organization}/activate', [ActiveOrganizationController::class, 'update'])
         ->name('organizations.activate');
 

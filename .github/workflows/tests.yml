@@ -7,10 +7,12 @@ on:
       - develop
       - feature/phase-2-1-elite
       - feature/phase-2-2-auth
+      - feature/phase-2-3-access-admin
   pull_request:
     branches:
       - main
       - feature/phase-2-1-elite
+      - feature/phase-2-2-auth
 
 jobs:
   phpunit:
