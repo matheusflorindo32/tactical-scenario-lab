@@ -22,6 +22,12 @@ class ExecutionEventController extends Controller
         'resource',
     ];
 
+    private const METADATA_SOURCES = [
+        'instructor',
+        'observer',
+        'system',
+    ];
+
     public function store(
         Request $request,
         ScenarioExecution $execution,
@@ -37,7 +43,8 @@ class ExecutionEventController extends Controller
             'kind' => ['required', 'string', Rule::in(self::KINDS)],
             'occurred_at' => ['required', 'date'],
             'summary' => ['required', 'string', 'max:500'],
-            'metadata' => ['nullable', 'array'],
+            'metadata' => ['nullable', 'array:source'],
+            'metadata.source' => ['nullable', 'string', Rule::in(self::METADATA_SOURCES)],
         ]);
 
         if (isset($validated['execution_team_id'])) {
