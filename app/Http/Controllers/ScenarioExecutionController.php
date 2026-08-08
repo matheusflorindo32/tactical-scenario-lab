@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Person;
 use App\Models\ScenarioExecution;
 use App\Models\ScenarioVersion;
 use App\Services\Auth\ActiveOrganization;
@@ -39,9 +40,34 @@ class ScenarioExecutionController extends Controller
         $organizationId = $activeOrganization->ensureAbility($request, AccessAbility::SCENARIOS_VIEW);
         $this->ensureOrganization($execution->organization_id, $organizationId);
 
-        $execution->load('scenarioVersion.scenario');
+        $execution->load([
+            'scenarioVersion.scenario',
+            'teams.participants.person',
+            'participants.person',
+            'events.team',
+            'events.participant.person',
+            'injects',
+            'resources',
+        ]);
 
-        return view('executions.show', compact('execution'));
+        $access = $request->user()
+            ->activeOrganizationAccesses()
+            ->where('organization_id', $organizationId)
+            ->first();
+        $canManage = in_array(AccessAbility::SCENARIOS_MANAGE, $access?->abilities ?? [], true);
+
+        $people = $canManage
+            ? Person::query()
+                ->where('status', 'active')
+                ->whereHas('memberships', fn ($query) => $query
+                    ->where('organization_id', $organizationId)
+                    ->where('status', 'active')
+                    ->whereNull('ended_at'))
+                ->orderBy('display_name')
+                ->get(['id', 'uuid', 'display_name', 'social_name'])
+            : collect();
+
+        return view('executions.show', compact('execution', 'canManage', 'people'));
     }
 
     public function start(
