@@ -4,6 +4,7 @@ use App\Http\Controllers\AccessAdministrationController;
 use App\Http\Controllers\ActiveOrganizationController;
 use App\Http\Controllers\AuthenticatedSessionController;
 use App\Http\Controllers\ExecutionEventController;
+use App\Http\Controllers\ExecutionInjectController;
 use App\Http\Controllers\ExecutionParticipantController;
 use App\Http\Controllers\ExecutionTeamController;
 use App\Http\Controllers\OrganizationController;
@@ -146,6 +147,12 @@ Route::middleware(['auth', 'account.active'])->group(function () {
         ->name('execution-participants.store');
     Route::post('/executions/{execution}/events', [ExecutionEventController::class, 'store'])
         ->name('execution-events.store');
+    Route::post('/executions/{execution}/injects', [ExecutionInjectController::class, 'store'])
+        ->name('execution-injects.store');
+    Route::patch('/execution-injects/{inject}/deliver', [ExecutionInjectController::class, 'deliver'])
+        ->name('execution-injects.deliver');
+    Route::patch('/execution-injects/{inject}/cancel', [ExecutionInjectController::class, 'cancel'])
+        ->name('execution-injects.cancel');
 
     Route::post('/scenarios/{scenario}/execute', [ScenarioController::class, 'execute'])
         ->name('scenarios.execute');
