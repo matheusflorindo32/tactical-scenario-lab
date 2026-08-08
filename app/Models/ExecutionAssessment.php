@@ -64,6 +64,18 @@ class ExecutionAssessment extends Model
         return $this->hasMany(AssessmentCriterion::class)->orderBy('position');
     }
 
+    public function criticalErrorOccurrences(): HasMany
+    {
+        return $this->hasMany(CriticalErrorOccurrence::class)->orderBy('id');
+    }
+
+    public function keyTimes(): HasMany
+    {
+        return $this->hasMany(KeyTimeRecord::class)
+            ->orderBy('occurred_at')
+            ->orderBy('id');
+    }
+
     public function isDraft(): bool
     {
         return $this->status === 'draft';
