@@ -1,161 +1,121 @@
-@php
-$hasData = $total > 0;
-@endphp
-
-<x-layouts.app :current="'dashboard'" :title="'Painel · Tactical Scenario Lab'">
-
+<x-layouts.app :current="'dashboard'" :title="'Painel do instrutor · Tactical Scenario Lab'">
     <x-slot:breadcrumbs>
-        <x-breadcrumb :items="[
-            ['label' => 'Painel'],
-        ]" />
+        <x-breadcrumb :items="[['label' => 'Painel do instrutor']]" />
     </x-slot:breadcrumbs>
 
     <x-slot:header>
-        <div class="flex flex-wrap items-end justify-between gap-4">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-                <x-badge variant="navy" size="sm" dot>Visão geral</x-badge>
+                <x-badge variant="navy" size="sm" dot>Operação institucional</x-badge>
                 <h1 class="mt-2 font-display text-3xl font-semibold tracking-tight text-navy-950">Painel do instrutor</h1>
-                <p class="mt-1.5 max-w-2xl text-sm text-ink-500">Estado atual dos cenários, avaliações e erros críticos mais monitorados. Atualizado a cada carregamento.</p>
+                <p class="mt-1.5 max-w-3xl text-sm leading-6 text-ink-500">Execuções, avaliações e ações que exigem atenção no período selecionado. As métricas usam o domínio M3/M4 e não a avaliação legada do cenário.</p>
             </div>
-            <div class="flex items-center gap-2">
-                <x-button href="{{ route('scenarios.create') }}">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="h-3.5 w-3.5"><path d="M12 5v14M5 12h14"/></svg>
-                    Novo cenário
-                </x-button>
-                <x-button href="{{ route('scenarios.index') }}" variant="secondary">Ver todos</x-button>
+            <div class="flex flex-wrap gap-2">
+                @if ($canManageScenarios)
+                    <x-button href="{{ route('scenarios.create') }}">Novo cenário</x-button>
+                @endif
+                <x-button href="{{ route('scenarios.index') }}" variant="secondary">Cenários</x-button>
+                @if ($canViewReports)
+                    <x-button href="{{ route('dashboard.executive') }}" variant="secondary">Visão executiva</x-button>
+                @endif
             </div>
         </div>
     </x-slot:header>
 
-    @if (! $hasData)
-        {{-- Estado vazio de dashboard --}}
-        <x-empty-state
-            icon="clip"
-            title="Ainda não há dados no painel"
-            description="Crie o primeiro cenário para começar a acompanhar indicadores, cenários recentes e erros críticos mais frequentes."
-        >
-            <x-slot:actions>
-                <x-button href="{{ route('scenarios.create') }}">Criar primeiro cenário</x-button>
-                <x-button href="{{ route('home') }}" variant="ghost">Voltar à página inicial</x-button>
-            </x-slot:actions>
-        </x-empty-state>
-    @else
-
-        {{-- Indicadores --}}
-        <section aria-label="Indicadores gerais" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <x-stats-card label="Total de cenários" :value="$total" hint="registrados no banco" icon="M4 6h16M4 12h16M4 18h10" accent="navy" />
-            <x-stats-card label="Rascunhos" :value="$drafts" hint="aguardando execução" icon="M12 20h9M16 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" accent="alert" />
-            <x-stats-card label="Em execução" :value="$running" hint="ativos agora" icon="M5 3v18l14-9L5 3z" accent="emergency" />
-            <x-stats-card
-                label="Média das avaliações"
-                :value="$avgScore ? round($avgScore) . '/100' : '—'"
-                :hint="$completed . ' cenários concluídos'"
-                icon="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"
-                accent="clinical"
-            />
-        </section>
-
-        {{-- Corpo: 2 colunas (2/3 + 1/3) --}}
-        <div class="mt-8 grid gap-6 lg:grid-cols-3">
-
-            {{-- Cenários recentes --}}
-            <div class="lg:col-span-2 space-y-6">
-                <x-card title="Cenários recentes" subtitle="Últimos seis registros" padding="none">
-                    <x-slot:actions>
-                        <a href="{{ route('scenarios.index') }}" class="text-xs font-semibold text-navy-700 hover:text-navy-900">Ver todos →</a>
-                    </x-slot:actions>
-
-                    @if ($recent->isEmpty())
-                        <div class="p-6">
-                            <x-empty-state
-                                icon="clip"
-                                title="Nenhum cenário nas últimas atividades"
-                                description="Crie um novo cenário para começar."
-                            />
-                        </div>
-                    @else
-                        <ul class="divide-y divide-stone-100">
-                            @foreach ($recent as $s)
-                                <li>
-                                    <a href="{{ route('scenarios.show', $s) }}" class="group grid grid-cols-12 items-center gap-3 px-6 py-4 hover:bg-stone-25 focus-visible:outline-none focus-visible:bg-stone-25">
-                                        <div class="col-span-7 min-w-0">
-                                            <p class="truncate font-display text-sm font-semibold text-navy-900 group-hover:text-navy-700">{{ $s->title }}</p>
-                                            <p class="mt-0.5 truncate text-xs text-ink-500">
-                                                {{ $s->casualties }} vítima{{ $s->casualties > 1 ? 's' : '' }} · ameaça {{ $s->threat_level }}
-                                            </p>
-                                        </div>
-                                        <div class="col-span-3">
-                                            <x-status-pill :status="$s->status" />
-                                        </div>
-                                        <div class="col-span-2 text-right">
-                                            @if ($s->status === 'completed')
-                                                <span class="font-mono text-sm font-semibold text-navy-900 tabular-nums">{{ $s->score }}/100</span>
-                                            @else
-                                                <span class="text-xs text-ink-500">—</span>
-                                            @endif
-                                        </div>
-                                    </a>
-                                </li>
-                            @endforeach
-                        </ul>
-                    @endif
-                </x-card>
-
-                {{-- Progresso geral --}}
-                <x-card title="Distribuição de status" subtitle="Composição do portfólio atual">
-                    <div class="space-y-4">
-                        <x-progress :value="$drafts" :max="$total" label="Rascunhos" variant="alert" />
-                        <x-progress :value="$running" :max="$total" label="Em execução" variant="emergency" />
-                        <x-progress :value="$completed" :max="$total" label="Concluídos" variant="clinical" />
-                    </div>
-                </x-card>
-            </div>
-
-            {{-- Barra lateral: erros críticos + ações --}}
-            <aside class="space-y-6">
-                <x-card title="Erros críticos mais monitorados" subtitle="Do catálogo gerado" accent="emergency">
-                    @if ($topErrors->isEmpty())
-                        <p class="text-sm text-ink-500">Sem dados ainda.</p>
-                    @else
-                        <ol class="space-y-3">
-                            @foreach ($topErrors as $err => $count)
-                                <li class="flex items-start justify-between gap-3">
-                                    <span class="text-sm leading-relaxed text-ink-700">{{ $err }}</span>
-                                    <x-badge variant="emergency" size="sm">{{ $count }}×</x-badge>
-                                </li>
-                            @endforeach
-                        </ol>
-                    @endif
-                </x-card>
-
-                <x-card title="Ações rápidas" padding="none">
-                    <ul class="divide-y divide-stone-100 text-sm">
-                        <li>
-                            <a href="{{ route('scenarios.create') }}" class="flex items-center justify-between px-6 py-3 hover:bg-stone-25">
-                                <span class="font-medium text-ink-900">Criar cenário</span>
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4 text-ink-300"><path d="M9 5l7 7-7 7"/></svg>
-                            </a>
-                        </li>
-                        <li>
-                            <a href="{{ route('scenarios.index') }}" class="flex items-center justify-between px-6 py-3 hover:bg-stone-25">
-                                <span class="font-medium text-ink-900">Ver todos os cenários</span>
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4 text-ink-300"><path d="M9 5l7 7-7 7"/></svg>
-                            </a>
-                        </li>
-                        <li>
-                            <a href="{{ url('/health') }}" target="_blank" rel="noopener" class="flex items-center justify-between px-6 py-3 hover:bg-stone-25">
-                                <span class="font-medium text-ink-900">Status da aplicação</span>
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4 text-ink-300"><path d="M15 3h6v6M14 10l7-7M9 21H3v-6M10 14l-7 7"/></svg>
-                            </a>
-                        </li>
-                    </ul>
-                </x-card>
-
-                <x-alert variant="warning" title="Uso educacional">
-                    Ferramenta de simulação. Não substitui protocolos institucionais nem decisão clínica em campo.
-                </x-alert>
-            </aside>
+    <form method="GET" action="{{ route('dashboard') }}" class="mb-6 grid gap-3 rounded-xl border border-stone-200 bg-white p-4 shadow-sm sm:grid-cols-3 lg:grid-cols-4">
+        <div>
+            <label for="date_from" class="text-xs font-semibold uppercase tracking-[0.1em] text-ink-500">De</label>
+            <input id="date_from" name="date_from" type="date" value="{{ $filter->dateFrom->toDateString() }}" class="mt-1 w-full rounded-md border-stone-300 text-sm focus:border-navy-500 focus:ring-navy-500">
         </div>
-    @endif
+        <div>
+            <label for="date_to" class="text-xs font-semibold uppercase tracking-[0.1em] text-ink-500">Até</label>
+            <input id="date_to" name="date_to" type="date" value="{{ $filter->dateTo->toDateString() }}" class="mt-1 w-full rounded-md border-stone-300 text-sm focus:border-navy-500 focus:ring-navy-500">
+        </div>
+        <div>
+            <label for="status" class="text-xs font-semibold uppercase tracking-[0.1em] text-ink-500">Status da execução</label>
+            <select id="status" name="status" class="mt-1 w-full rounded-md border-stone-300 text-sm focus:border-navy-500 focus:ring-navy-500">
+                <option value="">Todos</option>
+                @foreach (['draft' => 'Rascunho', 'running' => 'Em execução', 'completed' => 'Concluída', 'cancelled' => 'Cancelada'] as $value => $label)
+                    <option value="{{ $value }}" @selected($filter->status === $value)>{{ $label }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="flex items-end"><x-button type="submit" variant="secondary">Aplicar período</x-button></div>
+    </form>
 
+    <section aria-label="Indicadores operacionais" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+        <x-stats-card label="Em execução" :value="$running_count" hint="agora" icon="M5 3v18l14-9L5 3z" accent="emergency" />
+        <x-stats-card label="Rascunhos" :value="$draft_execution_count" hint="execuções" icon="M12 20h9" accent="alert" />
+        <x-stats-card label="Sem avaliação" :value="$completed_without_assessment_count" hint="concluídas" icon="M9 12l2 2 4-4" accent="navy" />
+        <x-stats-card label="Avaliações draft" :value="$draft_assessment_count" hint="a finalizar" icon="M4 6h16M4 12h16" accent="navy" />
+        <x-stats-card label="Ações abertas" :value="$open_action_count" hint="corretivas" icon="M5 13l4 4L19 7" accent="clinical" />
+        <x-stats-card label="Ações vencidas" :value="$overdue_action_count" hint="prioridade" icon="M12 9v4m0 4h.01" accent="emergency" />
+    </section>
+
+    <div class="mt-8 grid gap-6 lg:grid-cols-2">
+        <x-card title="Execuções em andamento" subtitle="Prioridade operacional" accent="emergency">
+            <div class="space-y-3">
+                @forelse ($running_executions as $execution)
+                    <a href="{{ route('executions.show', $execution) }}" class="block rounded-lg border border-stone-200 bg-stone-50 px-4 py-3 hover:bg-white">
+                        <p class="text-sm font-semibold text-navy-950">{{ $execution->scenarioVersion->scenario->title }}</p>
+                        <p class="mt-1 text-xs text-ink-500">Execução #{{ $execution->sequence_number }} · iniciada {{ $execution->started_at?->format('d/m/Y H:i') }}</p>
+                    </a>
+                @empty
+                    <p class="text-sm text-ink-500">Nenhuma execução em andamento no período.</p>
+                @endforelse
+            </div>
+        </x-card>
+
+        <x-card title="Concluídas sem avaliação" subtitle="Prontas para iniciar o assessment" accent="alert">
+            <div class="space-y-3">
+                @forelse ($completed_without_assessment as $execution)
+                    <a href="{{ route('executions.show', $execution) }}" class="block rounded-lg border border-stone-200 bg-stone-50 px-4 py-3 hover:bg-white">
+                        <p class="text-sm font-semibold text-navy-950">{{ $execution->scenarioVersion->scenario->title }}</p>
+                        <p class="mt-1 text-xs text-ink-500">Execução #{{ $execution->sequence_number }} · concluída {{ $execution->completed_at?->format('d/m/Y H:i') }}</p>
+                    </a>
+                @empty
+                    <p class="text-sm text-ink-500">Nenhuma execução aguardando criação de avaliação.</p>
+                @endforelse
+            </div>
+        </x-card>
+
+        <x-card title="Avaliações em elaboração" subtitle="Assessment M4 ainda não finalizado" accent="navy">
+            <div class="space-y-3">
+                @forelse ($draft_assessments as $assessment)
+                    <a href="{{ route('assessments.show', $assessment) }}" class="block rounded-lg border border-stone-200 bg-stone-50 px-4 py-3 hover:bg-white">
+                        <p class="text-sm font-semibold text-navy-950">{{ $assessment->execution->scenarioVersion->scenario->title }}</p>
+                        <p class="mt-1 text-xs text-ink-500">Execução #{{ $assessment->execution->sequence_number }} · avaliação em elaboração</p>
+                    </a>
+                @empty
+                    <p class="text-sm text-ink-500">Nenhuma avaliação em elaboração.</p>
+                @endforelse
+            </div>
+        </x-card>
+
+        <x-card title="Ações com prazo próximo" subtitle="Próximos 14 dias" accent="clinical">
+            <div class="space-y-3">
+                @forelse ($actions_due_soon as $action)
+                    <div class="rounded-lg border border-stone-200 bg-stone-50 px-4 py-3">
+                        <p class="text-sm font-semibold text-ink-900">{{ $action->action }}</p>
+                        <p class="mt-1 text-xs text-ink-500">{{ $action->responsible_label ?: $action->responsiblePerson?->preferredName() }} · prazo {{ $action->due_date?->format('d/m/Y') }}</p>
+                    </div>
+                @empty
+                    <p class="text-sm text-ink-500">Nenhuma ação com prazo nos próximos 14 dias.</p>
+                @endforelse
+            </div>
+        </x-card>
+    </div>
+
+    <x-card class="mt-6" title="Avaliações finalizadas recentemente" subtitle="Registros históricos mensuráveis" accent="clinical">
+        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            @forelse ($recent_finalized_assessments as $assessment)
+                <a href="{{ route('assessments.show', $assessment) }}" class="rounded-lg border border-stone-200 bg-stone-50 px-4 py-3 hover:bg-white">
+                    <p class="text-sm font-semibold text-navy-950">{{ $assessment->execution->scenarioVersion->scenario->title }}</p>
+                    <p class="mt-1 text-xs text-ink-500">{{ $assessment->final_score !== null ? number_format((float) $assessment->final_score, 2, ',', '.') . '/100' : 'Sem nota numérica' }} · {{ $assessment->result ?: 'Sem classificação histórica' }}</p>
+                </a>
+            @empty
+                <p class="text-sm text-ink-500">Nenhuma avaliação finalizada no período.</p>
+            @endforelse
+        </div>
+    </x-card>
 </x-layouts.app>
