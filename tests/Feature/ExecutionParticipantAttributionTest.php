@@ -36,7 +36,7 @@ class ExecutionParticipantAttributionTest extends TestCase
         $unit = Unit::create([
             'organization_id' => $organization->id,
             'name' => 'Unidade Alfa',
-            'kind' => 'operational',
+            'kind' => 'company',
             'status' => 'active',
         ]);
         $person = Person::create([
