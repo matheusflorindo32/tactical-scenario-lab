@@ -38,6 +38,7 @@ final class ExecutionHistoryQuery
                 'scenarioVersion.scenario',
                 'assessment',
                 'participants:id,scenario_execution_id,unit_id_snapshot,unit_name_snapshot',
+                'participants.unitSnapshot:id,uuid',
             ])
             ->select('scenario_executions.*')
             ->selectSub(function ($subquery): void {
