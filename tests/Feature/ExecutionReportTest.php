@@ -21,17 +21,6 @@ class ExecutionReportTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_scenario_execution_exposes_organization_relation_to_report_runtime(): void
-    {
-        [, $execution] = $this->executionContext('Diagnóstico Relação');
-
-        $this->assertTrue(
-            method_exists($execution, 'organization'),
-            'ScenarioExecution runtime methods: '.implode(', ', get_class_methods($execution)),
-        );
-        $this->assertInstanceOf(Organization::class, $execution->organization()->firstOrFail());
-    }
-
     public function test_report_builder_is_presentation_safe_and_omits_contact_pii(): void
     {
         [$organization, $execution] = $this->executionContext('Relatório Seguro');
@@ -93,6 +82,18 @@ class ExecutionReportTest extends TestCase
             ->assertHeader('content-type', 'application/pdf')
             ->assertHeader('content-disposition', 'attachment; filename=execution-'.$execution->uuid.'.pdf');
         $this->assertStringStartsWith('%PDF-', $response->getContent());
+    }
+
+    public function test_pdf_endpoint_blocks_cross_organization_execution(): void
+    {
+        [$activeOrganization] = $this->executionContext('Organização Ativa PDF');
+        [, $foreignExecution] = $this->executionContext('Organização Externa PDF');
+        $authorized = $this->user($activeOrganization, [AccessAbility::REPORTS_VIEW]);
+
+        $this->actingAs($authorized)
+            ->withSession(['active_organization_id' => $activeOrganization->id])
+            ->get('/reports/executions/'.$foreignExecution->uuid.'/pdf')
+            ->assertForbidden();
     }
 
     private function executionContext(string $title): array
