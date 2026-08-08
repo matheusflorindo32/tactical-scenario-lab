@@ -84,10 +84,15 @@ final class ExecutiveDashboardQuery
     {
         return $this->executions($filter)
             ->select(['id', 'started_at', 'created_at'])
-            ->orderBy('started_at')
+            ->orderBy('id')
             ->cursor()
-            ->groupBy(fn (ScenarioExecution $execution) => ($execution->started_at ?? $execution->created_at)->format('Y-m'))
-            ->map(fn (Collection $rows) => $rows->count());
+            ->reduce(function (Collection $months, ScenarioExecution $execution): Collection {
+                $month = ($execution->started_at ?? $execution->created_at)->format('Y-m');
+                $months->put($month, ((int) $months->get($month, 0)) + 1);
+
+                return $months;
+            }, collect())
+            ->sortKeys();
     }
 
     private function applyExecutionConstraints(Builder $query, InstitutionalFilter $filter): void
