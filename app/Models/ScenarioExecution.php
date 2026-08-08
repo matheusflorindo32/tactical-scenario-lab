@@ -59,6 +59,11 @@ class ScenarioExecution extends Model
             ->orderBy('id');
     }
 
+    public function injects(): HasMany
+    {
+        return $this->hasMany(ExecutionInject::class)->orderBy('id');
+    }
+
     public function isDraft(): bool
     {
         return $this->status === 'draft';
