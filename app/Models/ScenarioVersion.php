@@ -75,4 +75,9 @@ class ScenarioVersion extends Model
     {
         return $this->hasMany(VictimCohort::class);
     }
+
+    public function executions(): HasMany
+    {
+        return $this->hasMany(ScenarioExecution::class)->orderBy('sequence_number');
+    }
 }
