@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\HasPublicUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use InvalidArgumentException;
 
 class VictimCohort extends Model
 {
@@ -27,6 +28,15 @@ class VictimCohort extends Model
             'profile' => 'array',
             'characteristics' => 'array',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (VictimCohort $cohort): void {
+            if ((int) $cohort->quantity < 1) {
+                throw new InvalidArgumentException('Victim cohort quantity must be at least 1.');
+            }
+        });
     }
 
     public function scenarioVersion(): BelongsTo
