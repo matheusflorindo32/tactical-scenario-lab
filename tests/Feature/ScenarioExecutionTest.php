@@ -92,7 +92,7 @@ class ScenarioExecutionTest extends TestCase
     {
         $organization = Organization::create([
             'name' => 'Centro de Simulação M3',
-            'kind' => 'training_center',
+            'kind' => 'company',
             'status' => 'active',
         ]);
 
