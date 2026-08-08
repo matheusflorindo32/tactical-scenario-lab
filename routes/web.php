@@ -3,6 +3,7 @@
 use App\Http\Controllers\AccessAdministrationController;
 use App\Http\Controllers\ActiveOrganizationController;
 use App\Http\Controllers\AuthenticatedSessionController;
+use App\Http\Controllers\ExecutionAssessmentController;
 use App\Http\Controllers\ExecutionEventController;
 use App\Http\Controllers\ExecutionInjectController;
 use App\Http\Controllers\ExecutionParticipantController;
@@ -156,6 +157,15 @@ Route::middleware(['auth', 'account.active'])->group(function () {
         ->name('execution-injects.cancel');
     Route::patch('/execution-resources/{resource}', [ExecutionResourceController::class, 'update'])
         ->name('execution-resources.update');
+
+    Route::post('/executions/{execution}/assessment', [ExecutionAssessmentController::class, 'store'])
+        ->name('assessments.store');
+    Route::get('/assessments/{assessment}', [ExecutionAssessmentController::class, 'show'])
+        ->name('assessments.show');
+    Route::patch('/assessments/{assessment}/adjustment', [ExecutionAssessmentController::class, 'adjustment'])
+        ->name('assessments.adjustment');
+    Route::patch('/assessments/{assessment}/finalize', [ExecutionAssessmentController::class, 'finalize'])
+        ->name('assessments.finalize');
 
     Route::post('/scenarios/{scenario}/execute', [ScenarioController::class, 'execute'])
         ->name('scenarios.execute');
