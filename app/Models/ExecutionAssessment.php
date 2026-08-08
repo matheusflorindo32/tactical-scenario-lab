@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\HasPublicUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ExecutionAssessment extends Model
 {
@@ -56,6 +57,11 @@ class ExecutionAssessment extends Model
     public function finalizer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'finalized_by_user_id');
+    }
+
+    public function criteria(): HasMany
+    {
+        return $this->hasMany(AssessmentCriterion::class)->orderBy('position');
     }
 
     public function isDraft(): bool
