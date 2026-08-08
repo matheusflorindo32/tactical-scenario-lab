@@ -42,6 +42,7 @@ class ScenarioExecutionController extends Controller
 
         $execution->load([
             'scenarioVersion.scenario',
+            'assessment',
             'teams.participants.person',
             'participants.person',
             'events.team',
@@ -54,7 +55,9 @@ class ScenarioExecutionController extends Controller
             ->activeOrganizationAccesses()
             ->where('organization_id', $organizationId)
             ->first();
-        $canManage = in_array(AccessAbility::SCENARIOS_MANAGE, $access?->abilities ?? [], true);
+        $abilities = $access?->abilities ?? [];
+        $canManage = in_array(AccessAbility::SCENARIOS_MANAGE, $abilities, true);
+        $canEvaluate = in_array(AccessAbility::EVALUATIONS_MANAGE, $abilities, true);
 
         $people = $canManage
             ? Person::query()
@@ -67,7 +70,7 @@ class ScenarioExecutionController extends Controller
                 ->get(['id', 'uuid', 'display_name', 'social_name'])
             : collect();
 
-        return view('executions.show', compact('execution', 'canManage', 'people'));
+        return view('executions.show', compact('execution', 'canManage', 'canEvaluate', 'people'));
     }
 
     public function start(
