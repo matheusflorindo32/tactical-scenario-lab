@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use LogicException;
 
 class ExecutionAssessment extends Model
 {
@@ -43,6 +44,21 @@ class ExecutionAssessment extends Model
             'finalized_at' => 'datetime',
             'legacy_imported_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::updating(function (ExecutionAssessment $assessment): void {
+            if ($assessment->getOriginal('status') === 'finalized') {
+                throw new LogicException('Finalized assessment content is immutable.');
+            }
+        });
+
+        static::deleting(function (ExecutionAssessment $assessment): void {
+            if ($assessment->isFinalized()) {
+                throw new LogicException('Finalized assessment content is immutable.');
+            }
+        });
     }
 
     public function organization(): BelongsTo
