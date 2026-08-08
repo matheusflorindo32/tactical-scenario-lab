@@ -12,7 +12,9 @@ use App\Models\User;
 use App\Models\UserOrganizationAccess;
 use App\Support\Auth\AccessAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class ExecutionParticipantsTest extends TestCase
@@ -40,7 +42,7 @@ class ExecutionParticipantsTest extends TestCase
             'description' => 'Resposta inicial',
         ])->assertRedirect();
 
-        $teamId = (int) \DB::table('execution_teams')->value('id');
+        $teamId = (int) DB::table('execution_teams')->value('id');
 
         $this->post(route('execution-participants.store', $execution), [
             'person_id' => $person->id,
@@ -86,14 +88,14 @@ class ExecutionParticipantsTest extends TestCase
         $this->authenticate($organization);
         $person = $this->personWithMembership($organization, 'Operador Bravo');
 
-        \DB::table('execution_teams')->insert([
-            'uuid' => (string) \Illuminate\Support\Str::uuid(),
+        DB::table('execution_teams')->insert([
+            'uuid' => (string) Str::uuid(),
             'scenario_execution_id' => $otherExecution->id,
             'label' => 'Equipe de outra execução',
             'created_at' => now(),
             'updated_at' => now(),
         ]);
-        $foreignTeamId = (int) \DB::table('execution_teams')->where('scenario_execution_id', $otherExecution->id)->value('id');
+        $foreignTeamId = (int) DB::table('execution_teams')->where('scenario_execution_id', $otherExecution->id)->value('id');
 
         $this->post(route('execution-participants.store', $execution), [
             'person_id' => $person->id,
