@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\HasPublicUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ScenarioVersion extends Model
 {
@@ -40,5 +41,15 @@ class ScenarioVersion extends Model
     public function scenario(): BelongsTo
     {
         return $this->belongsTo(Scenario::class);
+    }
+
+    public function victims(): HasMany
+    {
+        return $this->hasMany(ScenarioVictim::class);
+    }
+
+    public function cohorts(): HasMany
+    {
+        return $this->hasMany(VictimCohort::class);
     }
 }
