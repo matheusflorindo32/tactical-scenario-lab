@@ -187,7 +187,7 @@ $versionStatus = $version?->publication_status ?? 'draft';
             </x-card>
 
             @if ($scenario->isCompleted() && count($observed))
-                <x-card title="Erros observados" subtitle="Fluxo legado preservado até o M4" accent="alert">
+                <x-card title="Erros observados" subtitle="Registro histórico legado preservado somente para consulta" accent="alert">
                     <ul class="space-y-2.5">
                         @foreach ($observed as $error)
                             <li class="rounded-md border border-alert-100 bg-alert-50/60 px-3 py-2.5 text-sm leading-6 text-ink-800">{{ $error }}</li>
@@ -196,49 +196,21 @@ $versionStatus = $version?->publication_status ?? 'draft';
                 </x-card>
             @endif
 
-            @if ($scenario->canBeEvaluated())
-                <x-card title="Avaliação e debriefing legado" subtitle="Compatibilidade temporária até o Assessment/Debriefing estruturado do M4" accent="clinical">
-                    @if ($scenario->isCompleted())
-                        <div class="mb-6 rounded-lg border border-clinical-200 bg-clinical-50/70 p-4">
-                            <p class="text-xs font-semibold uppercase tracking-[0.13em] text-clinical-700">Pontuação final</p>
-                            <p class="mt-1 font-display text-3xl font-semibold text-navy-950">{{ $scenario->score ?? 0 }}<span class="text-base font-medium text-ink-500">/100</span></p>
-                            @if ($scenario->debrief_notes)
-                                <p class="mt-3 whitespace-pre-line text-sm leading-6 text-ink-700">{{ $scenario->debrief_notes }}</p>
-                            @endif
+            @if ($scenario->isCompleted() && ($scenario->score !== null || $scenario->debrief_notes))
+                <x-card title="Avaliação histórica" subtitle="Registro legado somente para consulta; novas avaliações pertencem a cada execução" accent="clinical">
+                    @if ($scenario->score !== null)
+                        <div class="rounded-lg border border-clinical-200 bg-clinical-50/70 p-4">
+                            <p class="text-xs font-semibold uppercase tracking-[0.13em] text-clinical-700">Pontuação histórica</p>
+                            <p class="mt-1 font-display text-3xl font-semibold text-navy-950">{{ $scenario->score }}<span class="text-base font-medium text-ink-500">/100</span></p>
                         </div>
                     @endif
-
-                    <form method="POST" action="{{ route('scenarios.evaluate', $scenario) }}" class="space-y-5">
-                        @csrf
-                        <x-input label="Nota da execução (0 a 100)" name="score" type="number" min="0" max="100" step="1" required :value="old('score', $scenario->score)" :error="$errors->first('score')" />
-                        <x-textarea label="Notas do debriefing" name="debrief_notes" rows="6" placeholder="Pontos fortes, oportunidades de melhoria e decisões-chave." :value="old('debrief_notes', $scenario->debrief_notes)" :error="$errors->first('debrief_notes')" />
-
-                        @if (count($catalog))
-                            @php $selectedObserved = old('observed_critical_errors', $observed); @endphp
-                            <fieldset class="rounded-lg border border-stone-200 bg-stone-50/70 p-4">
-                                <legend class="px-1 text-sm font-semibold text-navy-950">Erros observados nesta execução</legend>
-                                <p class="mt-1 text-xs leading-5 text-ink-500">Marque somente ocorrências efetivamente observadas. O catálogo previsto permanece separado e não será sobrescrito.</p>
-                                <div class="mt-4 space-y-3">
-                                    @foreach ($catalog as $index => $error)
-                                        <label for="observed_error_{{ $index }}" class="flex cursor-pointer items-start gap-3 rounded-md border border-stone-200 bg-white px-3 py-3 text-sm leading-5 text-ink-800">
-                                            <input id="observed_error_{{ $index }}" name="observed_critical_errors[]" type="checkbox" value="{{ $error }}" @checked(in_array($error, $selectedObserved, true)) class="mt-0.5 rounded border-stone-300 text-navy-700 focus:ring-navy-500">
-                                            <span>{{ $error }}</span>
-                                        </label>
-                                    @endforeach
-                                </div>
-                                @error('observed_critical_errors')
-                                    <p class="mt-2 text-xs font-medium text-emergency-700">{{ $message }}</p>
-                                @enderror
-                                @error('observed_critical_errors.*')
-                                    <p class="mt-2 text-xs font-medium text-emergency-700">{{ $message }}</p>
-                                @enderror
-                            </fieldset>
-                        @endif
-
-                        <div class="flex justify-end border-t border-stone-100 pt-4">
-                            <x-button type="submit" variant="success">{{ $scenario->isCompleted() ? 'Atualizar avaliação' : 'Finalizar avaliação' }}</x-button>
+                    @if ($scenario->debrief_notes)
+                        <div class="mt-4 rounded-lg border border-stone-200 bg-white p-4">
+                            <p class="text-xs font-semibold uppercase tracking-[0.13em] text-ink-500">Debrief histórico</p>
+                            <p class="mt-2 whitespace-pre-line text-sm leading-6 text-ink-700">{{ $scenario->debrief_notes }}</p>
                         </div>
-                    </form>
+                    @endif
+                    <p class="mt-4 text-sm leading-6 text-ink-600">Para registrar ou consultar avaliação estruturada, abra a execução correspondente no histórico acima e acesse Avaliação &amp; Debriefing.</p>
                 </x-card>
             @endif
         </div>
