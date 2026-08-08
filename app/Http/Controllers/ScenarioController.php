@@ -42,11 +42,16 @@ class ScenarioController extends Controller
         $validated = $request->validate([
             'environment' => ['required', 'string', 'max:100'],
             'threat_level' => ['required', Rule::in(['controlada', 'potencial', 'ativa'])],
-            'casualties' => ['required', 'integer', 'min:1', 'max:10'],
+            'casualties' => ['nullable', 'integer', 'min:1', 'required_without:estimated_casualty_count'],
+            'estimated_casualty_count' => ['nullable', 'integer', 'min:1', 'required_without:casualties'],
             'mechanism' => ['required', 'string', 'max:150'],
             'resources' => ['nullable', 'array', 'max:20'],
             'resources.*' => ['string', 'max:80', 'distinct'],
         ]);
+
+        $estimatedCasualtyCount = (int) ($validated['estimated_casualty_count'] ?? $validated['casualties']);
+        $validated['casualties'] = $estimatedCasualtyCount;
+        $validated['estimated_casualty_count'] = $estimatedCasualtyCount;
 
         $scenario = Scenario::create([
             ...$generator->generate($validated),
