@@ -49,8 +49,11 @@ class LegacyAssessmentMigrationTest extends TestCase
         $this->assertNull($evidence->execution_event_id);
         $this->assertNull($evidence->created_by_user_id);
 
-        $occurrences = $assessment->criticalErrorOccurrences()->orderBy('catalog_label_snapshot')->get();
-        $this->assertSame(['Erro legado fora do catálogo atual', 'Falha de segurança'], $occurrences->pluck('catalog_label_snapshot')->all());
+        $occurrences = $assessment->criticalErrorOccurrences()->get();
+        $this->assertEqualsCanonicalizing(
+            ['Erro legado fora do catálogo atual', 'Falha de segurança'],
+            $occurrences->pluck('catalog_label_snapshot')->all(),
+        );
         $this->assertTrue($occurrences->every(fn ($occurrence): bool => $occurrence->source === 'legacy'));
         $this->assertTrue($occurrences->every(fn ($occurrence): bool => $occurrence->rule === 'record'));
         $this->assertTrue($occurrences->every(fn ($occurrence): bool => $occurrence->penalty_points === '0.00'));
