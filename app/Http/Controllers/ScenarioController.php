@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Scenario;
+use App\Services\Auth\ActiveOrganization;
 use App\Services\ScenarioGenerator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -12,20 +13,32 @@ use Illuminate\View\View;
 
 class ScenarioController extends Controller
 {
-    public function index(): View
+    public function index(Request $request, ActiveOrganization $activeOrganization): View
     {
+        $organizationId = $activeOrganization->ensureAbility($request, 'scenarios.view');
+
         return view('scenarios.index', [
-            'scenarios' => Scenario::latest()->paginate(10),
+            'scenarios' => Scenario::query()
+                ->where('organization_id', $organizationId)
+                ->latest()
+                ->paginate(10),
         ]);
     }
 
-    public function create(): View
+    public function create(Request $request, ActiveOrganization $activeOrganization): View
     {
+        $activeOrganization->ensureAbility($request, 'scenarios.manage');
+
         return view('scenarios.create');
     }
 
-    public function store(Request $request, ScenarioGenerator $generator): RedirectResponse
-    {
+    public function store(
+        Request $request,
+        ScenarioGenerator $generator,
+        ActiveOrganization $activeOrganization,
+    ): RedirectResponse {
+        $organizationId = $activeOrganization->ensureAbility($request, 'scenarios.manage');
+
         $validated = $request->validate([
             'environment' => ['required', 'string', 'max:100'],
             'threat_level' => ['required', Rule::in(['controlada', 'potencial', 'ativa'])],
@@ -35,15 +48,24 @@ class ScenarioController extends Controller
             'resources.*' => ['string', 'max:80', 'distinct'],
         ]);
 
-        $scenario = Scenario::create($generator->generate($validated));
+        $scenario = Scenario::create([
+            ...$generator->generate($validated),
+            'organization_id' => $organizationId,
+        ]);
 
         return redirect()
             ->route('scenarios.show', $scenario)
             ->with('success', 'Cenário criado como rascunho.');
     }
 
-    public function show(Scenario $scenario): View
-    {
+    public function show(
+        Request $request,
+        Scenario $scenario,
+        ActiveOrganization $activeOrganization,
+    ): View {
+        $organizationId = $activeOrganization->ensureAbility($request, 'scenarios.view');
+        $this->ensureScenarioInOrganization($scenario, $organizationId);
+
         return view('scenarios.show', compact('scenario'));
     }
 
@@ -52,8 +74,14 @@ class ScenarioController extends Controller
      * Idempotente: se já está em `running` ou `completed`, não muta e
      * devolve mensagem clara.
      */
-    public function execute(Scenario $scenario): RedirectResponse
-    {
+    public function execute(
+        Request $request,
+        Scenario $scenario,
+        ActiveOrganization $activeOrganization,
+    ): RedirectResponse {
+        $organizationId = $activeOrganization->ensureAbility($request, 'scenarios.manage');
+        $this->ensureScenarioInOrganization($scenario, $organizationId);
+
         if (! $scenario->canBeStarted()) {
             return back()->with('error', 'Este cenário não pode ser iniciado (status atual: '.$scenario->status.').');
         }
@@ -78,8 +106,14 @@ class ScenarioController extends Controller
      *   precisa vir do catálogo gerado (`critical_errors`) para evitar
      *   inserção arbitrária vinda do formulário.
      */
-    public function evaluate(Request $request, Scenario $scenario): RedirectResponse
-    {
+    public function evaluate(
+        Request $request,
+        Scenario $scenario,
+        ActiveOrganization $activeOrganization,
+    ): RedirectResponse {
+        $organizationId = $activeOrganization->ensureAbility($request, 'evaluations.manage');
+        $this->ensureScenarioInOrganization($scenario, $organizationId);
+
         if (! $scenario->canBeEvaluated()) {
             return back()->with('error', 'Inicie a execução antes de avaliar.');
         }
@@ -104,5 +138,14 @@ class ScenarioController extends Controller
         });
 
         return back()->with('success', 'Avaliação registrada e cenário concluído.');
+    }
+
+    private function ensureScenarioInOrganization(Scenario $scenario, int $organizationId): void
+    {
+        abort_unless(
+            $scenario->organization_id === $organizationId,
+            403,
+            'O cenário solicitado pertence a outra organização.',
+        );
     }
 }

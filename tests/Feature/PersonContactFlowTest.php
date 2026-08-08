@@ -48,14 +48,14 @@ class PersonContactFlowTest extends TestCase
 
     public function test_contact_requires_membership_with_selected_organization(): void
     {
-        [$organization, $person] = $this->context();
+        [, $person] = $this->context();
         $foreign = Organization::create(['name' => 'Organização externa']);
 
         $this->post(route('people.contacts.store', $person), [
             'organization_id' => $foreign->id,
             'type' => 'email',
             'value' => 'teste@example.com',
-        ])->assertSessionHasErrors('organization_id');
+        ])->assertForbidden();
 
         $this->assertDatabaseCount('person_contacts', 0);
     }

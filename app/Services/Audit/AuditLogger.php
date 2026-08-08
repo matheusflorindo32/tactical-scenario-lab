@@ -5,7 +5,6 @@ namespace App\Services\Audit;
 use App\Models\AuditLog;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 
 final class AuditLogger
@@ -15,12 +14,13 @@ final class AuditLogger
         'mask',
     ];
 
-    private const SENSITIVE_KEYS = [
-        'value',
-        'value_encrypted',
-        'value_fingerprint',
+    private const EXACT_SENSITIVE_KEYS = [
         'cpf',
         'rg',
+    ];
+
+    private const SENSITIVE_KEY_FRAGMENTS = [
+        'value',
         'email',
         'phone',
         'whatsapp',
@@ -85,9 +85,16 @@ final class AuditLogger
             return false;
         }
 
-        return Arr::first(
-            self::SENSITIVE_KEYS,
-            fn (string $sensitive): bool => $key === $sensitive || str_contains($key, $sensitive),
-        ) !== null;
+        if (in_array($key, self::EXACT_SENSITIVE_KEYS, true)) {
+            return true;
+        }
+
+        foreach (self::SENSITIVE_KEY_FRAGMENTS as $sensitive) {
+            if ($key === $sensitive || str_contains($key, $sensitive)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

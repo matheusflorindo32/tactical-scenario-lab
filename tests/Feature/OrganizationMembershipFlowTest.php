@@ -15,8 +15,13 @@ class OrganizationMembershipFlowTest extends TestCase
 
     public function test_membership_form_is_available(): void
     {
+        $organization = Organization::create(['name' => 'Organização Alfa']);
         $person = Person::create(['display_name' => 'Pessoa Multiinstitucional']);
-        Organization::create(['name' => 'Organização Alfa']);
+        OrganizationMembership::create([
+            'person_id' => $person->id,
+            'organization_id' => $organization->id,
+            'status' => 'active',
+        ]);
 
         $this->get(route('people.memberships.create', $person))
             ->assertOk()
@@ -56,6 +61,11 @@ class OrganizationMembershipFlowTest extends TestCase
         $first = Organization::create(['name' => 'Organização Alfa']);
         $second = Organization::create(['name' => 'Organização Bravo']);
         $person = Person::create(['display_name' => 'Pessoa Protegida']);
+        OrganizationMembership::create([
+            'person_id' => $person->id,
+            'organization_id' => $first->id,
+            'status' => 'active',
+        ]);
         $foreignUnit = Unit::create([
             'organization_id' => $second->id,
             'name' => 'Unidade externa',
@@ -67,7 +77,7 @@ class OrganizationMembershipFlowTest extends TestCase
             'status' => 'active',
         ])->assertSessionHasErrors('unit_id');
 
-        $this->assertDatabaseCount('organization_memberships', 0);
+        $this->assertSame(1, $person->memberships()->count());
     }
 
     public function test_equivalent_active_membership_is_rejected(): void

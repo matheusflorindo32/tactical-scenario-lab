@@ -52,7 +52,7 @@ class PersonIdentifierFlowTest extends TestCase
             'organization_id' => $foreign->id,
             'type' => 'matricula',
             'value' => 'ABC-123',
-        ])->assertSessionHasErrors('organization_id');
+        ])->assertForbidden();
 
         $this->assertDatabaseCount('person_identifiers', 0);
         $this->assertDatabaseHas('organizations', ['id' => $organization->id]);

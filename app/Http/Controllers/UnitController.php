@@ -7,22 +7,27 @@ use App\Http\Requests\UpdateUnitRequest;
 use App\Models\Organization;
 use App\Models\Unit;
 use App\Services\Audit\AuditLogger;
+use App\Services\Auth\ActiveOrganization;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class UnitController extends Controller
 {
-    public function create(Organization $organization): View
+    public function create(Request $request, Organization $organization, ActiveOrganization $activeOrganization): View
     {
+        $activeOrganization->ensure($request, $organization->id);
+
         $parents = $organization->units()->where('status', 'active')->orderBy('name')->get();
 
         return view('units.create', compact('organization', 'parents'));
     }
 
-    public function store(StoreUnitRequest $request, AuditLogger $audit): RedirectResponse
+    public function store(StoreUnitRequest $request, AuditLogger $audit, ActiveOrganization $activeOrganization): RedirectResponse
     {
         $data = $request->validated();
+        $activeOrganization->ensure($request, (int) $data['organization_id']);
         $this->ensureParentIsValid($data['parent_unit_id'] ?? null, (int) $data['organization_id']);
 
         $unit = Unit::create($data);
@@ -44,8 +49,10 @@ class UnitController extends Controller
             ->with('success', 'Unidade cadastrada com sucesso.');
     }
 
-    public function edit(Unit $unit): View
+    public function edit(Request $request, Unit $unit, ActiveOrganization $activeOrganization): View
     {
+        $activeOrganization->ensure($request, $unit->organization_id);
+
         $parents = $unit->organization
             ->units()
             ->whereKeyNot($unit->id)
@@ -56,20 +63,32 @@ class UnitController extends Controller
         return view('units.edit', compact('unit', 'parents'));
     }
 
-    public function update(UpdateUnitRequest $request, Unit $unit, AuditLogger $audit): RedirectResponse
-    {
+    public function update(
+        UpdateUnitRequest $request,
+        Unit $unit,
+        AuditLogger $audit,
+        ActiveOrganization $activeOrganization,
+    ): RedirectResponse {
+        $activeOrganization->ensure($request, $unit->organization_id);
+
         $data = $request->validated();
         $this->ensureParentIsValid($data['parent_unit_id'] ?? null, $unit->organization_id, $unit);
 
         $previous = $unit->only(['kind', 'status', 'parent_unit_id']);
         $unit->update($data);
 
+        $changedFields = collect($unit->getChanges())
+            ->keys()
+            ->reject(fn (string $field) => $field === 'updated_at')
+            ->values()
+            ->all();
+
         $audit->record(
             'unit.updated',
             $unit,
             $unit->organization_id,
             [
-                'changed_fields' => array_keys($unit->getChanges()),
+                'changed_fields' => $changedFields,
                 'previous_kind' => $previous['kind'],
                 'current_kind' => $unit->kind,
                 'previous_status' => $previous['status'],
@@ -85,8 +104,14 @@ class UnitController extends Controller
             ->with('success', 'Unidade atualizada com sucesso.');
     }
 
-    public function deactivate(Unit $unit, AuditLogger $audit): RedirectResponse
-    {
+    public function deactivate(
+        Request $request,
+        Unit $unit,
+        AuditLogger $audit,
+        ActiveOrganization $activeOrganization,
+    ): RedirectResponse {
+        $activeOrganization->ensure($request, $unit->organization_id);
+
         if ($unit->status !== 'inactive') {
             $unit->update(['status' => 'inactive']);
 
@@ -95,6 +120,7 @@ class UnitController extends Controller
                 $unit,
                 $unit->organization_id,
                 ['status' => 'inactive'],
+                $request,
             );
         }
 
@@ -118,11 +144,12 @@ class UnitController extends Controller
         $parent = Unit::query()
             ->whereKey($parentId)
             ->where('organization_id', $organizationId)
+            ->where('status', 'active')
             ->first();
 
         if (! $parent) {
             throw ValidationException::withMessages([
-                'parent_unit_id' => 'A unidade superior precisa pertencer à mesma organização.',
+                'parent_unit_id' => 'A unidade superior precisa estar ativa e pertencer à mesma organização.',
             ]);
         }
 

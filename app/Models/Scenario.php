@@ -3,10 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Scenario extends Model
 {
     protected $fillable = [
+        'organization_id',
         'title',
         'environment',
         'threat_level',
@@ -39,6 +41,11 @@ class Scenario extends Model
             'started_at' => 'datetime',
             'completed_at' => 'datetime',
         ];
+    }
+
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
     }
 
     /* ---------------------------------------------------------------

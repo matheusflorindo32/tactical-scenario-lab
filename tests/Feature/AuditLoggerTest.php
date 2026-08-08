@@ -49,6 +49,19 @@ class AuditLoggerTest extends TestCase
         $this->assertSame('Audit Test Agent', $log->user_agent);
     }
 
+    public function test_short_sensitive_keys_do_not_redact_unrelated_organization_metadata(): void
+    {
+        $sanitized = app(AuditLogger::class)->sanitize([
+            'rg' => '1234567',
+            'organization_context_initialized' => true,
+            'organization_role' => 'manager_org',
+        ]);
+
+        $this->assertSame('[REDACTED]', $sanitized['rg']);
+        $this->assertTrue($sanitized['organization_context_initialized']);
+        $this->assertSame('manager_org', $sanitized['organization_role']);
+    }
+
     public function test_audit_log_references_subject_and_organization_without_pii(): void
     {
         $organization = Organization::create(['name' => 'Organização Auditada']);

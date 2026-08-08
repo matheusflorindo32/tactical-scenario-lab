@@ -60,13 +60,13 @@ class PersonRoleFlowTest extends TestCase
 
     public function test_role_requires_active_membership_with_selected_organization(): void
     {
-        [$organization, $person] = $this->context();
+        [, $person] = $this->context();
         $foreign = Organization::create(['name' => 'Organização sem vínculo']);
 
         $this->post(route('people.roles.store', $person), [
             'organization_id' => $foreign->id,
             'role' => 'viewer',
-        ])->assertSessionHasErrors('organization_id');
+        ])->assertForbidden();
 
         $this->assertDatabaseCount('person_roles', 0);
     }
