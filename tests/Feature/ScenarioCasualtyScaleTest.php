@@ -58,6 +58,36 @@ class ScenarioCasualtyScaleTest extends TestCase
         }
     }
 
+    public function test_create_form_explains_scalable_estimate_without_legacy_cap(): void
+    {
+        $this->authenticateScenarioManager();
+
+        $this->get(route('scenarios.create'))
+            ->assertOk()
+            ->assertSee('Estimativa total de vítimas')
+            ->assertSee('name="estimated_casualty_count"', false)
+            ->assertDontSee('Uma a dez', false)
+            ->assertDontSee('max="10"', false)
+            ->assertDontSee('Informe entre 1 e 10 vítimas.', false);
+    }
+
+    public function test_scenario_show_distinguishes_total_estimate_from_detailed_representations(): void
+    {
+        $this->authenticateScenarioManager();
+
+        $this->post(route('scenarios.store'), $this->payload(1000))
+            ->assertSessionHasNoErrors();
+
+        $scenario = Scenario::latest('id')->firstOrFail();
+
+        $this->get(route('scenarios.show', $scenario))
+            ->assertOk()
+            ->assertSee('Estimativa total de vítimas')
+            ->assertSee('Representações detalhadas')
+            ->assertSee('0 individuais')
+            ->assertSee('0 cohorts');
+    }
+
     private function authenticateScenarioManager(): Organization
     {
         $organization = Organization::create([
