@@ -24,12 +24,28 @@ final class ScenarioExecutionManager
                 ->where('scenario_version_id', $version->id)
                 ->max('sequence_number')) + 1;
 
-            return ScenarioExecution::create([
+            $execution = ScenarioExecution::create([
                 'organization_id' => $scenario->organization_id,
                 'scenario_version_id' => $version->id,
                 'sequence_number' => $nextSequenceNumber,
                 'status' => 'draft',
             ]);
+
+            collect($version->resources ?? [])
+                ->filter(fn ($name): bool => is_string($name) && trim($name) !== '')
+                ->map(fn (string $name): string => trim($name))
+                ->unique()
+                ->each(function (string $name) use ($execution): void {
+                    $execution->resources()->create([
+                        'name' => $name,
+                        'planned_quantity' => 1,
+                        'available_quantity' => 1,
+                        'used_quantity' => 0,
+                        'status' => 'available',
+                    ]);
+                });
+
+            return $execution;
         });
     }
 
