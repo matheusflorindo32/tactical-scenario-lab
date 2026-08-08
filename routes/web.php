@@ -28,6 +28,7 @@ use App\Http\Controllers\PersonIdentifierController;
 use App\Http\Controllers\PersonRoleController;
 use App\Http\Controllers\ScenarioController;
 use App\Http\Controllers\ScenarioExecutionController;
+use App\Http\Controllers\ScenarioTemplateController;
 use App\Http\Controllers\ScenarioVersionController;
 use App\Http\Controllers\UnitController;
 use Illuminate\Support\Facades\Route;
@@ -88,6 +89,10 @@ Route::middleware(['auth', 'account.active'])->group(function () {
     Route::patch('/people/{person}/roles/{role}/revoke', [PersonRoleController::class, 'revoke'])->name('people.roles.revoke');
 
     Route::resource('scenarios', ScenarioController::class)->only(['index', 'create', 'store', 'show']);
+    Route::get('/scenario-templates', [ScenarioTemplateController::class, 'index'])->name('scenario-templates.index');
+    Route::post('/scenario-versions/{scenarioVersion}/templates', [ScenarioTemplateController::class, 'store'])->name('scenario-templates.store');
+    Route::post('/scenario-templates/{scenarioTemplate}/use', [ScenarioTemplateController::class, 'use'])->name('scenario-templates.use');
+    Route::patch('/scenario-templates/{scenarioTemplate}/archive', [ScenarioTemplateController::class, 'archive'])->name('scenario-templates.archive');
     Route::patch('/scenario-versions/{scenarioVersion}/publish', [ScenarioVersionController::class, 'publish'])->name('scenario-versions.publish');
     Route::post('/scenario-versions/{scenarioVersion}/executions', [ScenarioExecutionController::class, 'store'])->name('executions.store');
     Route::get('/executions/{execution}', [ScenarioExecutionController::class, 'show'])->name('executions.show');
