@@ -10,6 +10,8 @@ use App\Http\Controllers\PersonController;
 use App\Http\Controllers\PersonIdentifierController;
 use App\Http\Controllers\PersonRoleController;
 use App\Http\Controllers\ScenarioController;
+use App\Http\Controllers\ScenarioExecutionController;
+use App\Http\Controllers\ScenarioVersionController;
 use App\Http\Controllers\UnitController;
 use App\Models\Scenario;
 use App\Services\Auth\ActiveOrganization;
@@ -122,6 +124,19 @@ Route::middleware(['auth', 'account.active'])->group(function () {
 
     Route::resource('scenarios', ScenarioController::class)
         ->only(['index', 'create', 'store', 'show']);
+
+    Route::patch('/scenario-versions/{scenarioVersion}/publish', [ScenarioVersionController::class, 'publish'])
+        ->name('scenario-versions.publish');
+    Route::post('/scenario-versions/{scenarioVersion}/executions', [ScenarioExecutionController::class, 'store'])
+        ->name('executions.store');
+    Route::get('/executions/{execution}', [ScenarioExecutionController::class, 'show'])
+        ->name('executions.show');
+    Route::patch('/executions/{execution}/start', [ScenarioExecutionController::class, 'start'])
+        ->name('executions.start');
+    Route::patch('/executions/{execution}/complete', [ScenarioExecutionController::class, 'complete'])
+        ->name('executions.complete');
+    Route::patch('/executions/{execution}/cancel', [ScenarioExecutionController::class, 'cancel'])
+        ->name('executions.cancel');
 
     Route::post('/scenarios/{scenario}/execute', [ScenarioController::class, 'execute'])
         ->name('scenarios.execute');
