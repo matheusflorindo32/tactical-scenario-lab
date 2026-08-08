@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use InvalidArgumentException;
 use LogicException;
 
 class ExecutionAssessment extends Model
@@ -48,6 +49,20 @@ class ExecutionAssessment extends Model
 
     protected static function booted(): void
     {
+        static::saving(function (ExecutionAssessment $assessment): void {
+            if (! $assessment->scenario_execution_id || ! $assessment->organization_id) {
+                return;
+            }
+
+            $executionOrganizationId = ScenarioExecution::query()
+                ->whereKey($assessment->scenario_execution_id)
+                ->value('organization_id');
+
+            if ($executionOrganizationId === null || (int) $executionOrganizationId !== (int) $assessment->organization_id) {
+                throw new InvalidArgumentException('Assessment organization must match execution organization.');
+            }
+        });
+
         static::updating(function (ExecutionAssessment $assessment): void {
             if ($assessment->getOriginal('status') === 'finalized') {
                 throw new LogicException('Finalized assessment content is immutable.');
