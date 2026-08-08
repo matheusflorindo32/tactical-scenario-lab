@@ -41,10 +41,35 @@
         });
     </script>
 @endif
-@if ($errors->any())
+@if (session('error'))
     <script>
         document.addEventListener('alpine:initialized', () => {
-            Alpine.store('ui').toast.show('error', 'Corrija os campos destacados no formulário.');
+            Alpine.store('ui').toast.show('error', @json(session('error')));
+        });
+    </script>
+@endif
+@if ($errors->any())
+    @php
+        // Mostra o primeiro erro concreto no toast em vez do texto genérico.
+        $firstError = $errors->first();
+        $firstField = array_key_first($errors->messages());
+        $friendlyLabels = [
+            'environment'                => 'Ambiente',
+            'threat_level'               => 'Nível de ameaça',
+            'casualties'                 => 'Vítimas',
+            'mechanism'                  => 'Mecanismo do trauma',
+            'resources'                  => 'Recursos',
+            'score'                      => 'Nota',
+            'debrief_notes'              => 'Notas do debriefing',
+            'observed_critical_errors'   => 'Erros observados',
+        ];
+        $fieldRoot = strtok((string) $firstField, '.');
+        $label     = $friendlyLabels[$fieldRoot] ?? $fieldRoot;
+        $toastMsg  = $label ? "{$label}: {$firstError}" : $firstError;
+    @endphp
+    <script>
+        document.addEventListener('alpine:initialized', () => {
+            Alpine.store('ui').toast.show('error', @json($toastMsg));
         });
     </script>
 @endif
