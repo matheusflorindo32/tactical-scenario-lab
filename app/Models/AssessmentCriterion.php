@@ -6,6 +6,7 @@ use App\Models\Concerns\HasPublicUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use LogicException;
 
 class AssessmentCriterion extends Model
 {
@@ -30,6 +31,21 @@ class AssessmentCriterion extends Model
             'score' => 'decimal:2',
             'position' => 'integer',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (AssessmentCriterion $criterion): void {
+            if ($criterion->assessment()->firstOrFail()->isFinalized()) {
+                throw new LogicException('Finalized assessment criteria are immutable.');
+            }
+        });
+
+        static::deleting(function (AssessmentCriterion $criterion): void {
+            if ($criterion->assessment()->firstOrFail()->isFinalized()) {
+                throw new LogicException('Finalized assessment criteria are immutable.');
+            }
+        });
     }
 
     public function assessment(): BelongsTo
