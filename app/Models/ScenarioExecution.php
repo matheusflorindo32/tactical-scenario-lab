@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\HasPublicUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ScenarioExecution extends Model
 {
@@ -41,6 +42,16 @@ class ScenarioExecution extends Model
         return $this->belongsTo(ScenarioVersion::class);
     }
 
+    public function teams(): HasMany
+    {
+        return $this->hasMany(ExecutionTeam::class)->orderBy('label');
+    }
+
+    public function participants(): HasMany
+    {
+        return $this->hasMany(ExecutionParticipant::class);
+    }
+
     public function isDraft(): bool
     {
         return $this->status === 'draft';
@@ -72,6 +83,11 @@ class ScenarioExecution extends Model
     }
 
     public function canCancel(): bool
+    {
+        return $this->isDraft() || $this->isRunning();
+    }
+
+    public function canConfigure(): bool
     {
         return $this->isDraft() || $this->isRunning();
     }
