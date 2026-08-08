@@ -5,8 +5,10 @@ namespace Tests\Feature;
 use App\Models\Organization;
 use App\Models\Scenario;
 use App\Models\ScenarioExecution;
+use App\Services\ScenarioExecutionManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
+use LogicException;
 use Tests\TestCase;
 
 class ScenarioExecutionTest extends TestCase
@@ -33,7 +35,7 @@ class ScenarioExecutionTest extends TestCase
 
     public function test_same_published_version_can_have_multiple_execution_records(): void
     {
-        [$scenario, $version] = $this->publishedVersion();
+        [$scenario, $version] = $this->scenarioVersion('published');
 
         $first = ScenarioExecution::create([
             'organization_id' => $scenario->organization_id,
@@ -57,7 +59,7 @@ class ScenarioExecutionTest extends TestCase
 
     public function test_execution_lifecycle_guards_are_explicit(): void
     {
-        [$scenario, $version] = $this->publishedVersion();
+        [$scenario, $version] = $this->scenarioVersion('published');
 
         $execution = ScenarioExecution::create([
             'organization_id' => $scenario->organization_id,
@@ -88,7 +90,49 @@ class ScenarioExecutionTest extends TestCase
         $this->assertFalse($execution->canCancel());
     }
 
-    private function publishedVersion(): array
+    public function test_execution_manager_rejects_unpublished_version(): void
+    {
+        [, $version] = $this->scenarioVersion('draft');
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('Only published scenario versions can be executed.');
+
+        app(ScenarioExecutionManager::class)->create($version);
+    }
+
+    public function test_execution_manager_creates_sequential_runs_and_enforces_transitions(): void
+    {
+        [, $version] = $this->scenarioVersion('published');
+        $manager = app(ScenarioExecutionManager::class);
+
+        $first = $manager->create($version);
+        $second = $manager->create($version);
+
+        $this->assertSame(1, $first->sequence_number);
+        $this->assertSame(2, $second->sequence_number);
+        $this->assertSame('draft', $first->status);
+
+        $manager->start($first);
+        $first->refresh();
+        $this->assertSame('running', $first->status);
+        $this->assertNotNull($first->started_at);
+
+        $manager->complete($first);
+        $first->refresh();
+        $this->assertSame('completed', $first->status);
+        $this->assertNotNull($first->completed_at);
+
+        $manager->cancel($second);
+        $second->refresh();
+        $this->assertSame('cancelled', $second->status);
+        $this->assertNotNull($second->cancelled_at);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('Execution cannot be started from its current status.');
+        $manager->start($first);
+    }
+
+    private function scenarioVersion(string $publicationStatus): array
     {
         $organization = Organization::create([
             'name' => 'Centro de Simulação M3',
@@ -121,7 +165,7 @@ class ScenarioExecutionTest extends TestCase
             'learning_objectives' => $scenario->learning_objectives,
             'expected_actions' => $scenario->expected_actions,
             'critical_errors' => $scenario->critical_errors,
-            'publication_status' => 'published',
+            'publication_status' => $publicationStatus,
         ]);
 
         return [$scenario, $version];
