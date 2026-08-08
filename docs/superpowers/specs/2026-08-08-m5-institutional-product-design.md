@@ -99,7 +99,7 @@ Each query unit has one responsibility and is testable independently from Blade 
 
 ## 4. Authorization model
 
-Existing abilities are reused. M5 adds no new ability unless implementation proves an unavoidable authorization gap.
+M5 adds **no new ability**. Existing abilities are sufficient and remain authoritative.
 
 ### Instructor dashboard
 
@@ -189,19 +189,35 @@ M5 extends `execution_participants` with nullable historical attribution fields:
 
 When a participant is added to an execution:
 
-1. the request identifies the person and, when needed, the active institutional membership being represented;
-2. backend verifies membership belongs to the same person and active organization;
-3. backend snapshots the membership ID, unit ID/name and position into `ExecutionParticipant`;
+1. the request identifies the person and the active institutional membership being represented;
+2. backend verifies membership belongs to the same person and active organization and is active at the time of linking;
+3. backend snapshots membership ID, unit ID/name and position into `ExecutionParticipant`;
 4. future transfer, membership closure or unit rename does not silently rewrite the visible historical unit/position label for that execution.
+
+If the person has exactly one active membership in the active organization, the UI may preselect it. If multiple active memberships exist, the instructor must choose one; the backend never guesses.
 
 ### Existing M3 participants
 
-A migration/backfill is conservative:
+The backfill uses one exact anchor timestamp per execution:
 
-- if historical attribution can be resolved unambiguously, snapshot it;
-- if more than one plausible membership exists or no safe mapping exists, fields remain null;
-- M5 never guesses a historical unit;
-- dashboards/reports render these as `Sem unidade histórica` rather than fabricating attribution.
+`historical_anchor = started_at ?? created_at`
+
+For each existing participant, candidate memberships are restricted to the same person and same execution organization and must satisfy:
+
+- `started_at <= historical_anchor` when `started_at` is present;
+- `ended_at` is null or `ended_at >= historical_anchor`;
+- membership was not soft-deleted before the anchor.
+
+Backfill behavior is deterministic:
+
+- exactly one candidate → snapshot that membership, its unit ID/name and position;
+- zero candidates → leave historical fields null;
+- more than one candidate → leave historical fields null;
+- a candidate with no unit still snapshots membership/position but leaves unit fields null.
+
+M5 never chooses the “first” candidate and never uses the person's current membership as a fallback.
+
+Dashboards/reports render missing unit attribution as `Sem unidade histórica`.
 
 The report/unit-filter layer uses snapshot fields, not a person's current membership.
 
@@ -634,7 +650,8 @@ Must prove:
 
 - adding participant snapshots membership/unit/position;
 - transfer after execution does not change execution's historical unit label;
-- ambiguous legacy participant attribution remains null;
+- zero/multiple historical candidates remain null during backfill;
+- soft-deleted-before-anchor memberships are not selected;
 - cross-org membership cannot be snapshotted.
 
 ### PDF tests
@@ -745,7 +762,7 @@ M5 is complete only when all are true:
 - [ ] common period/scenario/unit filters are centralized in `InstitutionalFilter`;
 - [ ] active organization is never accepted as arbitrary client filter;
 - [ ] execution participants snapshot institutional attribution for new links;
-- [ ] ambiguous historical attribution is not guessed;
+- [ ] historical backfill follows the exact anchor/candidate rule and never guesses;
 - [ ] finalized assessment score metrics use M4 data;
 - [ ] pass rate excludes legacy assessments without result;
 - [ ] top errors use `CriticalErrorOccurrence` observations;
@@ -762,6 +779,7 @@ M5 is complete only when all are true:
 - [ ] scenario templates can be created from published versions;
 - [ ] template use creates a new draft scenario/version without copying history;
 - [ ] template archival works;
+- [ ] no new M5 ability is introduced;
 - [ ] `DemoSeeder` refuses production;
 - [ ] demo data is fictional and supports the five-minute walkthrough;
 - [ ] dashboard/history/report/template endpoints preserve ability checks and tenant isolation;
