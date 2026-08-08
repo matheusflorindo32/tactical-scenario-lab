@@ -6,7 +6,10 @@ use App\Http\Controllers\ScenarioController;
 use App\Models\Organization;
 use App\Models\Scenario;
 use App\Models\ScenarioExecution;
+use App\Models\User;
+use App\Models\UserOrganizationAccess;
 use App\Services\LegacyAssessmentImporter;
+use App\Support\Auth\AccessAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
@@ -106,6 +109,33 @@ class LegacyAssessmentMigrationTest extends TestCase
     {
         $this->assertFalse(Route::has('scenarios.evaluate'));
         $this->assertFalse(method_exists(ScenarioController::class, 'evaluate'));
+    }
+
+    public function test_completed_legacy_scenario_page_renders_without_retired_evaluation_form(): void
+    {
+        [$scenario] = $this->legacyContext();
+        $this->authenticateViewer($scenario->organization);
+
+        $this->get(route('scenarios.show', $scenario))
+            ->assertOk()
+            ->assertDontSee('name="score"', false)
+            ->assertDontSee('name="debrief_notes"', false)
+            ->assertDontSee('observed_critical_errors[]', false);
+    }
+
+    private function authenticateViewer(Organization $organization): void
+    {
+        $user = User::factory()->create(['status' => 'active']);
+        UserOrganizationAccess::create([
+            'user_id' => $user->id,
+            'organization_id' => $organization->id,
+            'role' => 'viewer',
+            'abilities' => [AccessAbility::SCENARIOS_VIEW],
+            'granted_at' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->withSession(['active_organization_id' => $organization->id]);
     }
 
     private function legacyContext(): array
