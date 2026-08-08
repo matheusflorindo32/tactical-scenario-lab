@@ -65,7 +65,7 @@ class DemoSeederTest extends TestCase
                 ->where('status', 'finalized')
                 ->count(),
             'action_items' => ActionItem::query()
-                ->whereHas('assessment', fn ($query) => $query->where('organization_id', $organizationId))
+                ->whereHas('debrief.assessment', fn ($query) => $query->where('organization_id', $organizationId))
                 ->count(),
         ];
     }
