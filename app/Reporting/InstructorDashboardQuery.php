@@ -7,6 +7,7 @@ use App\Models\ExecutionAssessment;
 use App\Models\ScenarioExecution;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 final class InstructorDashboardQuery
 {
@@ -61,7 +62,7 @@ final class InstructorDashboardQuery
         $query = ScenarioExecution::query()
             ->where('organization_id', $filter->organizationId)
             ->whereBetween(
-                \DB::raw('COALESCE(started_at, created_at)'),
+                DB::raw('COALESCE(started_at, created_at)'),
                 [$filter->dateFrom, $filter->dateTo],
             );
 
@@ -98,7 +99,7 @@ final class InstructorDashboardQuery
         $query
             ->where('scenario_executions.organization_id', $filter->organizationId)
             ->whereBetween(
-                \DB::raw('COALESCE(scenario_executions.started_at, scenario_executions.created_at)'),
+                DB::raw('COALESCE(scenario_executions.started_at, scenario_executions.created_at)'),
                 [$filter->dateFrom, $filter->dateTo],
             );
 
