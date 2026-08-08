@@ -1,0 +1,46 @@
+name: M5 Composer Lock Generator
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  composer-lock:
+    if: github.head_ref == 'feature/m5-institutional-product'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout M5 branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Setup PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, pdo, pdo_sqlite, openssl, tokenizer, xml, ctype, json
+          coverage: none
+          tools: composer:v2
+
+      - name: Generate Composer manifest and lock
+        run: composer require dompdf/dompdf:^3.1 --no-interaction --no-progress
+
+      - name: Validate Composer files
+        run: composer validate --strict
+
+      - name: Commit generated Composer files
+        run: |
+          if git diff --quiet -- composer.json composer.lock; then
+            echo "Composer files already current."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add composer.json composer.lock
+          git commit -m "build(m5): add dompdf dependency"
+          git push origin HEAD:${{ github.head_ref }}
