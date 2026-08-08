@@ -48,7 +48,7 @@ class ExecutionReportTest extends TestCase
         ]);
 
         $report = app(ExecutionReportDataBuilder::class)->build($execution, $organization->id);
-        $serialized = json_encode($report, JSON_THROW_ON_ERROR);
+        $serialized = json_encode($report, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
 
         $this->assertStringContainsString('Participante Fictício PDF', $serialized);
         $this->assertStringContainsString('Unidade PDF', $serialized);
