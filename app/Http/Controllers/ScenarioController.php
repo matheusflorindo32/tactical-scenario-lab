@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Scenario;
 use App\Services\Auth\ActiveOrganization;
 use App\Services\ScenarioGenerator;
+use App\Support\Auth\AccessAbility;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -86,20 +87,26 @@ class ScenarioController extends Controller
         Scenario $scenario,
         ActiveOrganization $activeOrganization,
     ): View {
-        $organizationId = $activeOrganization->ensureAbility($request, 'scenarios.view');
+        $organizationId = $activeOrganization->ensureAbility($request, AccessAbility::SCENARIOS_VIEW);
         $this->ensureScenarioInOrganization($scenario, $organizationId);
 
         $version = $scenario->latestVersion()
             ->withCount(['victims', 'cohorts'])
+            ->with(['executions' => fn ($query) => $query->orderByDesc('sequence_number')])
             ->first();
 
-        return view('scenarios.show-scalable', compact('scenario', 'version'));
+        $access = $request->user()
+            ->activeOrganizationAccesses()
+            ->where('organization_id', $organizationId)
+            ->first();
+        $canManage = in_array(AccessAbility::SCENARIOS_MANAGE, $access?->abilities ?? [], true);
+
+        return view('scenarios.show-scalable', compact('scenario', 'version', 'canManage'));
     }
 
     /**
-     * Inicia a execução de um cenário em rascunho.
-     * Idempotente: se já está em `running` ou `completed`, não muta e
-     * devolve mensagem clara.
+     * Fluxo legado preservado temporariamente até a migração completa para
+     * ScenarioExecution. O M3 deixa de apresentá-lo como caminho primário.
      */
     public function execute(
         Request $request,
@@ -124,14 +131,8 @@ class ScenarioController extends Controller
     }
 
     /**
-     * Registra avaliação e fecha o cenário.
-     *
-     * - Aceita reeavaliação enquanto `completed` (edição controlada).
-     * - Rejeita se ainda estiver em `draft` — não é possível avaliar
-     *   sem antes iniciar a execução.
-     * - `observed_critical_errors` é livre em conteúdo, mas cada item
-     *   precisa vir do catálogo gerado (`critical_errors`) para evitar
-     *   inserção arbitrária vinda do formulário.
+     * Fluxo de avaliação legado preservado até o M4, quando assessment e
+     * debriefing serão separados por execução.
      */
     public function evaluate(
         Request $request,
