@@ -9,13 +9,14 @@ final class ScenarioGenerator
         $threat = $data['threat_level'];
         $mechanism = $data['mechanism'];
         $environment = $data['environment'];
-        $casualties = (int) $data['casualties'];
+        $casualties = (int) ($data['estimated_casualty_count'] ?? $data['casualties']);
 
         return [
             'title' => "Cenário {$mechanism} — {$environment}",
             'environment' => $environment,
             'threat_level' => $threat,
             'casualties' => $casualties,
+            'estimated_casualty_count' => $casualties,
             'mechanism' => $mechanism,
             'resources' => $data['resources'] ?? [],
             'learning_objectives' => [
