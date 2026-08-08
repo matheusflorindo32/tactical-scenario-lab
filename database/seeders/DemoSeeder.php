@@ -167,6 +167,22 @@ class DemoSeeder extends Seeder
                 ]);
             }
 
+            $assessment->criticalErrorOccurrences()->create([
+                'catalog_label_snapshot' => 'Atraso crítico na identificação de hemorragia grave',
+                'rule' => 'record',
+                'penalty_points' => 0,
+                'execution_event_id' => $decisionEvent->id,
+                'observed_at' => $decisionEvent->occurred_at,
+                'notes' => 'Ocorrência fictícia registrada para demonstrar o ranking de erros observados.',
+                'source' => 'm4',
+            ]);
+            $assessment->keyTimes()->create([
+                'label' => 'Comando e triagem estabelecidos',
+                'occurred_at' => $decisionEvent->occurred_at,
+                'reference_seconds' => 300,
+                'notes' => 'Marco temporal fictício para demonstração institucional.',
+            ]);
+
             $debrief = $assessment->debrief()->create();
             $debrief->entries()->createMany([
                 [
@@ -192,9 +208,16 @@ class DemoSeeder extends Seeder
                 'action' => 'Executar nova rodada de treinamento focada em alocação antecipada de recursos.',
                 'responsible_label' => 'Coordenação Demo M5',
                 'due_date' => now()->addDays(30)->toDateString(),
-                'notes' => 'Item inteiramente fictício criado pelo DemoSeeder.',
+                'notes' => 'Item aberto e inteiramente fictício criado pelo DemoSeeder.',
+            ]);
+            $progressAction = $debrief->actionItems()->create([
+                'action' => 'Revisar o protocolo fictício de comunicação entre Núcleo Alfa e Núcleo Bravo.',
+                'responsible_label' => 'Equipe Demo M5',
+                'due_date' => now()->addDays(14)->toDateString(),
+                'notes' => 'Item fictício usado para demonstrar transição explícita de status.',
             ]);
             $assessmentManager->finalize($assessment, $manager);
+            $progressAction->transitionTo('in_progress', $manager);
 
             $commandVersion = $this->createPublishedScenario(
                 $organization,
@@ -224,6 +247,17 @@ class DemoSeeder extends Seeder
                 'summary' => 'Execução demo em andamento para alimentar a fila operacional.',
                 'metadata' => ['source' => 'system'],
             ]);
+
+            $draftAssessmentExecution = $executionManager->create($commandVersion);
+            $draftAssessmentExecution = $executionManager->start($draftAssessmentExecution);
+            $draftAssessmentExecution->events()->create([
+                'kind' => 'observation',
+                'occurred_at' => now(),
+                'summary' => 'Execução fictícia concluída e aguardando avaliação estruturada.',
+                'metadata' => ['source' => 'observer'],
+            ]);
+            $draftAssessmentExecution = $executionManager->complete($draftAssessmentExecution);
+            $assessmentManager->createForExecution($draftAssessmentExecution);
 
             $this->createPublishedScenario(
                 $organization,
