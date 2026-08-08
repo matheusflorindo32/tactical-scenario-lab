@@ -132,6 +132,32 @@ class ScenarioExecutionTest extends TestCase
         $manager->start($first);
     }
 
+    public function test_execution_manager_rechecks_persisted_status_before_lifecycle_transition(): void
+    {
+        [, $version] = $this->scenarioVersion('published');
+        $manager = app(ScenarioExecutionManager::class);
+        $execution = $manager->create($version);
+        $staleDraft = $execution->fresh();
+
+        ScenarioExecution::query()
+            ->whereKey($execution->id)
+            ->update([
+                'status' => 'cancelled',
+                'cancelled_at' => now(),
+            ]);
+
+        try {
+            $manager->start($staleDraft);
+            $this->fail('Expected stale draft transition to be rejected after persisted cancellation.');
+        } catch (LogicException $exception) {
+            $this->assertSame('Execution cannot be started from its current status.', $exception->getMessage());
+        }
+
+        $execution->refresh();
+        $this->assertSame('cancelled', $execution->status);
+        $this->assertNull($execution->started_at);
+    }
+
     private function scenarioVersion(string $publicationStatus): array
     {
         $organization = Organization::create([
