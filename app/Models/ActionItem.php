@@ -35,6 +35,12 @@ class ActionItem extends Model
 
     protected static function booted(): void
     {
+        static::creating(function (ActionItem $item): void {
+            if (blank($item->status)) {
+                $item->status = 'open';
+            }
+        });
+
         static::saving(function (ActionItem $item): void {
             $debrief = ExecutionDebrief::query()
                 ->with('assessment')
