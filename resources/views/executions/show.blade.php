@@ -1,39 +1,79 @@
-<x-app-layout>
-    <x-slot name="header">
-        <div class="flex flex-col gap-1">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Simulation Engine</p>
-            <h1 class="text-2xl font-bold text-navy-950">
-                Execução {{ $execution->sequence_number }}
-            </h1>
-        </div>
-    </x-slot>
+@php
+$statusLabel = match ($execution->status) {
+    'running' => 'Em execução',
+    'completed' => 'Concluída',
+    'cancelled' => 'Cancelada',
+    default => 'Rascunho',
+};
+$statusVariant = match ($execution->status) {
+    'running' => 'alert',
+    'completed' => 'clinical',
+    'cancelled' => 'emergency',
+    default => 'navy',
+};
+@endphp
 
-    <div class="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-        @if (session('success'))
-            <div class="rounded-lg border border-clinical-200 bg-clinical-50 px-4 py-3 text-sm text-clinical-800" role="status">
-                {{ session('success') }}
-            </div>
-        @endif
+<x-layouts.app :current="'scenarios'" :title="'Execução ' . $execution->sequence_number . ' · Tactical Scenario Lab'">
+    <x-slot:breadcrumbs>
+        <x-breadcrumb :items="[
+            ['label' => 'Painel', 'href' => route('dashboard')],
+            ['label' => 'Cenários', 'href' => route('scenarios.index')],
+            ['label' => $execution->scenarioVersion->scenario->title, 'href' => route('scenarios.show', $execution->scenarioVersion->scenario)],
+            ['label' => 'Execução ' . $execution->sequence_number],
+        ]" />
+    </x-slot:breadcrumbs>
 
-        <section class="rounded-xl border border-stone-200 bg-white p-6 shadow-sm" aria-labelledby="execution-summary-heading">
-            <div class="flex flex-col justify-between gap-4 md:flex-row md:items-start">
-                <div>
-                    <h2 id="execution-summary-heading" class="text-lg font-semibold text-navy-950">
-                        {{ $execution->scenarioVersion->scenario->title }}
-                    </h2>
-                    <p class="mt-1 text-sm text-stone-600">
-                        Versão {{ $execution->scenarioVersion->version_number }} · execução {{ $execution->sequence_number }}
-                    </p>
+    <x-slot:header>
+        <div class="flex flex-wrap items-end justify-between gap-4">
+            <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2">
+                    <x-badge :variant="$statusVariant" size="sm" dot>{{ $statusLabel }}</x-badge>
+                    <x-badge variant="navy" size="sm">Versão {{ $execution->scenarioVersion->version_number }}</x-badge>
                 </div>
-
-                <x-badge :variant="$execution->status === 'running' ? 'alert' : ($execution->status === 'completed' ? 'clinical' : 'navy')" dot>
-                    {{ $execution->status }}
-                </x-badge>
+                <h1 class="mt-3 font-display text-3xl font-semibold tracking-tight text-navy-950">
+                    Execução {{ $execution->sequence_number }}
+                </h1>
+                <p class="mt-2 max-w-3xl text-sm leading-6 text-ink-500">
+                    {{ $execution->scenarioVersion->scenario->title }}
+                </p>
             </div>
 
-            <p class="mt-5 text-sm leading-6 text-stone-600">
-                Esta é a fundação do cockpit da execução. Equipes, participantes, timeline, injects e recursos serão incorporados de forma incremental neste marco.
-            </p>
-        </section>
-    </div>
-</x-app-layout>
+            <x-button href="{{ route('scenarios.show', $execution->scenarioVersion->scenario) }}" variant="secondary">
+                Voltar ao cenário
+            </x-button>
+        </div>
+    </x-slot:header>
+
+    @if (session('success'))
+        <div class="mb-6">
+            <x-alert variant="success" title="Operação concluída">{{ session('success') }}</x-alert>
+        </div>
+    @endif
+
+    <x-card title="Fundação da execução" subtitle="Simulation Engine · M3" accent="navy">
+        <dl class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+                <dt class="text-xs font-semibold uppercase tracking-[0.12em] text-ink-500">Execução</dt>
+                <dd class="mt-1 font-display text-2xl font-semibold text-navy-950">#{{ $execution->sequence_number }}</dd>
+            </div>
+            <div>
+                <dt class="text-xs font-semibold uppercase tracking-[0.12em] text-ink-500">Versão</dt>
+                <dd class="mt-1 text-sm font-semibold text-ink-900">{{ $execution->scenarioVersion->version_number }}</dd>
+            </div>
+            <div>
+                <dt class="text-xs font-semibold uppercase tracking-[0.12em] text-ink-500">Estado</dt>
+                <dd class="mt-1 text-sm font-semibold text-ink-900">{{ $statusLabel }}</dd>
+            </div>
+            <div>
+                <dt class="text-xs font-semibold uppercase tracking-[0.12em] text-ink-500">Escala estimada</dt>
+                <dd class="mt-1 text-sm font-semibold tabular-nums text-ink-900">
+                    {{ number_format((int) $execution->scenarioVersion->estimated_casualty_count, 0, ',', '.') }} vítimas
+                </dd>
+            </div>
+        </dl>
+
+        <p class="mt-6 border-t border-stone-100 pt-5 text-sm leading-6 text-ink-600">
+            A estrutura desta execução já está separada da definição versionada do cenário. Equipes, participantes, timeline, injects e recursos serão incorporados incrementalmente neste mesmo marco.
+        </p>
+    </x-card>
+</x-layouts.app>
