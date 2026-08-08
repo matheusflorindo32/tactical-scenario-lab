@@ -11,6 +11,7 @@ use App\Services\ScenarioVersionManager;
 use App\Support\Auth\AccessAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
+use InvalidArgumentException;
 use LogicException;
 use Tests\TestCase;
 
@@ -97,6 +98,29 @@ class ScenarioVersioningTest extends TestCase
         $this->assertSame('Terminal intermodal', $versionOne->environment);
         $this->assertCount(2, $scenario->fresh()->versions);
         $this->assertTrue($scenario->fresh()->latestVersion()->first()->is($versionTwo));
+    }
+
+    public function test_revision_rejects_non_positive_estimated_casualty_count_at_domain_boundary(): void
+    {
+        [, $versionOne] = $this->createScenarioWithVersion(1000);
+        $manager = app(ScenarioVersionManager::class);
+        $manager->publish($versionOne);
+
+        foreach ([0, -1] as $invalidCount) {
+            try {
+                $manager->revise($versionOne->fresh(), [
+                    'estimated_casualty_count' => $invalidCount,
+                ]);
+                $this->fail('Expected non-positive estimated casualty count to be rejected.');
+            } catch (InvalidArgumentException $exception) {
+                $this->assertSame(
+                    'Estimated casualty count must be at least 1.',
+                    $exception->getMessage(),
+                );
+            }
+        }
+
+        $this->assertCount(1, $versionOne->scenario->fresh()->versions);
     }
 
     private function createScenarioWithVersion(int $estimatedCasualtyCount): array
