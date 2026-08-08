@@ -52,6 +52,13 @@ class ScenarioExecution extends Model
         return $this->hasMany(ExecutionParticipant::class);
     }
 
+    public function events(): HasMany
+    {
+        return $this->hasMany(ExecutionEvent::class)
+            ->orderBy('occurred_at')
+            ->orderBy('id');
+    }
+
     public function isDraft(): bool
     {
         return $this->status === 'draft';
