@@ -68,16 +68,21 @@ class ExecutionReportTest extends TestCase
         $this->assertStringNotContainsString('identifiers', strtolower($serialized));
     }
 
-    public function test_pdf_endpoint_requires_reports_view_and_returns_application_pdf(): void
+    public function test_pdf_endpoint_requires_reports_view(): void
     {
-        [$organization, $execution] = $this->executionContext('Relatório HTTP');
+        [$organization, $execution] = $this->executionContext('Relatório HTTP Não Autorizado');
         $unauthorized = $this->user($organization, [AccessAbility::SCENARIOS_VIEW]);
-        $authorized = $this->user($organization, [AccessAbility::REPORTS_VIEW]);
 
         $this->actingAs($unauthorized)
             ->withSession(['active_organization_id' => $organization->id])
             ->get('/reports/executions/'.$execution->uuid.'/pdf')
             ->assertForbidden();
+    }
+
+    public function test_authorized_pdf_endpoint_returns_application_pdf(): void
+    {
+        [$organization, $execution] = $this->executionContext('Relatório HTTP Autorizado');
+        $authorized = $this->user($organization, [AccessAbility::REPORTS_VIEW]);
 
         $response = $this->actingAs($authorized)
             ->withSession(['active_organization_id' => $organization->id])
