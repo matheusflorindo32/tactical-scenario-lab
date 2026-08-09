@@ -165,6 +165,13 @@ jobs:
             GRANT USAGE, SELECT ON SEQUENCES TO tactical_runtime_test;
           SQL
 
+      - name: Verify M6 migration rollback and reapply
+        run: |
+          php artisan migrate:rollback --path=database/migrations/2026_08_08_161000_add_m6_postgresql_immutability_guards.php --force
+          php artisan migrate:rollback --path=database/migrations/2026_08_08_160000_add_m6_structural_integrity.php --force
+          php artisan migrate --path=database/migrations/2026_08_08_160000_add_m6_structural_integrity.php --force
+          php artisan migrate --path=database/migrations/2026_08_08_161000_add_m6_postgresql_immutability_guards.php --force
+
       - name: Repeat M6 concurrency invariants
         run: |
           for attempt in 1 2 3; do
