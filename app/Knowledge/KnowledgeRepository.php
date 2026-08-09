@@ -27,6 +27,20 @@ final class KnowledgeRepository
         return $this->hydrate($definition);
     }
 
+    public function findByContext(string $routeName): ?KnowledgeArticle
+    {
+        $definition = collect(config('knowledge.articles', []))
+            ->first(function (array $article) use ($routeName): bool {
+                return in_array($routeName, (array) ($article['contextual_for'] ?? []), true);
+            });
+
+        if (! is_array($definition)) {
+            return null;
+        }
+
+        return $this->hydrate($definition);
+    }
+
     public function search(string $query, ?string $category = null): Collection
     {
         $articles = $this->all();
