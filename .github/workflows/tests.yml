@@ -10,6 +10,41 @@ on:
       - main
 
 jobs:
+  security-audit:
+    name: Security — Composer and npm audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+          tools: composer:v2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Validate Composer metadata
+        run: composer validate --strict
+
+      - name: Composer security audit
+        run: composer audit
+        env:
+          COMPOSER_NO_AUDIT: 0
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: npm high severity security audit
+        run: npm audit --audit-level=high
+
   phpunit:
     name: PHPUnit — PHP 8.4 / SQLite
     runs-on: ubuntu-latest
@@ -153,7 +188,7 @@ jobs:
           GRANT CONNECT ON DATABASE tactical_scenario_test TO tactical_runtime_test;
           GRANT USAGE ON SCHEMA public TO tactical_runtime_test;
           GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO tactical_runtime_test;
-          GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO tactical_runtime_test;
+          GRANT USAGE, SELECT ON ALL SEQUENCES TO tactical_runtime_test;
           ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
             GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO tactical_runtime_test;
           ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
