@@ -18,7 +18,6 @@ use App\Http\Controllers\ExecutionReportController;
 use App\Http\Controllers\ExecutionResourceController;
 use App\Http\Controllers\ExecutionTeamController;
 use App\Http\Controllers\ExecutiveDashboardController;
-use App\Http\Controllers\HealthController;
 use App\Http\Controllers\InstructorDashboardController;
 use App\Http\Controllers\KeyTimeRecordController;
 use App\Http\Controllers\OrganizationController;
@@ -35,9 +34,6 @@ use App\Http\Controllers\UnitController;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
-
-Route::get('/health/live', [HealthController::class, 'live'])->name('health.live');
-Route::get('/health/ready', [HealthController::class, 'ready'])->name('health.ready');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');
