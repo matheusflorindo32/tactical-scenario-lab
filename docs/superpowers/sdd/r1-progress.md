@@ -5,24 +5,16 @@ PR: #13 — draft
 Baseline: M9 `main` merge `1d77b89ef273e97cc53c7901df2d0f405684df45`
 Spec: `docs/superpowers/specs/2026-08-09-r1-production-operational-validation-design.md`
 Plan: `docs/superpowers/plans/2026-08-09-r1-production-operational-validation.md`
-Status: PROVIDER REVISION — VERCEL + NEON
+Status: REAL VERCEL + NEON STAGING BOOTSTRAP — SECRETS/MIGRATIONS BLOCKED
 
 ## Progress model
 
-- Architecture/design: 5% — complete.
-- Written spec review + implementation/operations plan: 5% — complete.
-- Provider/environment gate: 10% — previously earned; Gate 1A is replacing AWS with Vercel + Neon and does not add duplicate percentage.
-- Gates 2–7: 10% each.
-- Gate 8 + production promotion/closeout: final 20%.
-
-Current earned R1 progress: **20%**.
-
-Changing the staging provider does not retroactively award progress. Gate 2 raises R1 above 20% only after real hosted staging evidence exists.
+Current earned R1 progress remains **20%** until Gate 2 is fully GREEN. Real provider bootstrap evidence does not justify partial percentage inflation.
 
 ## Gates
 
-- [~] Gate 1A — Vercel + Neon Provider & Environment Contract — implementation/revalidation in progress.
-- [ ] Gate 2 — Real Isolated Staging + TLS.
+- [~] Gate 1A — Vercel + Neon Provider & Environment Contract — architecture corrected; exact corrected-head CI still required.
+- [~] Gate 2 — Real Isolated Staging + TLS — real project/Preview/HTTPS/Neon exist; secrets, migrations, runtime role and readiness remain blocked.
 - [ ] Gate 3 — Secrets + Database Runtime Least Privilege.
 - [ ] Gate 4 — PostgreSQL Recovery / Restore Drill.
 - [ ] Gate 5 — Real Deployment + Health Admission.
@@ -30,67 +22,98 @@ Changing the staging provider does not retroactively award progress. Gate 2 rais
 - [ ] Gate 7 — Observability + Failure/Recovery Drill.
 - [ ] Gate 8 — Production Decision + Release Closeout.
 
-## Historical Gate 1
+## Architecture correction
 
-The original provider evaluation selected AWS and proved its repository design with CI #875. That evidence remains historically valid but AWS is no longer the active R1 staging provider because its ECS/Fargate + ALB + RDS + Secrets Manager + CloudWatch topology introduces unnecessary cost/operational surface for this validation phase.
+The earlier R1 branch incorrectly treated Vercel as if it would execute `Dockerfile.vercel` as an OCI application container. The real provider import disproved that assumption: Vercel detected the root Vite build, generated Laravel assets successfully, then failed because it expected the static Vite output directory `dist`.
 
-AWS documentation is retained as a future enterprise/higher-control option. No AWS resource was ever claimed as created.
+The corrected provider adapter is:
 
-## Gate 1A — Vercel + Neon evidence
+- `vercel.json` with `framework: null`;
+- frontend `npm run build` with static boundary `public`;
+- `api/index.php` Laravel serverless entrypoint;
+- `vercel-php@0.8.0` for PHP 8.4;
+- Laravel writable serverless paths redirected to `/tmp`;
+- Node pinned to 22.x;
+- obsolete `Dockerfile.vercel` deleted;
+- root M9 Dockerfile still built/inspected in CI as a separate provider-neutral release contract.
 
-Provider/session evidence:
+The regression test retains the historical filename `R1VercelContainerContractTest` but now explicitly rejects the obsolete Dockerfile adapter and requires the real Vercel PHP configuration.
 
-- Vercel workspace authenticated in this ChatGPT session;
+## TDD / debugging evidence
+
+- Initial production import of `main` failed after a successful Vite build with `No Output Directory named "dist"`.
+- Root-cause analysis identified that merely pointing Vercel at `public/build` would deploy only frontend assets and not the Laravel backend.
+- RED contract commit: `f7b9ad3a349a3ebd9744a3e03786a9ddda5fa478` required the real PHP/serverless adapter while the obsolete Dockerfile still existed and `vercel.json`/`api/index.php` were absent.
+- `vercel.json` commit: `9bd8426ce182af97ea78ebb8fb29e57b1900f124`.
+- Laravel entrypoint commit: `29628ad8639410c7abf98257c9912beaf1098c39`.
+- Node 22 pin commit: `315b5e591869d06570d8051d94f888c2b34c0404`.
+- obsolete Vercel Dockerfile deletion: `7cafbfa7c8de6e64687437315c2d69020dd98850`.
+- workflow correction preserving root Docker CI only: `49b0129598188b30b3f88ae43243345a0c35fd7c`.
+
+## Real Vercel evidence
+
+Authenticated boundary:
+
 - team ID: `team_QHEyDZZUIeF7hGokK8amHy4H`;
-- Vercel projects enumerated; no Tactical Scenario Lab project existed at re-selection time;
-- Vercel first-party documentation confirms `Dockerfile.vercel` container images, container services, deployment environments, external environment variables, managed deployment HTTPS and runtime logs;
-- Vercel first-party documentation confirms a Neon Marketplace provisioning/integration path;
-- revised architecture/spec explicitly treats free/Hobby resources as staging only and requires a new Gate 8 production-plan decision.
+- project ID: `prj_GK7BQot3xOYCKYA09AKMffesiSgj`;
+- project name: `tactical-scenario-lab`.
 
-Repository evidence:
+Corrected Preview evidence on commit `49b0129598188b30b3f88ae43243345a0c35fd7c`:
 
-- revised R1 spec commit: `99e98983e3d9f7d0e0d4bb23d43f9cd7411caec4`;
-- revised implementation plan commit: `df8e35de3afb7b3d74ab5a515a2f39ba26ed2a35`;
-- TDD RED contract test commit: `1b153064179119f724a067d7ed552a5d98a63457`;
-- RED CI: #886 / run `31335797197` — `R1VercelContainerContractTest` failed exactly because `Dockerfile.vercel` did not exist; SQLite suite otherwise reported 343 passed / 31 skipped;
-- minimal GREEN implementation commit: `2f520df9a8594a05ef13c54e88e407cf24119205` adding `Dockerfile.vercel` while preserving PHP 8.4, PostgreSQL driver, frontend assets, non-root runtime, `$PORT` and no migration-on-startup behavior.
+- deployment ID: `dpl_DjWdeF2ZmwN7GyfHwEyu7eFwuzhs`;
+- deployment state observed: `READY`;
+- branch: `feature/r1-production-operational-validation`;
+- `GET /health/live` returned HTTP 200 with `{"status":"ok"}` over Vercel HTTPS;
+- response identified PHP 8.4.14;
+- runtime logs for the same request recorded `MissingAppKeyException`.
 
-`docs/R1_PROVIDER_SCORECARD.md` is now the active Vercel + Neon provider contract and `docs/R1_STAGING_RUNBOOK.md` is the active execution runbook.
+Therefore the original `dist` blocker is closed, but health admission is **not** GREEN: provider-side application secrets remain absent and the HTTP 200 must not override the fatal runtime-log evidence.
 
-## Gate 2 repository preparation
+## Real Neon evidence
 
-Prepared repository-side components:
+Dedicated staging project observed:
 
-- `Dockerfile.vercel` provider adapter;
-- `tests/Feature/R1VercelContainerContractTest.php` contract test;
-- provider scorecard and staging runbook revised for Vercel + Neon;
-- staging may use a custom `staging` environment when available or an isolated Preview target otherwise;
-- dedicated Neon staging PostgreSQL is required;
-- staging-only `APP_KEY`, `PII_FINGERPRINT_KEY` and DB credentials must remain outside Git;
-- exact Git SHA + Vercel deployment ID/URL are required;
-- `/health/live` and `/health/ready` must be verified on the hosted candidate;
-- controlled migration path + restricted runtime PostgreSQL role remain mandatory.
+- name: `tactical-scenario-lab-staging`;
+- project ID: `curly-moon-55089444`;
+- database: `neondb`;
+- PostgreSQL provider version: 18.4;
+- public application tables at inspection: 0;
+- current inspected identity: owner/migration-capable role, not an approved steady-state runtime role.
 
-## Current provider-action boundary
+The empty schema is expected because controlled Laravel migrations have not yet run. No migration is claimed as applied.
 
-The Vercel connector available in this session can authenticate, enumerate projects/deployments, inspect builds/logs and deploy a current linked project. It does **not currently expose explicit create-project, create-environment, environment-variable mutation or Neon Marketplace provisioning actions**.
+CI uses PostgreSQL 16 as the inherited reference. Because the provider target is PostgreSQL 18.4, R1 requires real migration/readiness/smoke qualification before provider compatibility becomes GREEN.
 
-Therefore repository preparation can be completed and verified here, but Gate 2 must not be marked GREEN unless a safe authenticated path actually creates/links the Tactical Scenario Lab project, provisions Neon, scopes secrets and returns a real HTTPS deployment.
+## Current blocking boundary
 
-No Vercel token, Neon password or database URL should be pasted into chat or committed to GitHub.
+The remaining Gate 2 path is now narrow and concrete:
+
+1. configure Vercel Preview environment values outside Git/chat, including unique `APP_KEY`, unique `PII_FINGERPRINT_KEY`, production-like safe Laravel settings and Neon connectivity;
+2. run `php artisan production:preflight` and Laravel migrations through a trusted migration-capable environment/session;
+3. provision/verify a restricted Neon runtime identity;
+4. switch Vercel steady-state DB credentials to that restricted identity;
+5. redeploy/freeze an exact candidate SHA;
+6. verify `/health/live` 200 with clean runtime logs;
+7. verify `/health/ready` 200 with database healthy;
+8. capture exact deployment identity and exact-head CI.
+
+The current Vercel connector exposes project/deployment/log inspection but no safe environment-variable mutation action. Secrets therefore remain a provider-UI/operator boundary. No token/API key should be sent through chat to bypass it.
 
 ## Exact-head policy
 
-Every repository-file write invalidates earlier exact-head CI as final evidence. After the provider-revision documents and configuration are complete, freeze the branch and require the inherited M9 matrix on that exact final HEAD:
+Every repository-file write invalidates earlier exact-head CI as final evidence. The branch must be frozen after the documentation/config correction and the complete inherited M9 matrix must succeed on that exact final SHA before Gate 1A or Gate 2 can be promoted.
+
+Required matrix:
 
 - dependency security;
-- real release container build/runtime contract;
+- root release container build/runtime contract;
 - SQLite suite;
-- PostgreSQL 16 suite including least privilege, rollback/reapply and M6 concurrency;
+- PostgreSQL reference suite including least privilege, rollback/reapply and M6 concurrency;
 - Pint.
-
-Gate 1A becomes GREEN only after that final exact-head matrix succeeds.
 
 ## Process integrity
 
-Earlier R1 temporary routing artifacts were removed with zero functional file differences and `main` was never modified. The active branch remains the only implementation surface for R1.
+- `main` has not been modified by this R1 correction;
+- PR #13 remains draft;
+- no application secret, Neon password, connection string or Vercel token has been committed;
+- no production promotion is implied by successful Preview bootstrap.
