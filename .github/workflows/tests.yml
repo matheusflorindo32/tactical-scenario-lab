@@ -16,7 +16,7 @@ on:
 
 jobs:
   phpunit:
-    name: PHPUnit — PHP 8.4
+    name: PHPUnit — PHP 8.4 / SQLite
     runs-on: ubuntu-latest
 
     steps:
@@ -66,6 +66,120 @@ jobs:
         run: php artisan migrate:fresh --force
 
       - name: Run tests
+        run: php artisan test
+
+  phpunit-postgres:
+    name: PHPUnit — PHP 8.4 / PostgreSQL 16
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: tactical_scenario_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d tactical_scenario_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      APP_ENV: testing
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: tactical_scenario_test
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      DB_SSLMODE: disable
+      PII_FINGERPRINT_KEY: ci-only-m6-fingerprint-key-not-for-production
+      M6_RUNTIME_DB_USERNAME: tactical_runtime_test
+      M6_RUNTIME_DB_PASSWORD: runtime-test-only
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, pdo, pdo_pgsql, openssl, tokenizer, xml, ctype, json
+          coverage: none
+          tools: composer:v2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Validate Composer metadata
+        run: composer validate --strict
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build frontend assets
+        run: npm run build
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          mkdir -p bootstrap/cache
+          mkdir -p storage/framework/cache/data
+          mkdir -p storage/framework/sessions
+          mkdir -p storage/framework/views
+          mkdir -p storage/logs
+
+      - name: Generate application key
+        run: php artisan key:generate
+
+      - name: Rebuild PostgreSQL database from migrations
+        run: php artisan migrate:fresh --force
+
+      - name: Provision least-privilege runtime role
+        run: |
+          PGPASSWORD="$DB_PASSWORD" psql \
+            --host="$DB_HOST" \
+            --port="$DB_PORT" \
+            --username="$DB_USERNAME" \
+            --dbname="$DB_DATABASE" \
+            --set=ON_ERROR_STOP=1 <<'SQL'
+          REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+          CREATE ROLE tactical_runtime_test LOGIN PASSWORD 'runtime-test-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT;
+          GRANT CONNECT ON DATABASE tactical_scenario_test TO tactical_runtime_test;
+          GRANT USAGE ON SCHEMA public TO tactical_runtime_test;
+          GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO tactical_runtime_test;
+          GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO tactical_runtime_test;
+          ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+            GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO tactical_runtime_test;
+          ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+            GRANT USAGE, SELECT ON SEQUENCES TO tactical_runtime_test;
+          SQL
+
+      - name: Verify M6 migration rollback and reapply
+        run: |
+          php artisan migrate:rollback --path=database/migrations/2026_08_08_161000_add_m6_postgresql_immutability_guards.php --force
+          php artisan migrate:rollback --path=database/migrations/2026_08_08_160000_add_m6_structural_integrity.php --force
+          php artisan migrate --path=database/migrations/2026_08_08_160000_add_m6_structural_integrity.php --force
+          php artisan migrate --path=database/migrations/2026_08_08_161000_add_m6_postgresql_immutability_guards.php --force
+
+      - name: Repeat M6 concurrency invariants
+        run: |
+          for attempt in 1 2 3; do
+            echo "M6 concurrency attempt ${attempt}/3"
+            php artisan test tests/Feature/PostgresConcurrencyTest.php
+          done
+
+      - name: Run tests on PostgreSQL
         run: php artisan test
 
   lint:
