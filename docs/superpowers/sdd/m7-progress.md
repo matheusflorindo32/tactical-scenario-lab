@@ -9,7 +9,7 @@ Status: IN PROGRESS
 - [x] Gate 1 — Shell & navigation — GREEN
 - [x] Gate 2 — Design-system primitives — GREEN
 - [x] Gate 3 — Dashboards — GREEN
-- [ ] Gate 4 — Scenarios/templates/history
+- [x] Gate 4 — Scenarios/templates/history — GREEN
 - [ ] Gate 5 — Execution cockpit
 - [ ] Gate 6 — Assessment & debrief workbench
 - [ ] Gate 7 — Management & low-light polish
@@ -46,6 +46,13 @@ Status: IN PROGRESS
 - Result: instructor dashboard ordered by operational attention using existing M5 truth; executive dashboard prioritizes risk, marks its own navigation state and no longer renders the completed-execution hint as a literal PHP expression.
 
 ### Gate 4 — Scenarios/templates/history
+- RED SHA: `cb9aa04e4863315d9a6cff9ef8847f3b9f43f0de`
+- RED CI: #745 / run `31311357647` — three expected workspace failures; 280 existing tests passed in SQLite. RED proved missing lifecycle language, incorrect Templates/Histórico active state and missing accessible history table contract.
+- GREEN SHA: `b36ff5d386f090dea931401d7fc491c8c2565d06`
+- GREEN CI: #749 / run `31311539493` — SQLite, PostgreSQL 16, least-privilege role, M6 rollback/reapply, repeated concurrency invariants, Vite build and Pint green.
+- Result: scenario workspace is version-first, removes `Scenario.score` from institutional presentation, exposes the lifecycle explicitly, makes Templates/Histórico canonical navigation contexts and uses the accessible table primitive for execution history.
+
+### Gate 5 — Execution cockpit
 - RED SHA: pending
 - RED CI: pending
 - GREEN SHA: pending
