@@ -40,6 +40,20 @@ class PostgresImmutabilityTest extends TestCase
         ]);
     }
 
+    public function test_runtime_sql_cannot_downgrade_published_scenario_to_draft(): void
+    {
+        $versionId = DB::table('scenario_versions')->where('publication_status', 'published')->value('id');
+        $this->assertNotNull($versionId);
+
+        PostgresRuntimeRole::activateWithinTransaction(DB::connection());
+        $this->expectException(QueryException::class);
+
+        DB::table('scenario_versions')->where('id', $versionId)->update([
+            'publication_status' => 'draft',
+            'updated_at' => now(),
+        ]);
+    }
+
     public function test_runtime_sql_can_change_draft_scenario_definition(): void
     {
         $versionId = $this->createDraftScenarioVersion();
