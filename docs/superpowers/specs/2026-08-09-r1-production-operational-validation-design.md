@@ -1,494 +1,301 @@
-# R1 — Production Release & Operational Validation — Design Specification
+# R1 — Production Release & Operational Validation
 
 Date: 2026-08-09
 Status: DESIGN APPROVED — WRITTEN SPEC REVIEW
 Baseline: `main` after M9 protected merge
 Branch: `feature/r1-production-operational-validation`
 
-## 1. Objective
+## Objective
 
-R1 converts the repository-level release readiness proven by M1–M9 into real operational evidence using a **staging-first** promotion model.
+R1 converts the repository-level readiness proven by M1–M9 into **real operational evidence** through a staging-first release process.
 
-R1 does not add a new product domain. It validates infrastructure, deployment, database identities, recovery, health admission, authenticated smoke/E2E behavior, observability boundaries and production promotion using the exact application contracts already established by M6–M9.
+R1 adds no new product domain. It validates hosting, TLS, secrets, PostgreSQL identities, backup/recovery, deployment, health admission, authenticated smoke/E2E, observability and production promotion while preserving all M6–M9 security and integrity contracts.
 
-The principal safety rule is:
+**Primary rule:** production promotion is blocked until staging has passed every applicable R1 promotion gate.
 
-> Production promotion is prohibited until an isolated staging environment has passed every promotion-blocking R1 gate that can be exercised before production.
+No CI simulation may be represented as a real provider deployment, restore drill, browser session or production result.
 
-R1 must never represent a simulated CI result as a real provider deployment, TLS validation, backup/PITR restore, browser session or production health result.
+## Selected strategy
 
-## 2. Selected operating strategy
+**Staging-first with explicit production promotion** is the selected model.
 
-The selected strategy is **staging-first with explicit production promotion**.
+Direct-to-production is rejected because it combines first-time provider, database, secret, migration and application risks in the live environment. A provider-neutral rehearsal alone is also insufficient because TLS, managed PostgreSQL, backup/PITR and traffic admission require provider evidence.
 
-Rejected alternatives:
+## Hard boundaries
 
-1. **Direct-to-production first deployment** — rejected because the first live infrastructure exercise would also become the first release exercise, unnecessarily combining provider, database, secrets, migration, health and application risks.
-2. **Provider-neutral rehearsal only** — useful as preparation but insufficient as final operational evidence because TLS, managed PostgreSQL, backup/PITR and traffic admission are provider-specific in practice.
+- staging and production are separate security boundaries;
+- staging never uses the authoritative production database;
+- production PII is not required or copied into staging by default;
+- staging and production do not share application secrets, DB credentials or provider tokens;
+- migration credentials are temporary and are removed from application runtime;
+- runtime uses a least-privilege PostgreSQL identity with no schema ownership/DDL capability;
+- production PostgreSQL must support PITR before promotion;
+- HTTPS is mandatory for hosted authenticated traffic;
+- exact Git SHA/image identity is required; branch names and mutable `latest` tags are insufficient;
+- unresolved Critical/High findings block promotion;
+- failed restore, readiness, authorization or release-critical smoke checks block promotion;
+- no provider, restore, TLS, browser or production evidence is fabricated;
+- no unrelated feature work, AI/RAG, clinical/tactical automation or broad refactor belongs to R1.
 
-Staging-first is selected because failures occur in an isolated environment before production identities, production data or public traffic are exposed.
+## Provider selection contract
 
-## 3. R1 scope
+Gate 1 compares candidate stacks only after they satisfy these **blocking requirements**:
 
-R1 includes:
+1. supported Laravel/PHP or validated Docker execution;
+2. managed PostgreSQL compatible with the M6/M9 contract;
+3. encrypted application and database transport;
+4. external secret management;
+5. isolated staging and production environments;
+6. health-check/traffic-admission capability or controlled equivalent;
+7. private persistent logs/diagnostics;
+8. backups with a documented restore path;
+9. PITR capability for the production PostgreSQL service;
+10. migration/runtime database credential separation;
+11. exact deployed SHA/image identification;
+12. operator access without committing provider credentials.
 
-- provider/environment selection evidence;
-- isolated staging infrastructure;
-- TLS and HTTPS validation;
-- external secret injection;
-- migration/runtime PostgreSQL identity separation;
-- managed PostgreSQL staging database;
-- backup/PITR configuration evidence where supported by the selected provider;
-- restore drill into an isolated recovery target;
-- deployment of an immutable application SHA/image;
-- `production:preflight`, migrations and Laravel cache warmup under controlled identity;
-- runtime startup under least-privilege identity;
-- liveness/readiness traffic-admission checks;
-- authenticated smoke/E2E tests in the hosted staging environment;
-- provider/private observability checks;
-- failure/recovery drills that do not risk production data;
-- controlled production promotion only after staging acceptance;
-- production smoke/health closeout;
-- an explicit version/tag decision rather than an invented version.
+Each item is recorded as **PASS**, **FAIL** or **UNKNOWN**. FAIL or UNKNOWN on a blocking requirement prevents provider selection. Cost, region and convenience rank only providers that have passed the blocking safety requirements.
 
-R1 does **not** include:
-
-- new clinical or tactical functionality;
-- AI/RAG/vector features;
-- feature redesign unrelated to deployment defects;
-- production data copied into staging by default;
-- exposing secrets/PII in logs or test artifacts;
-- weakening M6 PostgreSQL guards to simplify deployment;
-- weakening M7/M8 UX/security contracts;
-- broad infrastructure-as-code migration unless a RED operational requirement proves it necessary;
-- fabricating provider evidence when the required provider account/credentials are not available.
-
-## 4. Safety model
-
-### 4.1 Environment isolation
-
-At minimum, staging and production are distinct security boundaries.
-
-They must not share:
-
-- PostgreSQL database/cluster credentials;
-- `APP_KEY`;
-- `PII_FINGERPRINT_KEY`;
-- session secrets;
-- migration-role password;
-- runtime-role password;
-- provider service tokens;
-- TLS private keys when operator-managed;
-- backup restore targets.
-
-Staging must not use the authoritative production database.
-
-Synthetic or explicitly approved non-sensitive seed data is preferred for staging. Production PII is not copied into staging as an R1 default.
-
-### 4.2 Deployment identity separation
-
-The deployment sequence preserves the M6/M9 distinction:
-
-1. a controlled **migration identity** executes preflight/migrations;
-2. migration credentials are removed from web/worker runtime;
-3. the **runtime identity** is least-privilege and cannot own or alter schema;
-4. health and authenticated application checks execute only after runtime identity is active.
-
-A deployment that leaves migration-owner credentials available to runtime fails R1.
-
-### 4.3 Immutable release identity
-
-Every staging or production candidate is identified by an exact Git commit SHA and, where the platform uses a built image, by the corresponding immutable image digest/tag.
-
-A branch name, “latest”, mutable container tag or dashboard timestamp is not sufficient release identity.
-
-### 4.4 Promotion rule
-
-A release may be promoted to production only if:
-
-- all repository CI gates for the exact candidate SHA are green;
-- all staging Gates 1–7 required for promotion are green;
-- no unresolved Critical/High operational finding exists;
-- backup/recovery posture is known;
-- the production migration/runtime identity split is configured;
-- a rollback/recovery decision owner is identified;
-- production secrets are external to Git/source artifacts.
-
-## 5. Provider selection contract
-
-R1 does not select a provider by popularity or convenience alone.
-
-The selected provider/stack must demonstrate, through documentation and/or account configuration evidence, the following **blocking requirements**:
-
-1. supported execution model for the Laravel/PHP application or its validated Docker image;
-2. managed PostgreSQL suitable for the application's M6/M9 contract;
-3. encrypted transport/TLS support;
-4. external secret/environment-variable management;
-5. separate staging and production environments/projects/services;
-6. health-check/traffic-admission capability or an equivalent controlled routing mechanism;
-7. persistent/private application logs without requiring secrets in public health responses;
-8. backup capability and a documented restore path;
-9. PITR capability when required by the selected production recovery policy;
-10. ability to separate migration credentials from runtime credentials;
-11. ability to identify the exact deployed SHA/image;
-12. an operator-access model that does not require committing provider credentials.
-
-### 5.1 Provider scorecard
-
-Gate 1 records each candidate as:
-
-- PASS — blocking requirement demonstrated;
-- FAIL — blocking requirement not available;
-- UNKNOWN — not yet verified.
-
-A provider with any unresolved FAIL on a blocking requirement cannot be selected for production.
-
-UNKNOWN items block provider selection until resolved.
-
-Cost, region, convenience and vendor preference may rank providers only **after** blocking safety requirements are satisfied.
-
-## 6. Environment architecture
-
-R1 targets the following logical separation:
+## Environment model
 
 ```text
-GitHub / exact candidate SHA
-          |
-          v
-   immutable build/image
-          |
-     +----+------------------+
-     |                       |
-     v                       v
-STAGING                    PRODUCTION
-isolated secrets           isolated secrets
-staging migration role     production migration role
-staging runtime role       production runtime role
-staging PostgreSQL         production PostgreSQL
-staging TLS/domain         production TLS/domain
-staging logs               production logs
-staging recovery target    production backup/PITR policy
+exact candidate SHA / immutable image
+              |
+       +------+------+
+       |             |
+       v             v
+    STAGING       PRODUCTION
+ separate app     separate app
+ separate secrets separate secrets
+ migration role   migration role
+ runtime role     runtime role
+ separate PG      separate PG
+ HTTPS/TLS        HTTPS/TLS
+ private logs     private logs
+ restore target   backup + PITR
 ```
 
-Production is not required to exist before staging Gates 1–7 are proven.
+Production does not need to exist before staging Gates 1–7 are green.
 
-## 7. Gate model
+## Gate 1 — Provider & Environment Contract
 
-R1 uses eight gates.
-
-### Gate 1 — Provider & Environment Contract
-
-Goal: select a provider/stack only after proving mandatory operational capabilities.
+**Goal:** select the hosting/database stack only after mandatory capabilities are verified.
 
 Evidence:
 
 - provider scorecard;
-- supported Laravel/container deployment method;
-- PostgreSQL/backup/PITR capabilities;
-- TLS/secrets/environment isolation capabilities;
-- health/logging capabilities;
+- supported application/container deployment method;
+- managed PostgreSQL, backup, restore and PITR capabilities;
+- TLS, secrets, environment isolation, health and logging capabilities;
 - selected staging architecture;
 - explicit unresolved-item list.
 
-Acceptance:
+GREEN requires zero blocking FAIL/UNKNOWN, confirmed production PITR capability and documented staging/production isolation. Provider credentials remain outside Git.
 
-- no FAIL/UNKNOWN on production-blocking requirements needed for the selected design;
-- staging and production isolation model documented;
-- provider credentials remain outside the repository.
+## Gate 2 — Isolated Staging + TLS
 
-### Gate 2 — Isolated Staging + TLS
-
-Goal: create a real hosted staging environment without production trust/data reuse.
+**Goal:** create a real hosted staging environment isolated from production.
 
 Evidence:
 
-- staging service/application exists;
-- separate staging PostgreSQL exists;
-- staging hostname resolves;
-- valid HTTPS/TLS is observed;
-- HTTP-to-HTTPS policy is confirmed where applicable;
-- staging is not connected to production DB;
-- deployed artifact can be mapped to exact SHA/image.
+- hosted staging application;
+- separate staging PostgreSQL;
+- staging hostname and valid HTTPS/TLS;
+- if plaintext HTTP is exposed, it redirects to HTTPS and never serves authenticated application traffic;
+- no production database or secret reuse;
+- exact deployed SHA/image is identifiable.
 
-Acceptance:
+GREEN requires HTTPS staging, isolated data/trust boundaries and immutable release identity evidence.
 
-- staging is independently addressable over HTTPS;
-- no production secret/database reuse is detected;
-- provider shows exact release identity.
+## Gate 3 — Secrets + Migration/Runtime Identity Separation
 
-### Gate 3 — Secrets + Migration/Runtime Identity Separation
-
-Goal: prove production-style secret and database authorization boundaries in staging.
+**Goal:** prove production-style authorization boundaries in staging.
 
 Evidence:
 
-- secrets injected externally;
-- staging `APP_KEY` and `PII_FINGERPRINT_KEY` are not repository values;
-- migration role can run required schema operations;
-- runtime role can perform application DML but cannot perform DDL/schema ownership operations;
-- migration credentials are absent from running application/worker environment after deploy.
+- application secrets injected outside Git/artifacts;
+- migration role can perform required migration operations;
+- runtime role supports normal application DML but cannot own/alter schema;
+- migration credentials are absent from running web/worker runtime after deployment;
+- `production:preflight` succeeds with production-like staging settings.
 
-Acceptance:
+GREEN requires a runtime DDL-denial test, successful normal application access using the runtime identity and no exposed secret material.
 
-- `production:preflight` passes with staging production-like settings;
-- runtime DDL-denial test passes;
-- application operation under runtime identity passes;
-- no secret is committed/logged/artifacted.
+## Gate 4 — PostgreSQL + Backup/PITR + Restore Drill
 
-### Gate 4 — PostgreSQL + Backup/PITR + Restore Drill
-
-Goal: prove that staging database recovery is actionable rather than assumed.
+**Goal:** prove recoverability instead of merely proving backup configuration.
 
 Evidence:
 
-- managed PostgreSQL version/connection posture;
-- encrypted DB transport appropriate to provider;
-- backup/recovery-point evidence;
-- PITR configuration/evidence when the selected recovery policy requires PITR;
-- restore to a **separate isolated recovery target**;
-- restored application/schema/invariants validated without exposing production data.
+- managed PostgreSQL connection/TLS posture;
+- backup/recovery point evidence;
+- production PostgreSQL PITR capability/configuration evidence;
+- restore into a **separate isolated recovery target**;
+- migration state and application/integrity validation on the restored target.
 
-Acceptance:
+GREEN requires a successful isolated restore drill. The original staging database is not overwritten for the first recovery drill. The production PostgreSQL option must have PITR enabled or ready to be enabled before Gate 8.
 
-- restore completes into an isolated target;
-- migration state is coherent;
-- application can connect using recovery-target credentials;
-- M6 historical/tenant integrity checks remain valid;
-- original staging DB is not overwritten as the first restore drill.
+A configured backup without a successful restore drill is not GREEN.
 
-A configured backup without a successful restore drill does not satisfy Gate 4.
+## Gate 5 — Real Deployment + Health Admission
 
-### Gate 5 — Real Deployment + Health Admission
+**Goal:** prove the real release sequence in staging.
 
-Goal: prove the real deployment sequence and traffic-admission contract.
+Required order:
 
-Sequence:
+1. select exact candidate SHA/image;
+2. confirm repository CI green on that candidate;
+3. load migration identity;
+4. run `production:preflight`;
+5. apply migrations;
+6. warm Laravel config/route caches where applicable;
+7. remove migration credentials from runtime;
+8. start application under the runtime identity;
+9. verify `/health/live`;
+10. verify `/health/ready`;
+11. only then admit staging for functional QA.
 
-1. exact candidate SHA/image selected;
-2. repository CI for that candidate confirmed green;
-3. migration identity loaded;
-4. `php artisan production:preflight` passes;
-5. migrations execute successfully;
-6. config/route cache warmup executes as applicable;
-7. migration credentials removed from runtime;
-8. application starts under runtime identity;
-9. `GET /health/live` returns expected healthy response;
-10. `GET /health/ready` returns expected ready/database response;
-11. only then is staging considered admitted for functional QA.
+GREEN requires no migration-on-web-startup behavior, secret-safe probes, correct readiness behavior and recorded release identity.
 
-Acceptance:
+## Gate 6 — Authenticated Smoke/E2E + Browser QA
 
-- no migrate-on-web-startup behavior;
-- probes are secret-safe;
-- readiness reflects database loss appropriately;
-- release SHA/image identity is recorded.
+**Goal:** exercise the hosted application as real users using disposable staging data.
 
-### Gate 6 — Authenticated Smoke/E2E + Browser QA
+Minimum flow coverage:
 
-Goal: exercise the deployed application through real authenticated browser/HTTP behavior.
-
-Required smoke coverage:
-
-- login;
-- active organization context;
+- login and active organization context;
 - dashboard;
-- scenario workspace and version navigation;
-- execution cockpit read/create behavior appropriate to test data;
-- assessment/debrief flow appropriate to disposable staging data;
+- scenario/version workspace;
+- execution cockpit;
+- assessment/debrief;
 - history/report access;
-- Knowledge Center and contextual help;
+- Knowledge Center/contextual help;
 - people/organization/access surfaces for an authorized test administrator;
-- unauthorized/forbidden behavior for a restricted test identity;
+- forbidden behavior for a restricted test user;
 - logout/session invalidation;
-- low-light mode persistence/local behavior;
-- keyboard/focus/skip-link sanity checks.
+- low-light persistence;
+- keyboard, focus and skip-link sanity.
 
-Browser matrix minimum for staging release qualification:
+Browser qualification requires one Chromium-family desktop browser plus one independent engine. If the second engine cannot be automated, a manual check is required and recorded before production promotion.
 
-- one Chromium-family desktop browser;
-- one additional independent engine when tooling/environment permits.
+No production PII is used.
 
-If the environment cannot automate the second engine, the limitation is recorded and a manual check is required before production promotion.
+## Gate 7 — Observability + Failure/Recovery Drill
 
-No test uses real production PII.
+**Goal:** prove that predictable failures can be detected and recovered safely in staging.
 
-### Gate 7 — Observability + Failure/Recovery Drill
+Required evidence:
 
-Goal: prove the operator can detect and safely respond to predictable failures.
+- provider/application logs are private;
+- inspected logs contain no exposed secrets or raw sensitive payloads;
+- database-unavailable behavior is safely exercised where the provider permits;
+- liveness remains process-oriented while readiness fails closed;
+- restart/redeploy of the same candidate returns staging to health;
+- schema-compatible application rollback is rehearsed, or an approved roll-forward rehearsal is used when rollback is unsafe;
+- Gate 4 recovery evidence is still valid;
+- ownership/decision path for application rollback vs schema rollback vs PITR is documented.
 
-Required exercises in staging:
+GREEN requires observable failure without public diagnostic leakage and successful return to a healthy staging state.
 
-- confirm application/provider logs are private/protected;
-- confirm no secrets or raw sensitive payloads appear in inspected logs;
-- simulate or safely induce a database-unavailable condition where provider capabilities permit;
-- verify liveness remains process-oriented and readiness fails closed;
-- restart/redeploy the same candidate and confirm stable recovery;
-- exercise an application rollback to a known schema-compatible candidate **or** document why the current schema transition makes rollback inappropriate and perform the approved roll-forward rehearsal instead;
-- validate the Gate 4 recovery target/drill evidence;
-- record ownership and decision path for application rollback vs schema rollback vs PITR.
+## Gate 8 — Production Promotion + Release Closeout
 
-Acceptance:
-
-- observable failure is detected without exposing diagnostics publicly;
-- recovery procedure restores a healthy staging state;
-- no production data is used as a drill target.
-
-### Gate 8 — Production Promotion + Release Closeout
-
-Goal: promote only a staging-qualified immutable candidate and capture production evidence.
+**Goal:** promote only a staging-qualified immutable candidate.
 
 Preconditions:
 
 - Gates 1–7 GREEN;
-- exact candidate SHA still matches the intended production artifact;
-- repository CI still GREEN on candidate;
+- exact candidate CI remains GREEN;
 - zero unresolved Critical/High findings;
-- production secrets/roles/database configured separately from staging;
-- backup/recovery point appropriate to the production migration window confirmed.
+- production secrets/database/roles are independent from staging;
+- production PostgreSQL PITR is enabled;
+- an appropriate production recovery point is confirmed.
 
 Production sequence:
 
 1. freeze candidate identity;
-2. execute production preflight/migration under production migration identity;
+2. execute preflight/migrations using production migration identity;
 3. remove migration credentials;
-4. start production runtime under least privilege;
+4. start runtime under least privilege;
 5. verify production liveness/readiness;
 6. admit traffic;
-7. execute minimal non-destructive authenticated smoke checks;
-8. inspect logs/alerts for release anomalies;
-9. record deployed SHA/image, migration state and production health evidence;
+7. run minimal non-destructive authenticated smoke checks;
+8. inspect private logs/alerts;
+9. record deployed SHA/image, migration state and health evidence;
 10. make an explicit version/tag decision.
 
-Version/tag rule:
+A semantic version is created only when an explicit versioning policy/version decision exists. Otherwise the exact deployed SHA remains the release identity.
 
-- if a semantic version is explicitly selected under a documented versioning policy, create/tag that exact deployed commit;
-- otherwise record the exact SHA as the release identity and leave semantic tagging pending;
-- never invent a version merely to make R1 look complete.
+## Evidence model
 
-## 8. Evidence model
+Evidence is classified as:
 
-Every gate must distinguish:
+- **repository:** Git SHA, PR, CI, tests and documentation;
+- **provider:** environment, deployment identity, TLS, PostgreSQL, backup/restore and private logs;
+- **runtime:** preflight, role behavior, probes and authenticated smoke;
+- **manual:** required checks where authenticated automation/tool access is unavailable.
 
-- **repository evidence** — Git SHA, PR, CI, tests, docs;
-- **provider evidence** — service/environment configuration, deploy identity, TLS, PostgreSQL, backup/restore, private logs;
-- **runtime evidence** — probes, preflight, role behavior, authenticated smoke;
-- **manual evidence** — only where automation/tool access cannot perform the check.
+Evidence must be secret-safe. Tokens, passwords, PII, private connection strings and sensitive restored records do not belong in GitHub artifacts or public logs.
 
-Evidence must avoid secret material. Screenshots/log excerpts used as evidence must redact tokens, passwords, private URLs where sensitive, PII and database connection strings.
+## Failure policy
 
-## 9. Failure handling
+R1 is fail-closed:
 
-R1 is fail-closed.
+- Critical/High finding → promotion blocked;
+- provider FAIL/UNKNOWN → selection blocked;
+- failed restore drill → production blocked;
+- missing PITR capability → production blocked;
+- runtime least-privilege failure → production blocked;
+- readiness failure → traffic admission blocked;
+- release-critical authenticated smoke failure → promotion blocked;
+- unverifiable provider claim → UNKNOWN, never PASS.
 
-- Any unresolved Critical/High security or operational finding blocks promotion.
-- Any provider blocking requirement marked FAIL/UNKNOWN blocks provider selection.
-- Failed restore drill blocks production promotion.
-- Failed runtime least-privilege test blocks production promotion.
-- Failed readiness blocks traffic admission.
-- Failed authenticated smoke on a release-critical flow blocks production promotion.
-- Provider evidence that cannot be independently verified is recorded as UNKNOWN, not PASS.
+Failed gates are fixed and rerun; acceptance wording is not weakened to make a failure pass.
 
-A failed gate is fixed and rerun; it is not waived by changing the checklist wording.
+## Repository-change policy
 
-## 10. Data and privacy rules
+R1 may add only operational-validation artifacts or targeted fixes justified by observed staging failures:
 
-- No production PII is required for R1 staging qualification.
-- Staging uses synthetic/disposable tenant/user/scenario data unless an explicit privacy-approved dataset is provided.
-- Test credentials are environment-specific and never committed.
-- Database dumps containing sensitive production records are not stored in GitHub artifacts.
-- Health probes remain minimal and never expose connection metadata or exception details.
-- Recovery evidence reports integrity outcomes without publishing sensitive restored records.
+- R1 spec/plan/ledger/audit;
+- staging/release smoke or E2E tests;
+- narrowly justified provider/deployment configuration;
+- secret-safe CI integrations;
+- targeted defects fixed via RED → GREEN.
 
-## 11. Automation boundaries
+Every repository-file change reruns the complete M9 release matrix: dependency security, real container build/runtime contract, SQLite, PostgreSQL 16 including M6 hardening/concurrency, and Pint.
 
-Automation is preferred for deterministic checks, but R1 does not require inventing automation where provider/tool access is unavailable.
-
-Good automation candidates:
-
-- provider deployment status checks where an authenticated connector/API exists;
-- health probe verification;
-- release SHA verification;
-- authenticated staging smoke/E2E using dedicated synthetic accounts;
-- runtime role-denial tests;
-- CI/repository checks.
-
-Manual/provider-console evidence may remain necessary for:
-
-- initial billing/account/domain ownership;
-- certain backup/PITR controls;
-- DNS/TLS ownership challenges;
-- recovery target creation depending on provider;
-- second-browser validation if automation is unavailable.
-
-Manual does not mean optional: the gate remains blocked until evidence is captured.
-
-## 12. Repository changes allowed in R1
-
-R1 may add only what operational validation proves necessary, for example:
-
-- R1 specification/plan/ledger/audit docs;
-- staging/release smoke scripts or E2E tests;
-- provider-neutral deployment manifests/configuration when justified;
-- CI checks for staging release evidence where credentials can be safely referenced as GitHub/provider secrets;
-- targeted application fixes revealed by staging, each with its own RED→GREEN proof.
-
-R1 must not perform unrelated feature work or broad refactoring.
-
-Any product/runtime code defect found in staging is fixed on the R1 branch using TDD and rerun through the full repository matrix before redeployment.
-
-## 13. Testing strategy
-
-Repository changes follow RED → GREEN → full CI.
-
-Operational gates follow:
-
-1. define observable acceptance check;
-2. observe failing/not-yet-satisfied state;
-3. configure/fix the smallest required surface;
-4. rerun check;
-5. capture secret-safe evidence;
-6. do not promote until green.
-
-The M9 exact-head matrix remains a prerequisite for every candidate that changes repository files:
-
-- Security — Composer/npm audit;
-- real container build/runtime contract;
-- PHPUnit SQLite;
-- PHPUnit PostgreSQL 16 with M6 least-privilege, rollback/reapply and concurrency;
-- Pint.
-
-## 14. R1 progress model
+## Progress model
 
 R1 progress is evidence-based:
 
-- approved architecture/design: 5%;
-- written spec review + implementation/operations plan: next 5%;
-- Gates 1–7: 10% each = 70%;
-- Gate 8 + production promotion/closeout: final 20%.
+- approved architecture/design: **5%**;
+- written spec review + implementation/operations plan: next **5%**;
+- Gates 1–7: **10% each**;
+- Gate 8 + production promotion/closeout: final **20%**.
 
-A gate contributes its percentage only after its defined evidence is GREEN.
+A gate contributes only after its defined evidence is GREEN. Planning does not substitute for provider/runtime evidence.
 
-Planning text does not substitute for real provider/runtime evidence.
-
-## 15. Initial acceptance checklist
+## Acceptance checklist
 
 ### Design/spec
 - [x] Staging-first strategy selected.
 - [x] Production promotion block defined.
-- [x] Eight R1 gates defined.
+- [x] Eight gates defined.
 - [x] Environment/security boundaries defined.
+- [x] Spec self-review completed.
 - [ ] Written spec approved by user.
 - [ ] Detailed implementation/operations plan committed.
 
 ### Gate 1
-- [ ] Provider scorecard completed.
-- [ ] Provider selected with no blocking FAIL/UNKNOWN.
-- [ ] Staging architecture documented.
+- [ ] Provider scorecard complete.
+- [ ] Provider selected with zero blocking FAIL/UNKNOWN.
+- [ ] Production PostgreSQL PITR capability confirmed.
+- [ ] Staging architecture recorded.
 
 ### Gate 2
-- [ ] Isolated hosted staging exists.
-- [ ] Separate staging database exists.
+- [ ] Hosted isolated staging exists.
+- [ ] Separate staging PostgreSQL exists.
 - [ ] HTTPS/TLS verified.
+- [ ] Plaintext HTTP does not serve authenticated traffic.
 - [ ] Exact deployed artifact identified.
 
 ### Gate 3
@@ -499,55 +306,47 @@ Planning text does not substitute for real provider/runtime evidence.
 
 ### Gate 4
 - [ ] Backup/recovery point verified.
-- [ ] PITR posture verified as required.
+- [ ] Production PITR capability/configuration verified.
 - [ ] Isolated restore target created.
 - [ ] Restore drill completed.
 - [ ] Restored integrity/application checks pass.
 
 ### Gate 5
 - [ ] Exact candidate CI green.
-- [ ] `production:preflight` green in staging.
-- [ ] Migrations completed under migration identity.
+- [ ] Staging preflight green.
+- [ ] Migrations executed under migration identity.
 - [ ] Runtime starts under least privilege.
 - [ ] Liveness green.
 - [ ] Readiness green.
 
 ### Gate 6
-- [ ] Authenticated smoke/E2E flows green.
+- [ ] Authenticated smoke/E2E green.
 - [ ] Restricted-user authorization checks green.
 - [ ] Logout/session check green.
-- [ ] Accessibility/low-light sanity checks green.
+- [ ] Accessibility/low-light sanity green.
 - [ ] Browser matrix evidence recorded.
 
 ### Gate 7
-- [ ] Private logging/observability evidence captured.
-- [ ] Secret/PII log inspection passes.
+- [ ] Private observability evidence captured.
+- [ ] Secret/PII log inspection green.
 - [ ] DB/readiness failure behavior validated.
 - [ ] Restart/redeploy recovery green.
-- [ ] Rollback/roll-forward rehearsal completed.
+- [ ] Rollback/roll-forward rehearsal complete.
 - [ ] Recovery decision ownership recorded.
 
 ### Gate 8
 - [ ] Gates 1–7 GREEN.
-- [ ] Production environment independently configured.
+- [ ] Production independently configured.
 - [ ] Production migration/runtime roles separated.
+- [ ] Production PITR enabled.
 - [ ] Production recovery point confirmed.
 - [ ] Production preflight/migrations green.
 - [ ] Production liveness/readiness green.
 - [ ] Minimal production smoke green.
 - [ ] Release SHA/image and migration state recorded.
 - [ ] Version/tag decision explicitly recorded.
-- [ ] R1 closeout audit completed.
+- [ ] R1 closeout audit complete.
 
-## 16. Completion definition
+## Completion definition
 
-R1 is complete only when:
-
-1. a staging-qualified immutable candidate has been promoted under the defined gate policy;
-2. production health/admission and minimal smoke evidence are captured;
-3. migration/runtime identities remain separated;
-4. recovery posture includes a successful isolated restore drill before promotion;
-5. no unresolved Critical/High R1 finding remains;
-6. release identity and migration state are recorded;
-7. repository evidence and provider/runtime evidence are clearly distinguished;
-8. no provider, restore, browser or production result is fabricated.
+R1 is complete only when a staging-qualified immutable candidate has been promoted to production under this policy; production health and minimal smoke evidence are captured; least-privilege and recovery controls remain intact; an isolated restore drill succeeded before promotion; production PITR is enabled; no unresolved Critical/High finding remains; release identity/migration state are recorded; and no external operational result was fabricated.
