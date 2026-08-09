@@ -28,24 +28,7 @@ class HealthReadinessTest extends TestCase
 
     public function test_readiness_failure_is_privacy_safe(): void
     {
-        config([
-            'database.default' => 'health_unavailable',
-            'database.connections.health_unavailable' => [
-                'driver' => 'pgsql',
-                'url' => null,
-                'host' => '127.0.0.1',
-                'port' => 1,
-                'database' => 'health_private_database',
-                'username' => 'health_secret_user',
-                'password' => 'health_secret_password',
-                'charset' => 'utf8',
-                'prefix' => '',
-                'prefix_indexes' => true,
-                'search_path' => 'public',
-                'sslmode' => 'disable',
-            ],
-        ]);
-        DB::purge('health_unavailable');
+        $this->configureUnavailableDatabase();
 
         $response = $this->getJson('/health/ready')
             ->assertStatus(503)
@@ -69,6 +52,25 @@ class HealthReadinessTest extends TestCase
         }
     }
 
+    public function test_health_probes_do_not_depend_on_database_backed_web_session_middleware(): void
+    {
+        config(['session.driver' => 'database']);
+        $this->configureUnavailableDatabase();
+
+        $this->getJson('/health/live')
+            ->assertOk()
+            ->assertExactJson([
+                'status' => 'ok',
+            ]);
+
+        $this->getJson('/health/ready')
+            ->assertStatus(503)
+            ->assertExactJson([
+                'status' => 'unavailable',
+                'database' => 'unavailable',
+            ]);
+    }
+
     public function test_readiness_fails_closed_for_unsafe_production_configuration_without_exposing_violation_details(): void
     {
         $this->app->detectEnvironment(fn (): string => 'production');
@@ -88,5 +90,27 @@ class HealthReadinessTest extends TestCase
         $this->assertStringNotContainsString('APP_KEY', $body);
         $this->assertStringNotContainsString('APP_DEBUG', $body);
         $this->assertStringNotContainsString('Unsafe production configuration', $body);
+    }
+
+    private function configureUnavailableDatabase(): void
+    {
+        config([
+            'database.default' => 'health_unavailable',
+            'database.connections.health_unavailable' => [
+                'driver' => 'pgsql',
+                'url' => null,
+                'host' => '127.0.0.1',
+                'port' => 1,
+                'database' => 'health_private_database',
+                'username' => 'health_secret_user',
+                'password' => 'health_secret_password',
+                'charset' => 'utf8',
+                'prefix' => '',
+                'prefix_indexes' => true,
+                'search_path' => 'public',
+                'sslmode' => 'disable',
+            ],
+        ]);
+        DB::purge('health_unavailable');
     }
 }
