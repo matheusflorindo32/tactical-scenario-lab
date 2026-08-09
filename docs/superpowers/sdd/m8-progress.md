@@ -13,7 +13,7 @@ Status: IMPLEMENTATION
 - [x] Gate 4 — Operational guide content — GREEN
 - [x] Gate 5 — Contextual help — GREEN
 - [x] Gate 6 — Search & discovery hardening — GREEN
-- [ ] Gate 7 — Governance & content integrity
+- [x] Gate 7 — Governance & content integrity — GREEN
 - [ ] Gate 8 — Forensic audit & exact-head protected integration
 
 ## Baseline
@@ -69,7 +69,11 @@ Status: IMPLEMENTATION
 - Result: server-side search is trim/squish/lower/ASCII normalized, accent-insensitive, weighted 100/60/40/20/10 across title/tags/summary-category/body, deterministic on ties, category-controlled, and wired to Hub `?q=` without external search infrastructure or persistence.
 
 ### Gate 7 — Governance & content integrity
-- RED/GREEN evidence: pending
+- RED SHA: `975f315e47455430ccc219dfff9c5aa60523143b`
+- RED CI: #812 / run `31321335232` — catalog/file/link integrity contracts passed while one expected source-of-truth contract failed because `KnowledgeRepository::findByContext()` did not yet exist; SQLite retained 316 passing tests and Pint was green.
+- GREEN SHA: `b2e8801c61c6aa3daeb51ab3d771c56572a04aab`
+- GREEN CI: #814 / run `31321428176` — SQLite, PostgreSQL 16, Pint, production Vite build, fresh migrations, least-privilege runtime role, M6 rollback/reapply and repeated concurrency invariants all green.
+- Result: CI enforces unique/typed catalog metadata, controlled categories/audiences, valid review dates, related/contextual targets, no orphan Markdown files, resolvable internal links and safe content boundaries. `contextual_for` is now the single source of truth used by `KnowledgeRepository::findByContext()`; the shell no longer duplicates a route-to-slug map.
 
 ### Gate 8 — Forensic audit & exact-head protected integration
 - Audit SHA: pending
