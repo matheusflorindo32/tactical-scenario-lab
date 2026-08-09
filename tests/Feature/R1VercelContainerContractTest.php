@@ -25,4 +25,22 @@ class R1VercelContainerContractTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/CMD[^\n]*migrate\s+--force/i', $dockerfile);
         $this->assertStringNotContainsString('database/database.sqlite', $dockerfile);
     }
+
+    public function test_ci_builds_and_inspects_the_vercel_container(): void
+    {
+        $workflow = file_get_contents(base_path('.github/workflows/tests.yml'));
+
+        $this->assertStringContainsString(
+            'docker build --file Dockerfile.vercel --tag tactical-scenario-lab:vercel-ci .',
+            $workflow,
+        );
+        $this->assertStringContainsString(
+            'docker run --rm tactical-scenario-lab:vercel-ci php -m | grep -q pdo_pgsql',
+            $workflow,
+        );
+        $this->assertStringContainsString(
+            'docker run --rm tactical-scenario-lab:vercel-ci sh -lc',
+            $workflow,
+        );
+    }
 }
