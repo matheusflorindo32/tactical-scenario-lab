@@ -16,10 +16,38 @@ class M7ForensicUiContractTest extends TestCase
             $this->assertStringNotContainsString("href='#'", $content, "Placeholder link remains in {$path}");
             $this->assertStringNotContainsString('Tactical Medicine Academy', $content, "Legacy branding remains in {$path}");
             $this->assertDoesNotMatchRegularExpression(
-                '/(?:ink-(?:200|600|800)|emergency-(?:200|800)|clinical-(?:200|800)|amber-\d+)/',
+                '/(?:text|bg|border|ring)-amber-\d+/',
                 $content,
-                "Undefined/legacy design token remains in {$path}",
+                "Generic amber semantic class remains in {$path}",
             );
+        }
+    }
+
+    public function test_every_custom_color_class_used_by_canonical_ui_has_a_defined_theme_token(): void
+    {
+        $css = file_get_contents(resource_path('css/app.css'));
+
+        $this->assertIsString($css);
+
+        foreach ($this->canonicalUiFiles() as $path) {
+            $content = file_get_contents(resource_path($path));
+
+            $this->assertIsString($content);
+            preg_match_all(
+                '/(?:text|bg|border|ring)-(navy|stone|ink|emergency|clinical|alert)-(\d{2,3})/',
+                $content,
+                $matches,
+                PREG_SET_ORDER,
+            );
+
+            foreach ($matches as $match) {
+                $token = "--color-{$match[1]}-{$match[2]}:";
+                $this->assertStringContainsString(
+                    $token,
+                    $css,
+                    "Undefined design token {$token} referenced by {$path}",
+                );
+            }
         }
     }
 
