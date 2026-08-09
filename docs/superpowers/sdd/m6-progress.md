@@ -20,7 +20,7 @@ Do not write directly to `main`. M6 integrates only through its own PR after exa
 | 4 | PostgreSQL database immutability | GREEN | TRUE RED #692; diagnostic #695 isolated PostgreSQL JSON + stale fixture defects; exact clean HEAD `cd0c61cc189865da0a513dd345f33f5f02f149a4`; CI #703 green on PostgreSQL 16 + SQLite + Pint |
 | 5 | Deterministic concurrency hardening | GREEN | Real forked-process barrier harness; 7 race contracts; CI #709 repeated all 7 races 3x, then full PostgreSQL suite, SQLite and Pint all green on `7f6853058b664ed004aa1f8bb3b2477d9847ff0c`; no production changes required |
 | 6 | Liveness/readiness | GREEN | RED #711: exactly 4 new endpoint contracts 404 while 267 existing tests passed; GREEN #714 on exact HEAD `b1600fe45e0e5353471eaa0fa53d26d554fbb132`: PostgreSQL 16 + repeated concurrency + SQLite + Pint all green |
-| 7 | Production operations contract | PENDING | — |
+| 7 | Production operations contract | GREEN | `docs/PRODUCTION.md` matches tested role/TLS/preflight/probe contracts; exact docs HEAD `f9209af3d73a7dc38ca864253ca0718de4db196e`; CI #716 PostgreSQL 16 + repeated concurrency + SQLite + Pint all green |
 | 8 | Forensic audit + exact-head integration gate | PENDING | — |
 
 ## Task 1 evidence — PostgreSQL baseline
@@ -95,6 +95,18 @@ Do not write directly to `main`. M6 integrates only through its own PR after exa
 - CI `#713` proved the three runtime contracts and exposed one test-harness defect: removing `APP_KEY` caused Laravel encryption middleware to fail before the controller. The test was corrected to exercise unsafe production state through `APP_DEBUG=true`, without weakening the controller.
 - Exact Task 6 HEAD: `b1600fe45e0e5353471eaa0fa53d26d554fbb132`.
 - GREEN CI `#714` (`31291461453`): SQLite full suite success; PostgreSQL 16 repeated concurrency + full suite success; Pint success on the same HEAD.
+
+## Task 7 evidence — production operations contract
+
+- `docs/PRODUCTION.md` defines PostgreSQL as the production database and PostgreSQL 16 as the CI reference version while retaining SQLite only for local/regression use.
+- Migration and runtime identities are separated; runtime is documented as LOGIN/non-superuser/non-owner/no-DDL with table DML and sequence usage only.
+- TLS posture matches code/config: `DB_SSLMODE=disable` is forbidden in production and `verify-full` is preferred when provider trust material is available.
+- Deployment order exactly matches the M6 plan: immutable build, external secrets, `production:preflight`, migration credentials, cache/warm step, runtime credentials, liveness, readiness, traffic admission.
+- Backup/PITR and restore drills are explicitly infrastructure responsibilities; rollback text states that trigger/constraint removal cannot recreate deleted or corrupted history and forbids fabricating historical truth.
+- Database-backed session/cache/queue remain supported; Redis is optional/future rather than an M6 dependency.
+- `.env.example` was audited and already matched the documented names/posture, so it was intentionally left unchanged.
+- Exact Task 7 docs HEAD: `f9209af3d73a7dc38ca864253ca0718de4db196e`.
+- GREEN CI `#716` (`31291559345`): SQLite full suite success; PostgreSQL 16 repeated concurrency + full suite success; Pint success on the same HEAD.
 
 ## Baseline observations
 
