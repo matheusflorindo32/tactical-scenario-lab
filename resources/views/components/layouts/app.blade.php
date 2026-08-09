@@ -4,6 +4,18 @@
     'current' => null,
 ])
 
+@php
+$routeName = request()->route()?->getName();
+$contextualGuideSlug = match (true) {
+    in_array($routeName, ['scenarios.index', 'scenarios.show', 'scenario-templates.index'], true) => 'scenarios-and-versioning',
+    $routeName === 'executions.show' => 'execution-cockpit',
+    $routeName === 'assessments.show' => 'assessment-and-debrief',
+    in_array($routeName, ['execution-history.index', 'dashboard.executive'], true) => 'history-and-reports',
+    in_array($routeName, ['people.index', 'organizations.index', 'access.index'], true) => 'people-organizations-access',
+    default => null,
+};
+@endphp
+
 <!doctype html>
 <html lang="pt-BR" class="h-full">
 <head>
@@ -78,6 +90,12 @@
                     {{ $header }}
                 </header>
             @endisset
+
+            @if ($contextualGuideSlug !== null)
+                <div class="-mt-4 mb-6 flex justify-end print:hidden">
+                    <x-contextual-help :slug="$contextualGuideSlug" />
+                </div>
+            @endif
 
             {{ $slot }}
         </main>
