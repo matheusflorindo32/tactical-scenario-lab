@@ -154,8 +154,17 @@ Minimum normalized fields:
 - tags;
 - reviewed date;
 - rendered safe HTML;
-- generated table-of-contents headings where practical;
+- deterministic table-of-contents headings when the article contains at least two level-2 headings;
 - related article references.
+
+TOC contract:
+
+- include H2 headings and their nested H3 headings only;
+- do not create a TOC for fewer than two H2 sections;
+- generate stable URL-safe anchor ids from heading text;
+- duplicate heading ids receive deterministic numeric suffixes (`-2`, `-3`, ...);
+- the same ids must be applied to rendered headings and TOC links;
+- heading text is escaped as content and is never treated as raw HTML.
 
 The object is read-only from the perspective of the knowledge UI.
 
@@ -200,21 +209,25 @@ Sidebar integration:
 
 Search is deterministic and server-side over the small repository-backed corpus.
 
-Search fields:
+Search fields and relevance weights:
 
-- title;
-- summary;
-- tags;
-- category label;
-- Markdown body text.
+- title — 50;
+- tags — 30;
+- summary — 20;
+- category label — 10;
+- Markdown body text — 1.
 
-Normalization requirements:
+Search contract:
 
-- case-insensitive;
-- accent-insensitive for Portuguese discovery;
-- trimmed/collapsed query whitespace;
-- deterministic ordering;
-- empty query returns the normal catalog view rather than a special error.
+- the user query is trimmed, internal whitespace is collapsed, lowercased and ASCII-transliterated for comparison;
+- matching is case-insensitive and accent-insensitive for Portuguese discovery;
+- the normalized query uses substring matching against each normalized field;
+- an optional category filter is combined with the text query using AND semantics;
+- an empty text query returns the normal catalog/category view rather than a special error;
+- each field contributes its weight at most once per article;
+- results with a non-empty query are sorted by relevance score descending, then category declaration order, article `order`, then slug;
+- results without a text query are sorted by category declaration order, article `order`, then slug;
+- the raw query is never rendered as HTML.
 
 Preferred normalization uses framework string utilities such as lowercase + ASCII transliteration. No external search service, database full-text index, Redis, Elasticsearch, Meilisearch or vector store is introduced in M8.
 
@@ -229,7 +242,7 @@ Required:
 - breadcrumb back to Knowledge Hub;
 - article title and summary;
 - category, audiences and reviewed date;
-- table of contents when the article has meaningful section depth;
+- TOC under the deterministic rule in section 7;
 - readable content width;
 - semantic headings;
 - related articles;
@@ -427,7 +440,7 @@ RED covers canonical navigation, authenticated hub, GET search surface, category
 
 ### Gate 3 — Article experience
 
-RED covers article route, metadata, semantic content, TOC/anchors where applicable, related content, safe links and print/readability hooks. GREEN delivers the institutional reading experience.
+RED covers article route, metadata, semantic content, deterministic TOC/anchors, related content, safe links and print/readability hooks. GREEN delivers the institutional reading experience.
 
 ### Gate 4 — Operational guide content
 
@@ -439,7 +452,7 @@ RED proves the required operational screens lack real guide links. GREEN adds ro
 
 ### Gate 6 — Search & discovery hardening
 
-RED covers accent/case normalization, body/tag discovery, deterministic ordering and safe no-result behavior. GREEN completes the server-side search contract without external services.
+RED covers accent/case normalization, weighted deterministic relevance, body/tag discovery, category+query AND semantics and safe no-result behavior. GREEN completes the server-side search contract without external services.
 
 ### Gate 7 — Governance & content integrity
 
