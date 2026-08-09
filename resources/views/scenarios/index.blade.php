@@ -1,115 +1,137 @@
 @php
-$total     = $scenarios->total();
-$drafts    = $scenarios->getCollection()->where('status','draft')->count();
-$running   = $scenarios->getCollection()->where('status','running')->count();
-$completed = $scenarios->getCollection()->where('status','completed')->count();
-$avgScore  = optional($scenarios->getCollection()->where('status','completed'))->avg('score');
+$collection = $scenarios->getCollection();
+$publishedDefinitions = $collection->filter(fn ($scenario) => $scenario->latestVersion?->publication_status === 'published')->count();
+$draftDefinitions = $collection->filter(fn ($scenario) => $scenario->latestVersion?->publication_status === 'draft')->count();
+$executionCount = $collection->sum(fn ($scenario) => (int) ($scenario->latestVersion?->executions_count ?? 0));
 @endphp
 
 <x-layouts.app :current="'scenarios'" :title="'Cenários · Tactical Scenario Lab'">
-
     <x-slot:breadcrumbs>
         <x-breadcrumb :items="[
-            ['label' => 'Painel',    'href'  => route('scenarios.index')],
+            ['label' => 'Painel', 'href' => route('dashboard')],
             ['label' => 'Cenários'],
         ]" />
     </x-slot:breadcrumbs>
 
     <x-slot:header>
-        <div class="flex flex-wrap items-end justify-between gap-4">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-                <x-badge variant="navy" size="sm" dot>MVP · v0.1.0</x-badge>
-                <h1 class="mt-2 font-display text-3xl font-semibold tracking-tight text-navy-950">Painel de cenários</h1>
-                <p class="mt-1.5 max-w-2xl text-sm text-ink-500">Rascunhos, execuções em andamento e cenários avaliados. Clique em um cenário para abrir a ficha completa.</p>
+                <div class="flex flex-wrap items-center gap-2">
+                    <x-badge variant="navy" size="sm" dot>Workspace institucional</x-badge>
+                    <x-badge variant="clinical" size="sm">Definições versionadas</x-badge>
+                </div>
+                <h1 class="mt-3 font-display text-3xl font-semibold tracking-tight text-navy-950">Cenários</h1>
+                <p class="mt-2 max-w-3xl text-sm leading-6 text-ink-500">Crie, publique e reutilize definições versionadas antes de iniciar execuções. Avaliações e histórico permanecem vinculados às execuções, não ao registro legado do cenário.</p>
             </div>
-            <x-button href="{{ route('scenarios.create') }}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="h-3.5 w-3.5"><path d="M12 5v14M5 12h14"/></svg>
-                Novo cenário
-            </x-button>
+            <div class="flex flex-wrap gap-2">
+                <x-button href="{{ route('scenario-templates.index') }}" variant="secondary">Templates</x-button>
+                @if ($canManage)
+                    <x-button href="{{ route('scenarios.create') }}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="h-3.5 w-3.5" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                        Novo cenário
+                    </x-button>
+                @endif
+            </div>
         </div>
     </x-slot:header>
 
-    {{-- Indicadores --}}
-    <section aria-label="Indicadores gerais" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <x-stats-card label="Total" :value="$total" hint="cenários registrados" icon="M4 6h16M4 12h16M4 18h10" accent="navy" />
-        <x-stats-card label="Rascunhos" :value="$drafts" hint="aguardando execução" icon="M12 20h9M16 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" accent="alert" />
-        <x-stats-card label="Em execução" :value="$running" hint="cenários ativos agora" icon="M5 3v18l14-9L5 3z" accent="emergency" />
-        <x-stats-card
-            label="Média das avaliações"
-            :value="$avgScore ? round($avgScore) . '/100' : '—'"
-            :hint="$completed . ' avaliados'"
-            icon="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"
-            accent="clinical"
-        />
+    <section aria-labelledby="scenario-lifecycle-heading" class="rounded-xl border border-stone-200 bg-white p-5 shadow-xs">
+        <div class="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500">Fluxo institucional</p>
+                <h2 id="scenario-lifecycle-heading" class="mt-1 font-display text-xl font-semibold text-navy-950">Ciclo do cenário</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-6 text-ink-500">A publicação congela a definição daquela versão. Novas mudanças exigem revisão em um novo rascunho.</p>
+            </div>
+            <a href="{{ route('scenario-templates.index') }}" class="text-sm font-semibold text-navy-700 hover:text-navy-950">Abrir biblioteca de templates</a>
+        </div>
+
+        <ol class="mt-5 grid gap-2 sm:grid-cols-3 xl:grid-cols-6" aria-label="Etapas do ciclo do cenário">
+            @foreach ([
+                ['Rascunho', 'Definir e revisar'],
+                ['Publicado', 'Congelar versão'],
+                ['Preparar', 'Equipe e recursos'],
+                ['Executar', 'Registrar operação'],
+                ['Avaliar', 'Evidências e debrief'],
+                ['Histórico', 'Preservar resultado'],
+            ] as $index => [$label, $description])
+                <li class="relative rounded-lg border border-stone-200 bg-stone-50 p-3">
+                    <span class="font-mono text-[10px] font-semibold text-ink-500">{{ str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT) }}</span>
+                    <p class="mt-1 text-sm font-semibold text-navy-950">{{ $label }}</p>
+                    <p class="mt-1 text-xs leading-5 text-ink-500">{{ $description }}</p>
+                </li>
+            @endforeach
+        </ol>
     </section>
 
-    {{-- Lista --}}
-    <section aria-labelledby="lista-cenarios-titulo" class="mt-8">
-        <div class="mb-4 flex items-baseline justify-between">
-            <h2 id="lista-cenarios-titulo" class="font-display text-lg font-semibold text-navy-900">Cenários recentes</h2>
+    <section aria-label="Resumo da página de cenários" class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <x-stats-card label="Cenários" :value="$scenarios->total()" hint="na organização ativa" icon="M4 6h16M4 12h16M4 18h10" accent="navy" />
+        <x-stats-card label="Versões publicadas" :value="$publishedDefinitions" hint="nesta página" icon="M9 12l2 2 4-4" accent="clinical" />
+        <x-stats-card label="Versões em rascunho" :value="$draftDefinitions" hint="nesta página" icon="M12 20h9M16 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" accent="alert" />
+        <x-stats-card label="Execuções" :value="$executionCount" hint="da versão vigente nesta página" icon="M5 3v18l14-9L5 3z" accent="navy" />
+    </section>
+
+    <section aria-labelledby="scenario-list-heading" class="mt-8">
+        <div class="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+                <h2 id="scenario-list-heading" class="font-display text-lg font-semibold text-navy-950">Definições recentes</h2>
+                <p class="mt-1 text-xs text-ink-500">A situação abaixo vem da versão mais recente de cada cenário.</p>
+            </div>
             <span class="text-xs text-ink-500">Página {{ $scenarios->currentPage() }} de {{ $scenarios->lastPage() ?: 1 }}</span>
         </div>
 
-        @forelse ($scenarios as $scenario)
-            @if ($loop->first)
-                <ul class="grid gap-3">
-            @endif
-                <li>
-                    <a
-                        href="{{ route('scenarios.show', $scenario) }}"
-                        class="group block rounded-lg bg-white p-5 ring-1 ring-stone-200 transition-all hover:-translate-y-0.5 hover:ring-navy-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy-500"
-                    >
-                        <div class="flex flex-wrap items-start justify-between gap-4">
-                            <div class="min-w-0 flex-1">
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <x-status-pill :status="$scenario->status" />
-                                    <x-badge variant="{{ $scenario->threat_level === 'ativa' ? 'emergency' : ($scenario->threat_level === 'potencial' ? 'alert' : 'neutral') }}" size="sm">
-                                        Ameaça {{ $scenario->threat_level }}
-                                    </x-badge>
-                                </div>
-                                <h3 class="mt-2 font-display text-lg font-semibold text-navy-900 group-hover:text-navy-700">{{ $scenario->title }}</h3>
-                                <p class="mt-1 text-sm text-ink-500">
-                                    {{ $scenario->casualties }} vítima{{ $scenario->casualties > 1 ? 's' : '' }}
-                                    @if (is_array($scenario->resources) && count($scenario->resources))
-                                        · {{ implode(' · ', array_slice($scenario->resources, 0, 3)) }}@if(count($scenario->resources) > 3)…@endif
-                                    @endif
-                                </p>
+        <x-table
+            label="Cenários da organização"
+            :empty="$scenarios->isEmpty()"
+            empty-title="Nenhum cenário criado ainda"
+            empty-description="Crie um cenário para iniciar o ciclo de definição, publicação, execução e avaliação."
+        >
+            <thead class="bg-stone-50 text-xs font-semibold uppercase tracking-[0.08em] text-ink-500">
+                <tr>
+                    <th scope="col" class="px-5 py-3">Cenário</th>
+                    <th scope="col" class="px-5 py-3">Definição vigente</th>
+                    <th scope="col" class="px-5 py-3">Escala</th>
+                    <th scope="col" class="px-5 py-3">Execuções</th>
+                    <th scope="col" class="px-5 py-3"><span class="sr-only">Ação</span></th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-stone-100 bg-white">
+                @foreach ($scenarios as $scenario)
+                    @php
+                        $version = $scenario->latestVersion;
+                        $published = $version?->publication_status === 'published';
+                        $threatLevel = $version?->threat_level ?? $scenario->threat_level;
+                        $casualties = (int) ($version?->estimated_casualty_count ?? $scenario->estimated_casualty_count ?? $scenario->casualties);
+                    @endphp
+                    <tr class="transition-colors hover:bg-stone-50/70">
+                        <td class="px-5 py-4 align-top">
+                            <a href="{{ route('scenarios.show', $scenario) }}" class="font-semibold text-navy-950 hover:text-navy-700">{{ $scenario->title }}</a>
+                            <p class="mt-1 max-w-md text-xs leading-5 text-ink-500">{{ $version?->mechanism ?? $scenario->mechanism }}</p>
+                        </td>
+                        <td class="px-5 py-4 align-top">
+                            <div class="flex flex-wrap gap-2">
+                                <x-badge :variant="$published ? 'clinical' : 'alert'" size="sm" dot>{{ $published ? 'Publicado' : 'Rascunho' }}</x-badge>
+                                @if ($version)<x-badge variant="neutral" size="sm">Versão {{ $version->version_number }}</x-badge>@endif
                             </div>
-
-                            <div class="flex items-center gap-6">
-                                @if ($scenario->status === 'completed')
-                                    <div class="text-right">
-                                        <p class="font-display text-2xl font-semibold text-navy-900 tabular-nums">{{ $scenario->score ?? 0 }}<span class="text-sm text-ink-500">/100</span></p>
-                                        <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-500">avaliação</p>
-                                    </div>
-                                @endif
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4 shrink-0 text-ink-300 transition-transform group-hover:translate-x-1 group-hover:text-navy-700"><path d="M9 5l7 7-7 7"/></svg>
-                            </div>
-                        </div>
-                    </a>
-                </li>
-            @if ($loop->last)
-                </ul>
-            @endif
-        @empty
-            <x-empty-state
-                icon="clip"
-                title="Nenhum cenário criado ainda"
-                description="Comece pelo wizard: em oito passos curtos você gera a ficha completa, com objetivos, ações esperadas e erros críticos a monitorar."
-            >
-                <x-slot:actions>
-                    <x-button href="{{ route('scenarios.create') }}">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="h-3.5 w-3.5"><path d="M12 5v14M5 12h14"/></svg>
-                        Criar o primeiro cenário
-                    </x-button>
-                    <x-button href="{{ url('/') }}" variant="ghost">Voltar à página inicial</x-button>
-                </x-slot:actions>
-            </x-empty-state>
-        @endforelse
+                            <p class="mt-2 text-xs text-ink-500">Ameaça {{ $threatLevel }}</p>
+                        </td>
+                        <td class="px-5 py-4 align-top">
+                            <p class="font-mono text-sm font-semibold tabular-nums text-navy-950">{{ number_format($casualties, 0, ',', '.') }}</p>
+                            <p class="mt-1 text-xs text-ink-500">vítima(s) estimada(s)</p>
+                        </td>
+                        <td class="px-5 py-4 align-top">
+                            <p class="font-mono text-sm font-semibold tabular-nums text-navy-950">{{ (int) ($version?->executions_count ?? 0) }}</p>
+                            <p class="mt-1 text-xs text-ink-500">na versão vigente</p>
+                        </td>
+                        <td class="px-5 py-4 text-right align-top">
+                            <x-button href="{{ route('scenarios.show', $scenario) }}" variant="ghost" size="sm">Abrir</x-button>
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </x-table>
 
         @if ($scenarios->hasPages())
             <div class="mt-6">{{ $scenarios->links() }}</div>
         @endif
     </section>
-
 </x-layouts.app>
