@@ -3,7 +3,7 @@
 Plan: `docs/superpowers/plans/2026-08-09-m8-knowledge-center.md`
 Branch: `feature/m8-knowledge-center`
 PR: #11 — draft
-Status: IMPLEMENTATION
+Status: FINAL VERIFICATION
 
 ## Gates
 
@@ -14,7 +14,7 @@ Status: IMPLEMENTATION
 - [x] Gate 5 — Contextual help — GREEN
 - [x] Gate 6 — Search & discovery hardening — GREEN
 - [x] Gate 7 — Governance & content integrity — GREEN
-- [ ] Gate 8 — Forensic audit & exact-head protected integration
+- [ ] Gate 8 — Forensic audit & exact-head protected integration — exact-head verification pending
 
 ## Baseline
 
@@ -59,7 +59,7 @@ Status: IMPLEMENTATION
 - RED CI: #804 / run `31320776268` — three contextual-help contracts failed only because the operational pages lacked the guide link; SQLite retained 310 passing tests and Pint was green.
 - GREEN SHA: `3880f380495f526c377bded348a66d25c5b4c6c7`
 - GREEN CI: #806 / run `31320882046` — SQLite, PostgreSQL 16, Pint, production Vite build, fresh migrations, least-privilege runtime role, M6 rollback/reapply and repeated concurrency invariants all green.
-- Result: a reusable contextual-help component plus route-name mapping links scenarios, execution, assessment, history/reporting and management surfaces to the exact product guide; knowledge URLs contain no tenant identifiers.
+- Result: a reusable contextual-help component links scenarios, execution, assessment, history/reporting and management surfaces to the exact product guide; knowledge URLs contain no tenant identifiers.
 
 ### Gate 6 — Search & discovery hardening
 - RED SHA: `fd74af2f76ef6c75dd913818fa3ceda1f86e23b2`
@@ -76,6 +76,10 @@ Status: IMPLEMENTATION
 - Result: CI enforces unique/typed catalog metadata, controlled categories/audiences, valid review dates, related/contextual targets, no orphan Markdown files, resolvable internal links and safe content boundaries. `contextual_for` is now the single source of truth used by `KnowledgeRepository::findByContext()`; the shell no longer duplicates a route-to-slug map.
 
 ### Gate 8 — Forensic audit & exact-head protected integration
-- Audit SHA: pending
-- Exact-head CI: pending
-- Merge evidence: pending
+- RED SHA: `d2e750365963e443788a35750d4587c97e9cd716`
+- RED CI: #816 / run `31321630880` — route/security/hygiene contracts passed while the new forensic completion test correctly blocked on README, Design System and phase-audit synchronization.
+- Audit/candidate SHA: `c4f6f7f7c87769cb1914aef9b1d8d28f1f56fc1a`
+- Candidate CI: #819 / run `31321809559` — SQLite, PostgreSQL 16, forensic contracts, Pint, production Vite build, fresh migrations, least-privilege runtime role, M6 rollback/reapply and repeated concurrency invariants all green.
+- Audit artifact: `docs/PHASE_M8_AUDIT.md`.
+- Final exact-head CI: pending on the ledger-freeze HEAD created by this commit.
+- Merge evidence: pending; final run/merge evidence will be recorded in PR #11 so the exact tested SHA does not move after verification.
