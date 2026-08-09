@@ -16,13 +16,19 @@ class ScenarioController extends Controller
 {
     public function index(Request $request, ActiveOrganization $activeOrganization): View
     {
-        $organizationId = $activeOrganization->ensureAbility($request, 'scenarios.view');
+        $organizationId = $activeOrganization->ensureAbility($request, AccessAbility::SCENARIOS_VIEW);
+        $access = $request->user()
+            ->activeOrganizationAccesses()
+            ->where('organization_id', $organizationId)
+            ->first();
 
         return view('scenarios.index', [
             'scenarios' => Scenario::query()
                 ->where('organization_id', $organizationId)
+                ->with(['latestVersion' => fn ($query) => $query->withCount('executions')])
                 ->latest()
                 ->paginate(10),
+            'canManage' => in_array(AccessAbility::SCENARIOS_MANAGE, $access?->abilities ?? [], true),
         ]);
     }
 
