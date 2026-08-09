@@ -57,7 +57,7 @@ class M9ForensicReleaseContractTest extends TestCase
     {
         $path = base_path('docs/PHASE_M9_AUDIT.md');
 
-        if (!file_exists($path)) {
+        if (! file_exists($path)) {
             $this->markTestIncomplete('M9 audit artifact is not implemented yet.');
         }
 
