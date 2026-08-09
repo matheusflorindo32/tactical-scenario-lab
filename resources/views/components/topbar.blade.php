@@ -38,11 +38,25 @@ $canManageScenarios = in_array(\App\Support\Auth\AccessAbility::SCENARIOS_MANAGE
         <div class="flex shrink-0 items-center gap-2">
             @if ($canManageScenarios)
                 <x-button href="{{ route('scenarios.create') }}" size="sm">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="h-3.5 w-3.5"><path d="M12 5v14M5 12h14"/></svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="h-3.5 w-3.5" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
                     <span class="hidden sm:inline">Novo cenário</span>
                     <span class="sm:hidden">Novo</span>
                 </x-button>
             @endif
+
+            <button
+                type="button"
+                data-theme-toggle
+                x-on:click="$store.theme.toggle()"
+                x-bind:aria-pressed="$store.theme.current === 'low-light'"
+                x-bind:title="$store.theme.current === 'low-light' ? 'Usar modo claro' : 'Usar modo de baixa luz'"
+                class="inline-flex h-11 w-11 items-center justify-center rounded-full border border-stone-200 bg-white text-ink-700 transition-colors hover:bg-stone-100 hover:text-navy-950"
+                aria-label="Alternar modo de baixa luz"
+            >
+                <svg x-show="$store.theme.current === 'light'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5" aria-hidden="true"><path d="M12 3v2m0 14v2M3 12h2m14 0h2M5.64 5.64l1.42 1.42m9.88 9.88 1.42 1.42M18.36 5.64l-1.42 1.42M7.06 16.94l-1.42 1.42"/><circle cx="12" cy="12" r="4"/></svg>
+                <svg x-show="$store.theme.current === 'low-light'" x-cloak viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5" aria-hidden="true"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
+                <span class="sr-only" x-text="$store.theme.current === 'low-light' ? 'Modo de baixa luz ativo' : 'Modo claro ativo'">Modo claro ativo</span>
+            </button>
 
             <x-dropdown width="64">
                 <x-slot:trigger>
