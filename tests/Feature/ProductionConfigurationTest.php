@@ -15,7 +15,7 @@ class ProductionConfigurationTest extends TestCase
             'app.key' => '',
             'database.default' => 'sqlite',
             'database.connections.pgsql.sslmode' => 'disable',
-            'production.pii_fingerprint_key' => '',
+            'privacy.fingerprint_key' => '',
             'production.require_secure_session' => true,
             'session.secure' => false,
         ]);
@@ -38,7 +38,7 @@ class ProductionConfigurationTest extends TestCase
             'app.key' => 'base64:testing-application-key-material',
             'database.default' => 'pgsql',
             'database.connections.pgsql.sslmode' => 'verify-full',
-            'production.pii_fingerprint_key' => 'testing-pii-fingerprint-secret',
+            'privacy.fingerprint_key' => 'testing-pii-fingerprint-secret',
             'production.require_secure_session' => true,
             'session.secure' => true,
         ]);
@@ -59,7 +59,7 @@ class ProductionConfigurationTest extends TestCase
             'app.key' => $appSecret,
             'database.default' => 'pgsql',
             'database.connections.pgsql.sslmode' => 'require',
-            'production.pii_fingerprint_key' => $piiSecret,
+            'privacy.fingerprint_key' => $piiSecret,
             'production.require_secure_session' => true,
             'session.secure' => true,
         ]);
@@ -79,7 +79,7 @@ class ProductionConfigurationTest extends TestCase
             'app.key' => '',
             'database.default' => 'sqlite',
             'database.connections.pgsql.sslmode' => 'disable',
-            'production.pii_fingerprint_key' => '',
+            'privacy.fingerprint_key' => '',
             'production.require_secure_session' => true,
             'session.secure' => false,
         ]);
