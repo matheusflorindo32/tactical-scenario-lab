@@ -36,10 +36,11 @@ final class KnowledgeRepository
             throw $this->sourceUnavailable();
         }
 
-        $html = Str::markdown($markdown, [
+        $safeHtml = Str::markdown($markdown, [
             'html_input' => 'strip',
             'allow_unsafe_links' => false,
         ]);
+        [$html, $toc] = $this->decorateHeadings($safeHtml);
 
         return new KnowledgeArticle(
             slug: (string) ($definition['slug'] ?? ''),
@@ -56,7 +57,44 @@ final class KnowledgeRepository
             markdown: $markdown,
             html: $html,
             searchText: Str::squish(strip_tags($markdown)),
+            toc: $toc,
         );
+    }
+
+    private function decorateHeadings(string $html): array
+    {
+        $headings = [];
+        $occurrences = [];
+
+        $decorated = preg_replace_callback(
+            '/<(h[23])>(.*?)<\/\1>/si',
+            function (array $matches) use (&$headings, &$occurrences): string {
+                $label = trim(html_entity_decode(strip_tags($matches[2]), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+                $base = Str::slug(Str::ascii($label));
+
+                if ($base === '') {
+                    $base = 'secao';
+                }
+
+                $occurrences[$base] = ($occurrences[$base] ?? 0) + 1;
+                $id = $occurrences[$base] === 1 ? $base : $base.'-'.$occurrences[$base];
+
+                $headings[] = [
+                    'level' => (int) substr($matches[1], 1),
+                    'label' => $label,
+                    'id' => $id,
+                ];
+
+                return sprintf('<%1$s id="%2$s">%3$s</%1$s>', $matches[1], e($id), $matches[2]);
+            },
+            $html,
+        );
+
+        if (! is_string($decorated)) {
+            $decorated = $html;
+        }
+
+        return [$decorated, count($headings) >= 2 ? $headings : []];
     }
 
     private function resolveSourcePath(string $file): string
