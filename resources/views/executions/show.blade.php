@@ -169,6 +169,7 @@ $statusVariant = match ($execution->status) {
                                 <div class="rounded-lg border border-stone-200 bg-stone-50 px-4 py-3">
                                     <p class="text-sm font-semibold text-ink-900">{{ $participant->person->preferredName() }}</p>
                                     <p class="mt-1 text-xs text-ink-500">{{ $participant->role ?: 'Participante' }} @if ($participant->team) · {{ $participant->team->label }} @endif</p>
+                                    <p class="mt-1 text-xs text-ink-500">Vínculo histórico: {{ $participant->unit_name_snapshot ?: 'Sem unidade histórica' }} @if ($participant->position_snapshot) · {{ $participant->position_snapshot }} @endif</p>
                                 </div>
                             @empty
                                 <p class="text-sm text-ink-500">Nenhum participante vinculado.</p>
@@ -189,10 +190,15 @@ $statusVariant = match ($execution->status) {
                         <form method="POST" action="{{ route('execution-participants.store', $execution) }}" class="space-y-3">
                             @csrf
                             <h3 class="text-sm font-semibold text-navy-950">Adicionar participante</h3>
-                            <select name="person_uuid" class="w-full rounded-md border-stone-300 text-sm focus:border-navy-500 focus:ring-navy-500" required>
-                                <option value="">Selecione uma pessoa</option>
-                                @foreach ($people as $person)<option value="{{ $person->uuid }}">{{ $person->preferredName() }}</option>@endforeach
+                            <select name="organization_membership_uuid" class="w-full rounded-md border-stone-300 text-sm focus:border-navy-500 focus:ring-navy-500" required>
+                                <option value="">Selecione o vínculo representado</option>
+                                @foreach ($availableMemberships as $membership)
+                                    <option value="{{ $membership->uuid }}">
+                                        {{ $membership->person->preferredName() }} · {{ $membership->unit?->name ?? 'Sem unidade' }} @if ($membership->position) · {{ $membership->position }} @endif
+                                    </option>
+                                @endforeach
                             </select>
+                            <p class="text-xs leading-5 text-ink-500">O vínculo selecionado é congelado como contexto histórico desta execução; transferências futuras não reescrevem o registro.</p>
                             <select name="execution_team_uuid" class="w-full rounded-md border-stone-300 text-sm focus:border-navy-500 focus:ring-navy-500">
                                 <option value="">Sem equipe</option>
                                 @foreach ($execution->teams as $team)<option value="{{ $team->uuid }}">{{ $team->label }}</option>@endforeach

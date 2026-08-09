@@ -15,6 +15,10 @@ class ExecutionParticipant extends Model
         'scenario_execution_id',
         'execution_team_id',
         'person_id',
+        'organization_membership_id',
+        'unit_id_snapshot',
+        'unit_name_snapshot',
+        'position_snapshot',
         'role',
     ];
 
@@ -31,5 +35,15 @@ class ExecutionParticipant extends Model
     public function person(): BelongsTo
     {
         return $this->belongsTo(Person::class);
+    }
+
+    public function membership(): BelongsTo
+    {
+        return $this->belongsTo(OrganizationMembership::class, 'organization_membership_id')->withTrashed();
+    }
+
+    public function unitSnapshot(): BelongsTo
+    {
+        return $this->belongsTo(Unit::class, 'unit_id_snapshot');
     }
 }

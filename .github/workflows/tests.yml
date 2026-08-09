@@ -37,6 +37,9 @@ jobs:
           node-version: '22'
           cache: npm
 
+      - name: Validate Composer metadata
+        run: composer validate --strict
+
       - name: Install PHP dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
@@ -59,8 +62,8 @@ jobs:
       - name: Generate application key
         run: php artisan key:generate
 
-      - name: Run migrations
-        run: php artisan migrate --force
+      - name: Rebuild database from migrations
+        run: php artisan migrate:fresh --force
 
       - name: Run tests
         run: php artisan test
@@ -79,6 +82,9 @@ jobs:
           php-version: '8.4'
           coverage: none
           tools: composer:v2
+
+      - name: Validate Composer metadata
+        run: composer validate --strict
 
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --no-progress

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\OrganizationMembership;
 use App\Models\Person;
 use App\Models\ScenarioExecution;
 use App\Models\ScenarioVersion;
@@ -70,7 +71,27 @@ class ScenarioExecutionController extends Controller
                 ->get(['id', 'uuid', 'display_name', 'social_name'])
             : collect();
 
-        return view('executions.show', compact('execution', 'canManage', 'canEvaluate', 'people'));
+        $availableMemberships = $canManage
+            ? OrganizationMembership::query()
+                ->where('organization_id', $organizationId)
+                ->where('status', 'active')
+                ->whereNull('ended_at')
+                ->whereHas('person', fn ($query) => $query->where('status', 'active'))
+                ->with(['person', 'unit'])
+                ->get()
+                ->sortBy(fn (OrganizationMembership $membership) => mb_strtolower(
+                    $membership->person->preferredName().'|'.($membership->unit?->name ?? '').'|'.($membership->position ?? ''),
+                ))
+                ->values()
+            : collect();
+
+        return view('executions.show', compact(
+            'execution',
+            'canManage',
+            'canEvaluate',
+            'people',
+            'availableMemberships',
+        ));
     }
 
     public function start(

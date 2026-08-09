@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,7 +10,10 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Scenario extends Model
 {
+    use HasPublicUuid;
+
     protected $fillable = [
+        'uuid',
         'organization_id',
         'title',
         'environment',
@@ -62,11 +66,6 @@ class Scenario extends Model
         return $this->hasOne(ScenarioVersion::class)->ofMany('version_number', 'max');
     }
 
-    /* ---------------------------------------------------------------
-       Guards de ciclo de vida.
-       O controller deve consultá-los antes de mutar `status`.
-       --------------------------------------------------------------- */
-
     public function isDraft(): bool
     {
         return $this->status === 'draft';
@@ -82,13 +81,11 @@ class Scenario extends Model
         return $this->status === 'completed';
     }
 
-    /** Só pode iniciar a partir de rascunho. */
     public function canBeStarted(): bool
     {
         return $this->isDraft();
     }
 
-    /** Avaliação aceita durante execução e após conclusão (edição). */
     public function canBeEvaluated(): bool
     {
         return $this->isRunning() || $this->isCompleted();

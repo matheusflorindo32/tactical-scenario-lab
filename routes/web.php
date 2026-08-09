@@ -9,11 +9,16 @@ use App\Http\Controllers\AuthenticatedSessionController;
 use App\Http\Controllers\CriticalErrorOccurrenceController;
 use App\Http\Controllers\DebriefEntryController;
 use App\Http\Controllers\ExecutionAssessmentController;
+use App\Http\Controllers\ExecutionCsvController;
 use App\Http\Controllers\ExecutionEventController;
+use App\Http\Controllers\ExecutionHistoryController;
 use App\Http\Controllers\ExecutionInjectController;
 use App\Http\Controllers\ExecutionParticipantController;
+use App\Http\Controllers\ExecutionReportController;
 use App\Http\Controllers\ExecutionResourceController;
 use App\Http\Controllers\ExecutionTeamController;
+use App\Http\Controllers\ExecutiveDashboardController;
+use App\Http\Controllers\InstructorDashboardController;
 use App\Http\Controllers\KeyTimeRecordController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OrganizationMembershipController;
@@ -23,11 +28,9 @@ use App\Http\Controllers\PersonIdentifierController;
 use App\Http\Controllers\PersonRoleController;
 use App\Http\Controllers\ScenarioController;
 use App\Http\Controllers\ScenarioExecutionController;
+use App\Http\Controllers\ScenarioTemplateController;
 use App\Http\Controllers\ScenarioVersionController;
 use App\Http\Controllers\UnitController;
-use App\Models\Scenario;
-use App\Services\Auth\ActiveOrganization;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
@@ -41,29 +44,18 @@ Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
     ->middleware('auth')
     ->name('logout');
 
-Route::get('/dashboard', function (Request $request, ActiveOrganization $activeOrganization) {
-    $organizationId = $activeOrganization->id($request);
-    $scenarioQuery = Scenario::query()->where('organization_id', $organizationId);
-    $recent = (clone $scenarioQuery)->latest()->limit(6)->get();
-    $all = (clone $scenarioQuery)->get(['status', 'score', 'critical_errors']);
-
-    return view('dashboard', [
-        'recent' => $recent,
-        'total' => $all->count(),
-        'drafts' => $all->where('status', 'draft')->count(),
-        'running' => $all->where('status', 'running')->count(),
-        'completed' => $all->where('status', 'completed')->count(),
-        'avgScore' => optional($all->where('status', 'completed'))->avg('score'),
-        'topErrors' => $all->pluck('critical_errors')
-            ->filter(fn ($value) => is_array($value))
-            ->flatten()
-            ->countBy()
-            ->sortDesc()
-            ->take(4),
-    ]);
-})->middleware(['auth', 'account.active'])->name('dashboard');
+Route::get('/dashboard', InstructorDashboardController::class)
+    ->middleware(['auth', 'account.active'])
+    ->name('dashboard');
+Route::get('/dashboard/executive', ExecutiveDashboardController::class)
+    ->middleware(['auth', 'account.active'])
+    ->name('dashboard.executive');
 
 Route::middleware(['auth', 'account.active'])->group(function () {
+    Route::get('/history/executions', ExecutionHistoryController::class)->name('execution-history.index');
+    Route::get('/reports/executions.csv', ExecutionCsvController::class)->name('reports.executions.csv');
+    Route::get('/reports/executions/{execution}/pdf', ExecutionReportController::class)->name('reports.executions.pdf');
+
     Route::get('/access', [AccessAdministrationController::class, 'index'])->name('access.index');
     Route::get('/access/create', [AccessAdministrationController::class, 'create'])->name('access.create');
     Route::post('/access', [AccessAdministrationController::class, 'store'])->name('access.store');
@@ -97,6 +89,10 @@ Route::middleware(['auth', 'account.active'])->group(function () {
     Route::patch('/people/{person}/roles/{role}/revoke', [PersonRoleController::class, 'revoke'])->name('people.roles.revoke');
 
     Route::resource('scenarios', ScenarioController::class)->only(['index', 'create', 'store', 'show']);
+    Route::get('/scenario-templates', [ScenarioTemplateController::class, 'index'])->name('scenario-templates.index');
+    Route::post('/scenario-versions/{scenarioVersion}/templates', [ScenarioTemplateController::class, 'store'])->name('scenario-templates.store');
+    Route::post('/scenario-templates/{scenarioTemplate}/use', [ScenarioTemplateController::class, 'use'])->name('scenario-templates.use');
+    Route::patch('/scenario-templates/{scenarioTemplate}/archive', [ScenarioTemplateController::class, 'archive'])->name('scenario-templates.archive');
     Route::patch('/scenario-versions/{scenarioVersion}/publish', [ScenarioVersionController::class, 'publish'])->name('scenario-versions.publish');
     Route::post('/scenario-versions/{scenarioVersion}/executions', [ScenarioExecutionController::class, 'store'])->name('executions.store');
     Route::get('/executions/{execution}', [ScenarioExecutionController::class, 'show'])->name('executions.show');

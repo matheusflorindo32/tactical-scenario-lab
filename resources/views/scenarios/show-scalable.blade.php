@@ -37,7 +37,10 @@ $versionStatus = $version?->publication_status ?? 'draft';
                 </p>
             </div>
 
-            <x-button href="{{ route('scenarios.index') }}" variant="secondary">Voltar aos cenários</x-button>
+            <div class="flex flex-wrap gap-2">
+                <x-button href="{{ route('scenario-templates.index') }}" variant="secondary">Templates</x-button>
+                <x-button href="{{ route('scenarios.index') }}" variant="secondary">Voltar aos cenários</x-button>
+            </div>
         </div>
     </x-slot:header>
 
@@ -79,10 +82,17 @@ $versionStatus = $version?->publication_status ?? 'draft';
                                 <x-button type="submit">Publicar versão</x-button>
                             </form>
                         @elseif ($versionStatus === 'published')
-                            <form method="POST" action="{{ route('executions.store', $version) }}">
-                                @csrf
-                                <x-button type="submit">Nova execução</x-button>
-                            </form>
+                            <div class="flex flex-wrap gap-2">
+                                <form method="POST" action="{{ route('executions.store', $version) }}">
+                                    @csrf
+                                    <x-button type="submit">Nova execução</x-button>
+                                </form>
+                                <form method="POST" action="{{ route('scenario-templates.store', $version) }}">
+                                    @csrf
+                                    <input type="hidden" name="name" value="{{ $scenario->title }}">
+                                    <x-button type="submit" variant="secondary">Salvar como template</x-button>
+                                </form>
+                            </div>
                         @endif
                     @endif
                 </div>
