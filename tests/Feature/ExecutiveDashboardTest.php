@@ -30,19 +30,15 @@ class ExecutiveDashboardTest extends TestCase
         $legacyUnknown = $this->execution($organization, $version, 2);
         $failed = $this->execution($organization, $version, 3);
 
-        $passedAssessment = $this->assessment($organization, $passed, 92, 'passed', false);
+        $this->assessment($organization, $passed, 92, 'passed', false, observedError: 'Erro realmente observado');
         $this->assessment($organization, $legacyUnknown, 50, null, false, 'legacy');
-        $failedAssessment = $this->assessment($organization, $failed, 60, 'failed', true);
-
-        $this->criticalError($passedAssessment, 'Erro realmente observado');
-        $this->criticalError($failedAssessment, 'Erro realmente observado');
+        $this->assessment($organization, $failed, 60, 'failed', true, observedError: 'Erro realmente observado');
 
         $foreignOrganization = $this->organization('Executivo Externo');
         $foreignScenario = $this->scenario($foreignOrganization, 'Cenário Externo', legacyScore: 100, criticalErrors: ['Erro externo']);
         $foreignVersion = $this->version($foreignScenario);
         $foreignExecution = $this->execution($foreignOrganization, $foreignVersion, 1);
-        $foreignAssessment = $this->assessment($foreignOrganization, $foreignExecution, 100, 'passed', false);
-        $this->criticalError($foreignAssessment, 'Erro externo');
+        $this->assessment($foreignOrganization, $foreignExecution, 100, 'passed', false, observedError: 'Erro externo');
 
         $filter = InstitutionalFilter::fromRequest(request(), $organization->id);
         $data = app(ExecutiveDashboardQuery::class)->get($filter);
@@ -136,13 +132,14 @@ class ExecutiveDashboardTest extends TestCase
         ?string $result,
         bool $automaticFail,
         string $source = 'm4',
+        ?string $observedError = null,
     ): int {
-        return (int) DB::table('execution_assessments')->insertGetId([
+        $assessmentId = (int) DB::table('execution_assessments')->insertGetId([
             'uuid' => (string) Str::uuid(),
             'organization_id' => $organization->id,
             'scenario_execution_id' => $execution->id,
             'source' => $source,
-            'status' => 'finalized',
+            'status' => 'draft',
             'pass_threshold' => $source === 'm4' ? 70 : null,
             'base_score' => $score,
             'penalty_points' => 0,
@@ -150,10 +147,22 @@ class ExecutiveDashboardTest extends TestCase
             'final_score' => $score,
             'result' => $result,
             'automatic_fail' => $automaticFail,
-            'finalized_at' => now(),
+            'finalized_at' => null,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+        if ($observedError !== null) {
+            $this->criticalError($assessmentId, $observedError);
+        }
+
+        DB::table('execution_assessments')->where('id', $assessmentId)->update([
+            'status' => 'finalized',
+            'finalized_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $assessmentId;
     }
 
     private function criticalError(int $assessmentId, string $label): void
