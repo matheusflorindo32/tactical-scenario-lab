@@ -27,6 +27,106 @@ final class KnowledgeRepository
         return $this->hydrate($definition);
     }
 
+    public function search(string $query, ?string $category = null): Collection
+    {
+        $articles = $this->all();
+        $categories = (array) config('knowledge.categories', []);
+
+        if ($category !== null && $category !== '' && array_key_exists($category, $categories)) {
+            $articles = $articles
+                ->filter(fn (KnowledgeArticle $article): bool => $article->category === $category)
+                ->values();
+        }
+
+        $normalizedQuery = $this->normalizeSearchValue($query);
+
+        if ($normalizedQuery === '') {
+            return $articles
+                ->values()
+                ->map(fn (KnowledgeArticle $article, int $index): array => [
+                    'article' => $article,
+                    'index' => $index,
+                ])
+                ->sort(function (array $left, array $right): int {
+                    $order = $left['article']->order <=> $right['article']->order;
+
+                    return $order !== 0 ? $order : $left['index'] <=> $right['index'];
+                })
+                ->pluck('article')
+                ->values();
+        }
+
+        return $articles
+            ->map(function (KnowledgeArticle $article) use ($normalizedQuery, $categories): array {
+                return [
+                    'article' => $article,
+                    'score' => $this->searchScore($article, $normalizedQuery, $categories),
+                    'normalized_title' => $this->normalizeSearchValue($article->title),
+                ];
+            })
+            ->filter(fn (array $result): bool => $result['score'] > 0)
+            ->sort(function (array $left, array $right): int {
+                $score = $right['score'] <=> $left['score'];
+                if ($score !== 0) {
+                    return $score;
+                }
+
+                $order = $left['article']->order <=> $right['article']->order;
+                if ($order !== 0) {
+                    return $order;
+                }
+
+                $title = $left['normalized_title'] <=> $right['normalized_title'];
+                if ($title !== 0) {
+                    return $title;
+                }
+
+                return $left['article']->slug <=> $right['article']->slug;
+            })
+            ->pluck('article')
+            ->values();
+    }
+
+    private function searchScore(KnowledgeArticle $article, string $query, array $categories): int
+    {
+        $title = $this->normalizeSearchValue($article->title);
+
+        if ($title === $query) {
+            return 100;
+        }
+
+        $titleTokens = preg_split('/\s+/', $title) ?: [];
+        if (
+            str_starts_with($title, $query)
+            || collect($titleTokens)->contains(fn (string $token): bool => str_starts_with($token, $query))
+        ) {
+            return 60;
+        }
+
+        foreach ($article->tags as $tag) {
+            if (str_contains($this->normalizeSearchValue((string) $tag), $query)) {
+                return 40;
+            }
+        }
+
+        $summary = $this->normalizeSearchValue($article->summary);
+        $categoryLabel = $this->normalizeSearchValue((string) ($categories[$article->category] ?? $article->category));
+        if (str_contains($summary, $query) || str_contains($categoryLabel, $query)) {
+            return 20;
+        }
+
+        if (str_contains($this->normalizeSearchValue($article->searchText), $query)) {
+            return 10;
+        }
+
+        return 0;
+    }
+
+    private function normalizeSearchValue(string $value): string
+    {
+        return Str::lower(Str::ascii(Str::squish($value)));
+    }
+
     private function hydrate(array $definition): KnowledgeArticle
     {
         $path = $this->resolveSourcePath((string) ($definition['file'] ?? ''));
