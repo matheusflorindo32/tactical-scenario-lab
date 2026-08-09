@@ -17,4 +17,9 @@ final class PostgresRuntimeRole
 
         return $connection;
     }
+
+    public static function activateWithinTransaction(Connection $connection): void
+    {
+        $connection->statement('SET LOCAL ROLE tactical_runtime_test');
+    }
 }
