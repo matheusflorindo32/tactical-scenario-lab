@@ -8,7 +8,7 @@ Status: IMPLEMENTATION
 ## Gates
 
 - [x] Gate 1 — Secure knowledge contract — GREEN
-- [ ] Gate 2 — Knowledge Hub
+- [x] Gate 2 — Knowledge Hub — GREEN
 - [ ] Gate 3 — Article experience
 - [ ] Gate 4 — Operational guide content
 - [ ] Gate 5 — Contextual help
@@ -34,7 +34,11 @@ Status: IMPLEMENTATION
 - Result: exact catalog lookup, path confinement, generic fail-closed source errors and safe CommonMark rendering are enforced without a new database/runtime persistence layer.
 
 ### Gate 2 — Knowledge Hub
-- RED/GREEN evidence: pending
+- RED SHA: `96aaad0a79dd5c27292e789854fccfce54463f8a`
+- RED CI: #787 / run `31319703046` — four expected Hub failures: named knowledge routes absent and `/knowledge` returned 404 for guest, inactive and active users; 299 tests passed in SQLite and Pint was green.
+- GREEN SHA: `091889b1d2e6f613382bc9a5c2e81c1957787a91`
+- GREEN CI: #792 / run `31319877359` — SQLite, PostgreSQL 16, Pint, production Vite build, fresh migrations, least-privilege runtime role, M6 rollback/reapply and repeated concurrency invariants all green.
+- Result: authenticated Knowledge Hub, canonical sidebar entry, GET discovery form, controlled category filter, audience/review metadata, result count and accessible empty state are implemented without new persistence.
 
 ### Gate 3 — Article experience
 - RED/GREEN evidence: pending
