@@ -19,7 +19,7 @@ Do not write directly to `main`. M6 integrates only through its own PR after exa
 | 3 | Structural integrity + runtime role | GREEN | RED #680 proved cross-org direct SQL was possible; composite tenant FK + restricted runtime role; CI #691 green on PostgreSQL 16 + SQLite + Pint |
 | 4 | PostgreSQL database immutability | GREEN | TRUE RED #692; diagnostic #695 isolated PostgreSQL JSON + stale fixture defects; exact clean HEAD `cd0c61cc189865da0a513dd345f33f5f02f149a4`; CI #703 green on PostgreSQL 16 + SQLite + Pint |
 | 5 | Deterministic concurrency hardening | GREEN | Real forked-process barrier harness; 7 race contracts; CI #709 repeated all 7 races 3x, then full PostgreSQL suite, SQLite and Pint all green on `7f6853058b664ed004aa1f8bb3b2477d9847ff0c`; no production changes required |
-| 6 | Liveness/readiness | PENDING | — |
+| 6 | Liveness/readiness | GREEN | RED #711: exactly 4 new endpoint contracts 404 while 267 existing tests passed; GREEN #714 on exact HEAD `b1600fe45e0e5353471eaa0fa53d26d554fbb132`: PostgreSQL 16 + repeated concurrency + SQLite + Pint all green |
 | 7 | Production operations contract | PENDING | — |
 | 8 | Forensic audit + exact-head integration gate | PENDING | — |
 
@@ -83,6 +83,18 @@ Do not write directly to `main`. M6 integrates only through its own PR after exa
 - Exact Task 5 HEAD: `7f6853058b664ed004aa1f8bb3b2477d9847ff0c`.
 - GREEN CI `#709` (`31291231683`): 21 repeated concurrency executions passed, followed by the complete PostgreSQL suite; SQLite and Pint also passed on the same HEAD.
 - No application-service remediation was necessary: the existing row locks, aggregate locks, state re-reads and uniqueness constraints already satisfied all tested race contracts.
+
+## Task 6 evidence — privacy-safe liveness/readiness
+
+- RED commit: `9deb86e488db6a6208b795da807a7c0af1e10062`.
+- RED CI `#711`: all 267 pre-existing tests passed and exactly the four new health contracts failed with 404 before routes/controller existed.
+- `GET /health/live` is public and minimal: HTTP 200 with only `status=ok`; it performs no database check.
+- `GET /health/ready` is public and minimal: it runs production preflight only in production, then a minimal `select 1` against the default database.
+- Readiness failure returns HTTP 503 with only `status=unavailable` and `database=unavailable`; host, credentials, SQL, SQLSTATE, PII key names and exception messages are not returned.
+- Readiness logging is coarse (`readiness_unavailable`) and does not attach the caught exception.
+- CI `#713` proved the three runtime contracts and exposed one test-harness defect: removing `APP_KEY` caused Laravel encryption middleware to fail before the controller. The test was corrected to exercise unsafe production state through `APP_DEBUG=true`, without weakening the controller.
+- Exact Task 6 HEAD: `b1600fe45e0e5353471eaa0fa53d26d554fbb132`.
+- GREEN CI `#714` (`31291461453`): SQLite full suite success; PostgreSQL 16 repeated concurrency + full suite success; Pint success on the same HEAD.
 
 ## Baseline observations
 
