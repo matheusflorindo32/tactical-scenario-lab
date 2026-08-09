@@ -8,7 +8,7 @@ Status: IMPLEMENTATION
 ## Gates
 
 - [x] Gate 1 — Global M1–M8 Release Baseline Audit — GREEN
-- [ ] Gate 2 — Security & Dependency Governance
+- [x] Gate 2 — Security & Dependency Governance — GREEN
 - [ ] Gate 3 — Production Container & Deployment Parity
 - [ ] Gate 4 — CI & Release Pipeline Hardening
 - [ ] Gate 5 — Reliability & Deterministic Performance Budget
@@ -34,14 +34,19 @@ Status: IMPLEMENTATION
 - Result: SECURITY policy, product/locale example metadata, Composer description, Docker runtime baseline and CI branch triggers no longer contradict the current product. No domain model, migration or business-rule change was introduced.
 
 ### Gate 2 — Security & Dependency Governance
+- RED SHA: `b788e7624f316b3a588eea56ca374eeeb64f830e`
+- RED CI: #836 / run `31325649447` — policy assertions were already green; the new workflow contract failed only because explicit Composer/npm audit commands were absent. SQLite retained 325 passing tests with PostgreSQL-specific tests skipped and Pint was green.
+- Rejected candidate SHA: `99820f9b1706f93f3f951a18343fc844e9c9ad8a` / CI #837 — rejected because `composer audit` was run without installed packages or `--locked`; this was a security-job configuration error, not a vulnerability finding.
+- Rejected candidate SHA: `d04cd799f2cfa5552f06804dd826d1e49f06c51c` / CI #838 — the security job itself passed `composer audit --locked` and `npm audit --audit-level=high`, but the full run was rejected after an accidental workflow rewrite removed `IN SCHEMA public` from the PostgreSQL sequence GRANT, causing least-privilege provisioning to fail.
+- GREEN SHA: `9f380d0d62959740e69922bf4c45e9c789a5bafa`
+- GREEN CI: #839 / run `31325858072` — Security job `93276003095`, SQLite job `93276003138`, PostgreSQL 16 job `93276003133` and Pint job `93276003151` all SUCCESS. Composer lockfile audit and npm high-severity audit passed without ignore lists or lockfile mutation; PostgreSQL least-privilege provisioning, rollback/reapply, repeated concurrency invariants and full suite also passed.
+- Result: dependency security is now an explicit release-blocking CI gate. No advisory was suppressed; npm reported zero vulnerabilities and Composer lockfile audit passed.
+
+### Gate 3 — Production Container & Deployment Parity
 - RED SHA: pending
 - RED CI: pending
 - GREEN SHA: pending
 - GREEN CI: pending
-
-### Gate 3 — Production Container & Deployment Parity
-- RED SHA: pending
-- GREEN SHA: pending
 
 ### Gate 4 — CI & Release Pipeline Hardening
 - RED SHA: pending
