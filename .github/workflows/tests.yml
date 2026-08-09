@@ -97,6 +97,8 @@ jobs:
       DB_PASSWORD: postgres
       DB_SSLMODE: disable
       PII_FINGERPRINT_KEY: ci-only-m6-fingerprint-key-not-for-production
+      M6_RUNTIME_DB_USERNAME: tactical_runtime_test
+      M6_RUNTIME_DB_PASSWORD: runtime-test-only
 
     steps:
       - name: Checkout
@@ -152,7 +154,7 @@ jobs:
             --dbname="$DB_DATABASE" \
             --set=ON_ERROR_STOP=1 <<'SQL'
           REVOKE CREATE ON SCHEMA public FROM PUBLIC;
-          CREATE ROLE tactical_runtime_test NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT;
+          CREATE ROLE tactical_runtime_test LOGIN PASSWORD 'runtime-test-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT;
           GRANT CONNECT ON DATABASE tactical_scenario_test TO tactical_runtime_test;
           GRANT USAGE ON SCHEMA public TO tactical_runtime_test;
           GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO tactical_runtime_test;
