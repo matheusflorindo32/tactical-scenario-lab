@@ -8,7 +8,7 @@
             <div>
                 <x-badge variant="navy" size="sm" dot>Operação institucional</x-badge>
                 <h1 class="mt-2 font-display text-3xl font-semibold tracking-tight text-navy-950">Painel do instrutor</h1>
-                <p class="mt-1.5 max-w-3xl text-sm leading-6 text-ink-500">Execuções, avaliações e ações que exigem atenção no período selecionado. As métricas usam o domínio M3/M4 e não a avaliação legada do cenário.</p>
+                <p class="mt-1.5 max-w-3xl text-sm leading-6 text-ink-500">Priorize execuções, avaliações e ações que exigem intervenção no período selecionado. As métricas continuam derivadas do domínio operacional M3/M4.</p>
             </div>
             <div class="flex flex-wrap gap-2">
                 @if ($canManageScenarios)
@@ -22,7 +22,7 @@
         </div>
     </x-slot:header>
 
-    <form method="GET" action="{{ route('dashboard') }}" class="mb-6 grid gap-3 rounded-xl border border-stone-200 bg-white p-4 shadow-sm sm:grid-cols-3 lg:grid-cols-4">
+    <form method="GET" action="{{ route('dashboard') }}" class="mb-8 grid gap-3 rounded-xl border border-stone-200 bg-white p-4 shadow-sm sm:grid-cols-3 lg:grid-cols-4">
         <div>
             <label for="date_from" class="text-xs font-semibold uppercase tracking-[0.1em] text-ink-500">De</label>
             <input id="date_from" name="date_from" type="date" value="{{ $filter->dateFrom->toDateString() }}" class="mt-1 w-full rounded-md border-stone-300 text-sm focus:border-navy-500 focus:ring-navy-500">
@@ -43,79 +43,165 @@
         <div class="flex items-end"><x-button type="submit" variant="secondary">Aplicar período</x-button></div>
     </form>
 
-    <section aria-label="Indicadores operacionais" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-        <x-stats-card label="Em execução" :value="$running_count" hint="agora" icon="M5 3v18l14-9L5 3z" accent="emergency" />
-        <x-stats-card label="Rascunhos" :value="$draft_execution_count" hint="execuções" icon="M12 20h9" accent="alert" />
-        <x-stats-card label="Sem avaliação" :value="$completed_without_assessment_count" hint="concluídas" icon="M9 12l2 2 4-4" accent="navy" />
-        <x-stats-card label="Avaliações draft" :value="$draft_assessment_count" hint="a finalizar" icon="M4 6h16M4 12h16" accent="navy" />
-        <x-stats-card label="Ações abertas" :value="$open_action_count" hint="corretivas" icon="M5 13l4 4L19 7" accent="clinical" />
-        <x-stats-card label="Ações vencidas" :value="$overdue_action_count" hint="prioridade" icon="M12 9v4m0 4h.01" accent="emergency" />
+    <section aria-labelledby="attention-heading">
+        <div class="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-emergency-600">Prioridade operacional</p>
+                <h2 id="attention-heading" class="mt-1 font-display text-2xl font-semibold tracking-tight text-navy-950">Central de atenção</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-6 text-ink-500">A fila abaixo é organizada por urgência operacional, sem alterar a fonte de verdade dos indicadores.</p>
+            </div>
+            <p class="text-xs font-medium text-ink-500">Período: {{ $filter->dateFrom->format('d/m/Y') }} – {{ $filter->dateTo->format('d/m/Y') }}</p>
+        </div>
+
+        <div class="grid gap-5 xl:grid-cols-2">
+            <section data-attention-priority="running" aria-labelledby="attention-running" class="rounded-xl border border-stone-200 bg-white p-5 shadow-xs">
+                <div class="mb-4 flex items-center justify-between gap-3">
+                    <div>
+                        <h3 id="attention-running" class="text-base font-semibold text-navy-950">Em execução</h3>
+                        <p class="mt-1 text-xs text-ink-500">Operações ativas têm precedência sobre todas as demais filas.</p>
+                    </div>
+                    <x-badge variant="emergency" dot>{{ $running_count }}</x-badge>
+                </div>
+                <div class="space-y-3">
+                    @forelse ($running_executions as $execution)
+                        <x-attention-item
+                            :title="$execution->scenarioVersion->scenario->title"
+                            :metadata="'Execução #'.$execution->sequence_number.' · iniciada '.($execution->started_at?->format('d/m/Y H:i') ?? 'sem horário')"
+                            variant="emergency"
+                            :href="route('executions.show', $execution)"
+                        >
+                            Abrir o cockpit para acompanhar timeline, injects, recursos e ciclo da execução.
+                        </x-attention-item>
+                    @empty
+                        <x-empty-state title="Nenhuma execução ativa" description="Não há operação em andamento no período selecionado." icon="clip" class="py-8" />
+                    @endforelse
+                </div>
+            </section>
+
+            <section data-attention-priority="overdue-actions" aria-labelledby="attention-overdue" class="rounded-xl border border-stone-200 bg-white p-5 shadow-xs">
+                <div class="mb-4 flex items-center justify-between gap-3">
+                    <div>
+                        <h3 id="attention-overdue" class="text-base font-semibold text-navy-950">Ações vencidas</h3>
+                        <p class="mt-1 text-xs text-ink-500">Pendências corretivas cujo prazo já terminou.</p>
+                    </div>
+                    <x-badge variant="emergency" dot>{{ $overdue_action_count }}</x-badge>
+                </div>
+                @if ($overdue_action_count > 0)
+                    <x-attention-item
+                        :title="$overdue_action_count.' '.($overdue_action_count === 1 ? 'ação vencida' : 'ações vencidas')"
+                        metadata="Acompanhamento institucional prioritário"
+                        variant="emergency"
+                    >
+                        O contador usa exclusivamente ações abertas ou em andamento com prazo anterior à data atual no filtro institucional vigente.
+                    </x-attention-item>
+                @else
+                    <x-empty-state title="Nenhuma ação vencida" description="Não há pendência corretiva fora do prazo neste período." icon="clip" class="py-8" />
+                @endif
+            </section>
+
+            <section data-attention-priority="unassessed" aria-labelledby="attention-unassessed" class="rounded-xl border border-stone-200 bg-white p-5 shadow-xs">
+                <div class="mb-4 flex items-center justify-between gap-3">
+                    <div>
+                        <h3 id="attention-unassessed" class="text-base font-semibold text-navy-950">Sem avaliação</h3>
+                        <p class="mt-1 text-xs text-ink-500">Execuções concluídas que ainda não possuem assessment.</p>
+                    </div>
+                    <x-badge variant="alert" dot>{{ $completed_without_assessment_count }}</x-badge>
+                </div>
+                <div class="space-y-3">
+                    @forelse ($completed_without_assessment as $execution)
+                        <x-attention-item
+                            :title="$execution->scenarioVersion->scenario->title"
+                            :metadata="'Execução #'.$execution->sequence_number.' · concluída '.($execution->completed_at?->format('d/m/Y H:i') ?? 'sem horário')"
+                            variant="alert"
+                            :href="route('executions.show', $execution)"
+                        >
+                            Abra a execução para iniciar a avaliação institucional quando autorizado.
+                        </x-attention-item>
+                    @empty
+                        <x-empty-state title="Fila de avaliação em dia" description="Nenhuma execução concluída aguarda criação de assessment." icon="clip" class="py-8" />
+                    @endforelse
+                </div>
+            </section>
+
+            <section data-attention-priority="draft-assessments" aria-labelledby="attention-draft-assessments" class="rounded-xl border border-stone-200 bg-white p-5 shadow-xs">
+                <div class="mb-4 flex items-center justify-between gap-3">
+                    <div>
+                        <h3 id="attention-draft-assessments" class="text-base font-semibold text-navy-950">Avaliações em elaboração</h3>
+                        <p class="mt-1 text-xs text-ink-500">Assessments M4 existentes que ainda não foram finalizados.</p>
+                    </div>
+                    <x-badge variant="navy" dot>{{ $draft_assessment_count }}</x-badge>
+                </div>
+                <div class="space-y-3">
+                    @forelse ($draft_assessments as $assessment)
+                        <x-attention-item
+                            :title="$assessment->execution->scenarioVersion->scenario->title"
+                            :metadata="'Execução #'.$assessment->execution->sequence_number.' · avaliação em elaboração'"
+                            variant="navy"
+                            :href="route('assessments.show', $assessment)"
+                        >
+                            Continue rubrica, evidências, debrief e plano de ação no registro desta execução.
+                        </x-attention-item>
+                    @empty
+                        <x-empty-state title="Nenhuma avaliação em elaboração" description="Não há assessment draft pendente no período selecionado." icon="file" class="py-8" />
+                    @endforelse
+                </div>
+            </section>
+
+            <section data-attention-priority="due-soon" aria-labelledby="attention-due-soon" class="rounded-xl border border-stone-200 bg-white p-5 shadow-xs">
+                <div class="mb-4">
+                    <h3 id="attention-due-soon" class="text-base font-semibold text-navy-950">Ações com prazo próximo</h3>
+                    <p class="mt-1 text-xs text-ink-500">Plano de ação com vencimento nos próximos 14 dias.</p>
+                </div>
+                <div class="space-y-3">
+                    @forelse ($actions_due_soon as $action)
+                        <x-attention-item
+                            :title="$action->action"
+                            :metadata="($action->responsible_label ?: $action->responsiblePerson?->preferredName() ?: 'Responsável não exibido').' · prazo '.($action->due_date?->format('d/m/Y') ?? 'não informado')"
+                            variant="clinical"
+                        >
+                            Status atual: {{ $action->status }}.
+                        </x-attention-item>
+                    @empty
+                        <x-empty-state title="Sem vencimentos próximos" description="Nenhuma ação aberta ou em andamento vence nos próximos 14 dias." icon="clip" class="py-8" />
+                    @endforelse
+                </div>
+            </section>
+
+            <section data-attention-priority="recent-finalized" aria-labelledby="attention-finalized" class="rounded-xl border border-stone-200 bg-white p-5 shadow-xs">
+                <div class="mb-4">
+                    <h3 id="attention-finalized" class="text-base font-semibold text-navy-950">Avaliações finalizadas recentemente</h3>
+                    <p class="mt-1 text-xs text-ink-500">Registros históricos mensuráveis já congelados.</p>
+                </div>
+                <div class="space-y-3">
+                    @forelse ($recent_finalized_assessments as $assessment)
+                        <x-attention-item
+                            :title="$assessment->execution->scenarioVersion->scenario->title"
+                            :metadata="'Execução #'.$assessment->execution->sequence_number.' · '.($assessment->final_score !== null ? number_format((float) $assessment->final_score, 2, ',', '.').'/100' : 'sem nota numérica')"
+                            variant="clinical"
+                            :href="route('assessments.show', $assessment)"
+                        >
+                            Resultado: {{ $assessment->result ?: 'sem classificação histórica' }}.
+                        </x-attention-item>
+                    @empty
+                        <x-empty-state title="Nenhuma avaliação finalizada" description="Não há registro finalizado recente para o período selecionado." icon="file" class="py-8" />
+                    @endforelse
+                </div>
+            </section>
+        </div>
     </section>
 
-    <div class="mt-8 grid gap-6 lg:grid-cols-2">
-        <x-card title="Execuções em andamento" subtitle="Prioridade operacional" accent="emergency">
-            <div class="space-y-3">
-                @forelse ($running_executions as $execution)
-                    <a href="{{ route('executions.show', $execution) }}" class="block rounded-lg border border-stone-200 bg-stone-50 px-4 py-3 hover:bg-white">
-                        <p class="text-sm font-semibold text-navy-950">{{ $execution->scenarioVersion->scenario->title }}</p>
-                        <p class="mt-1 text-xs text-ink-500">Execução #{{ $execution->sequence_number }} · iniciada {{ $execution->started_at?->format('d/m/Y H:i') }}</p>
-                    </a>
-                @empty
-                    <p class="text-sm text-ink-500">Nenhuma execução em andamento no período.</p>
-                @endforelse
-            </div>
-        </x-card>
-
-        <x-card title="Concluídas sem avaliação" subtitle="Prontas para iniciar o assessment" accent="alert">
-            <div class="space-y-3">
-                @forelse ($completed_without_assessment as $execution)
-                    <a href="{{ route('executions.show', $execution) }}" class="block rounded-lg border border-stone-200 bg-stone-50 px-4 py-3 hover:bg-white">
-                        <p class="text-sm font-semibold text-navy-950">{{ $execution->scenarioVersion->scenario->title }}</p>
-                        <p class="mt-1 text-xs text-ink-500">Execução #{{ $execution->sequence_number }} · concluída {{ $execution->completed_at?->format('d/m/Y H:i') }}</p>
-                    </a>
-                @empty
-                    <p class="text-sm text-ink-500">Nenhuma execução aguardando criação de avaliação.</p>
-                @endforelse
-            </div>
-        </x-card>
-
-        <x-card title="Avaliações em elaboração" subtitle="Assessment M4 ainda não finalizado" accent="navy">
-            <div class="space-y-3">
-                @forelse ($draft_assessments as $assessment)
-                    <a href="{{ route('assessments.show', $assessment) }}" class="block rounded-lg border border-stone-200 bg-stone-50 px-4 py-3 hover:bg-white">
-                        <p class="text-sm font-semibold text-navy-950">{{ $assessment->execution->scenarioVersion->scenario->title }}</p>
-                        <p class="mt-1 text-xs text-ink-500">Execução #{{ $assessment->execution->sequence_number }} · avaliação em elaboração</p>
-                    </a>
-                @empty
-                    <p class="text-sm text-ink-500">Nenhuma avaliação em elaboração.</p>
-                @endforelse
-            </div>
-        </x-card>
-
-        <x-card title="Ações com prazo próximo" subtitle="Próximos 14 dias" accent="clinical">
-            <div class="space-y-3">
-                @forelse ($actions_due_soon as $action)
-                    <div class="rounded-lg border border-stone-200 bg-stone-50 px-4 py-3">
-                        <p class="text-sm font-semibold text-ink-900">{{ $action->action }}</p>
-                        <p class="mt-1 text-xs text-ink-500">{{ $action->responsible_label ?: $action->responsiblePerson?->preferredName() }} · prazo {{ $action->due_date?->format('d/m/Y') }}</p>
-                    </div>
-                @empty
-                    <p class="text-sm text-ink-500">Nenhuma ação com prazo nos próximos 14 dias.</p>
-                @endforelse
-            </div>
-        </x-card>
-    </div>
-
-    <x-card class="mt-6" title="Avaliações finalizadas recentemente" subtitle="Registros históricos mensuráveis" accent="clinical">
-        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            @forelse ($recent_finalized_assessments as $assessment)
-                <a href="{{ route('assessments.show', $assessment) }}" class="rounded-lg border border-stone-200 bg-stone-50 px-4 py-3 hover:bg-white">
-                    <p class="text-sm font-semibold text-navy-950">{{ $assessment->execution->scenarioVersion->scenario->title }}</p>
-                    <p class="mt-1 text-xs text-ink-500">{{ $assessment->final_score !== null ? number_format((float) $assessment->final_score, 2, ',', '.') . '/100' : 'Sem nota numérica' }} · {{ $assessment->result ?: 'Sem classificação histórica' }}</p>
-                </a>
-            @empty
-                <p class="text-sm text-ink-500">Nenhuma avaliação finalizada no período.</p>
-            @endforelse
+    <section aria-labelledby="panorama-heading" class="mt-10">
+        <div class="mb-4">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500">Contexto do período</p>
+            <h2 id="panorama-heading" class="mt-1 font-display text-xl font-semibold text-navy-950">Panorama operacional</h2>
         </div>
-    </x-card>
+        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+            <x-stats-card label="Em execução" :value="$running_count" hint="agora" icon="M5 3v18l14-9L5 3z" accent="emergency" />
+            <x-stats-card label="Rascunhos" :value="$draft_execution_count" hint="execuções" icon="M12 20h9" accent="alert" />
+            <x-stats-card label="Sem avaliação" :value="$completed_without_assessment_count" hint="concluídas" icon="M9 12l2 2 4-4" accent="navy" />
+            <x-stats-card label="Avaliações draft" :value="$draft_assessment_count" hint="a finalizar" icon="M4 6h16M4 12h16" accent="navy" />
+            <x-stats-card label="Ações abertas" :value="$open_action_count" hint="corretivas" icon="M5 13l4 4L19 7" accent="clinical" />
+            <x-stats-card label="Ações vencidas" :value="$overdue_action_count" hint="prioridade" icon="M12 9v4m0 4h.01" accent="emergency" />
+        </div>
+    </section>
 </x-layouts.app>

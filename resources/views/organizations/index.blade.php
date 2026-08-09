@@ -1,40 +1,64 @@
-<x-layouts.app :current="'organizations'" :title="'Organizações · Tactical Medicine Academy'">
+<x-layouts.app :current="'organizations'" :title="'Organizações · Tactical Scenario Lab'">
+    <x-slot:breadcrumbs>
+        <x-breadcrumb :items="[
+            ['label' => 'Painel', 'href' => route('dashboard')],
+            ['label' => 'Organizações'],
+        ]" />
+    </x-slot:breadcrumbs>
+
     <x-slot:header>
         <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emergency-700">Estrutura institucional</p>
-                <h1 class="mt-2 font-display text-3xl font-semibold tracking-tight text-navy-950">Organizações</h1>
-                <p class="mt-2 max-w-2xl text-sm leading-6 text-ink-500">Instituições, unidades e vínculos operacionais centralizados em uma estrutura preparada para expansão.</p>
+                <x-badge variant="navy" size="sm" dot>Estrutura institucional</x-badge>
+                <h1 class="mt-3 font-display text-3xl font-semibold tracking-tight text-navy-950">Organizações</h1>
+                <p class="mt-2 max-w-2xl text-sm leading-6 text-ink-500">Instituições acessíveis, suas unidades e vínculos operacionais dentro da governança multi-organização.</p>
             </div>
             <x-button href="{{ route('organizations.create') }}">Nova organização</x-button>
         </div>
     </x-slot:header>
 
-    <section class="overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-sm">
-        @forelse ($organizations as $organization)
-            <a href="{{ route('organizations.show', $organization) }}" class="group flex flex-col gap-4 border-b border-ink-100 px-5 py-5 transition last:border-b-0 hover:bg-navy-50/50 sm:flex-row sm:items-center sm:justify-between">
-                <div class="min-w-0">
-                    <div class="flex flex-wrap items-center gap-2">
-                        <h2 class="truncate text-base font-semibold text-navy-950 group-hover:text-emergency-700">{{ $organization->name }}</h2>
-                        <span class="rounded-full px-2.5 py-1 text-xs font-medium {{ $organization->status === 'active' ? 'bg-clinical-50 text-clinical-800' : 'bg-ink-100 text-ink-600' }}">
+    <x-table
+        label="Organizações acessíveis"
+        :empty="$organizations->isEmpty()"
+        empty-title="Nenhuma organização cadastrada"
+        empty-description="Cadastre a primeira instituição para habilitar pessoas, unidades e vínculos."
+    >
+        <thead class="bg-stone-50 text-xs font-semibold uppercase tracking-[0.08em] text-ink-500">
+            <tr>
+                <th scope="col" class="px-5 py-3">Organização</th>
+                <th scope="col" class="px-5 py-3">Status</th>
+                <th scope="col" class="px-5 py-3">Unidades</th>
+                <th scope="col" class="px-5 py-3">Vínculos</th>
+                <th scope="col" class="px-5 py-3"><span class="sr-only">Ação</span></th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-stone-100 bg-white">
+            @foreach ($organizations as $organization)
+                <tr class="transition-colors hover:bg-stone-50/70">
+                    <td class="px-5 py-4 align-top">
+                        <a href="{{ route('organizations.show', $organization) }}" class="font-semibold text-navy-950 hover:text-navy-700">{{ $organization->name }}</a>
+                        <p class="mt-1 text-xs text-ink-500">{{ ucfirst(str_replace('_', ' ', $organization->kind)) }}</p>
+                    </td>
+                    <td class="px-5 py-4 align-top">
+                        <x-badge :variant="$organization->status === 'active' ? 'clinical' : 'neutral'" size="sm" dot>
                             {{ $organization->status === 'active' ? 'Ativa' : 'Inativa' }}
-                        </span>
-                    </div>
-                    <p class="mt-1 text-sm text-ink-500">{{ ucfirst(str_replace('_', ' ', $organization->kind)) }}</p>
-                </div>
-                <div class="flex gap-6 text-sm text-ink-600">
-                    <span><strong class="text-navy-950">{{ $organization->units_count }}</strong> unidades</span>
-                    <span><strong class="text-navy-950">{{ $organization->memberships_count }}</strong> vínculos</span>
-                </div>
-            </a>
-        @empty
-            <div class="px-6 py-16 text-center">
-                <h2 class="text-lg font-semibold text-navy-950">Nenhuma organização cadastrada</h2>
-                <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-500">Cadastre a primeira instituição para habilitar pessoas, unidades e vínculos.</p>
-                <div class="mt-6"><x-button href="{{ route('organizations.create') }}">Cadastrar organização</x-button></div>
-            </div>
-        @endforelse
-    </section>
+                        </x-badge>
+                    </td>
+                    <td class="px-5 py-4 align-top">
+                        <span class="font-mono text-sm font-semibold tabular-nums text-navy-950">{{ $organization->units_count }}</span>
+                    </td>
+                    <td class="px-5 py-4 align-top">
+                        <span class="font-mono text-sm font-semibold tabular-nums text-navy-950">{{ $organization->memberships_count }}</span>
+                    </td>
+                    <td class="px-5 py-4 text-right align-top">
+                        <x-button href="{{ route('organizations.show', $organization) }}" variant="ghost" size="sm">Abrir</x-button>
+                    </td>
+                </tr>
+            @endforeach
+        </tbody>
+    </x-table>
 
-    <div class="mt-6">{{ $organizations->links() }}</div>
+    @if ($organizations->hasPages())
+        <div class="mt-6">{{ $organizations->links() }}</div>
+    @endif
 </x-layouts.app>

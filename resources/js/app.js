@@ -6,6 +6,43 @@ import focus from '@alpinejs/focus';
 Alpine.plugin(focus);
 
 // -----------------------------------------------------------------
+// Tema institucional — preferência estritamente local ao navegador.
+// Light é o estado SSR inicial; low-light é opt-in e não cria API,
+// cookie de servidor ou persistência no banco.
+// -----------------------------------------------------------------
+Alpine.store('theme', {
+    current: 'light',
+
+    init() {
+        let stored = null;
+
+        try {
+            stored = localStorage.getItem('tsl-theme');
+        } catch (_) {
+            stored = null;
+        }
+
+        this.current = stored === 'low-light' ? 'low-light' : 'light';
+        this.apply();
+    },
+
+    apply() {
+        document.documentElement.dataset.theme = this.current;
+    },
+
+    toggle() {
+        this.current = this.current === 'low-light' ? 'light' : 'low-light';
+        this.apply();
+
+        try {
+            localStorage.setItem('tsl-theme', this.current);
+        } catch (_) {
+            // Modo privado ou quota indisponível: mantém a preferência na sessão atual.
+        }
+    },
+});
+
+// -----------------------------------------------------------------
 // Store global — utilitários compartilhados entre componentes.
 // -----------------------------------------------------------------
 Alpine.store('ui', {
