@@ -12,7 +12,7 @@ Status: IMPLEMENTATION
 - [x] Gate 3 — Production Container & Deployment Parity — GREEN
 - [x] Gate 4 — CI & Release Pipeline Hardening — GREEN
 - [x] Gate 5 — Reliability & Deterministic Performance Budget — GREEN
-- [ ] Gate 6 — UX, Localization & Accessibility Finalization
+- [x] Gate 6 — UX, Localization & Accessibility Finalization — GREEN
 - [ ] Gate 7 — Observability, Recovery & Release Documentation
 - [ ] Gate 8 — Final Forensic Audit & Protected Integration
 
@@ -65,12 +65,17 @@ Status: IMPLEMENTATION
 - Result: release cacheability is now deterministic in CI without wall-clock performance thresholds, while liveness remains database-independent and readiness remains minimal and secret-safe.
 
 ### Gate 6 — UX, Localization & Accessibility Finalization
-- RED SHA: pending
-- GREEN SHA: pending
+- RED SHA: `f721a1786e418bf53c5ffeb85e46dcdcdfa4352c`
+- RED CI: #851 / run `31326632581` — the inherited shell/accessibility contract passed, while the new release identity/locale contract failed exactly because `config/app.php` still used Laravel/English fallback values. SQLite retained 334 passing tests with 31 PostgreSQL-specific tests skipped; Security and Pint were green.
+- GREEN SHA: `3b85929ab7c35450f65e762139435e3b0dccd726`
+- GREEN CI: #852 / run `31326693188` — Security job `93278097485`, SQLite job `93278097466`, PostgreSQL 16 job `93278097487` and Pint job `93278097497` all SUCCESS. PostgreSQL also passed release cacheability, fresh migrations, least-privilege provisioning, rollback/reapply, repeated M6 concurrency invariants and the full suite.
+- Result: application fallback identity is Tactical Scenario Lab and locale/fallback/faker defaults are `pt_BR`. Existing M7/M8 skip-link, Knowledge navigation/contextual help, reduced-motion and browser-local low-light contracts remained green; no visual redesign or domain behavior change was introduced.
 
 ### Gate 7 — Observability, Recovery & Release Documentation
 - RED SHA: pending
+- RED CI: pending
 - GREEN SHA: pending
+- GREEN CI: pending
 
 ### Gate 8 — Final Forensic Audit & Protected Integration
 - Candidate SHA: pending
