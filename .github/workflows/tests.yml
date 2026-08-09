@@ -91,6 +91,13 @@ jobs:
       - name: Generate application key
         run: php artisan key:generate
 
+      - name: Verify Laravel release cacheability
+        run: |
+          php artisan config:cache
+          php artisan route:cache
+          php artisan config:clear
+          php artisan route:clear
+
       - name: Rebuild database from migrations
         run: php artisan migrate:fresh --force
 
@@ -170,6 +177,13 @@ jobs:
 
       - name: Generate application key
         run: php artisan key:generate
+
+      - name: Verify Laravel release cacheability
+        run: |
+          php artisan config:cache
+          php artisan route:cache
+          php artisan config:clear
+          php artisan route:clear
 
       - name: Rebuild PostgreSQL database from migrations
         run: php artisan migrate:fresh --force
