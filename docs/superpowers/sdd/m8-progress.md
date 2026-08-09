@@ -7,7 +7,7 @@ Status: IMPLEMENTATION
 
 ## Gates
 
-- [ ] Gate 1 — Secure knowledge contract
+- [x] Gate 1 — Secure knowledge contract — GREEN
 - [ ] Gate 2 — Knowledge Hub
 - [ ] Gate 3 — Article experience
 - [ ] Gate 4 — Operational guide content
@@ -27,11 +27,11 @@ Status: IMPLEMENTATION
 ## Evidence ledger
 
 ### Gate 1 — Secure knowledge contract
-- RED SHA: pending
-- RED CI: pending
-- GREEN SHA: pending
-- GREEN CI: pending
-- Result: pending
+- RED SHA: `912cb8a391136c6e7e2ebeb9559cabe9b80fb21b`
+- RED CI: #782 / run `31319431731` — five new M8 security contracts failed because `App\Knowledge\KnowledgeRepository` did not exist; SQLite retained 294 passing legacy tests and Pint was green.
+- GREEN SHA: `e0397e99aa0cfb5e3ee530d46e524d7e98c06e57`
+- GREEN CI: #785 / run `31319517306` — SQLite, PostgreSQL 16, Pint, production Vite build, fresh migrations, least-privilege runtime role, M6 rollback/reapply and repeated concurrency invariants all green.
+- Result: exact catalog lookup, path confinement, generic fail-closed source errors and safe CommonMark rendering are enforced without a new database/runtime persistence layer.
 
 ### Gate 2 — Knowledge Hub
 - RED/GREEN evidence: pending
