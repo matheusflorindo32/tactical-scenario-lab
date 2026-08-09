@@ -44,6 +44,26 @@ jobs:
       - name: npm high severity security audit
         run: npm audit --audit-level=high
 
+  container-build:
+    name: Container — build and runtime contract
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Build release container
+        run: docker build --tag tactical-scenario-lab:ci .
+
+      - name: Verify PostgreSQL extension
+        run: docker run --rm tactical-scenario-lab:ci php -m | grep -q pdo_pgsql
+
+      - name: Verify non-root runtime
+        run: docker run --rm tactical-scenario-lab:ci sh -lc 'test "$(id -u)" -ne 0'
+
+      - name: Verify built frontend assets
+        run: docker run --rm tactical-scenario-lab:ci sh -lc 'test -f public/build/manifest.json'
+
   phpunit:
     name: PHPUnit — PHP 8.4 / SQLite
     runs-on: ubuntu-latest
