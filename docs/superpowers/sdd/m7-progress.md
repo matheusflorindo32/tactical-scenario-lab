@@ -11,7 +11,7 @@ Status: IN PROGRESS
 - [x] Gate 3 — Dashboards — GREEN
 - [x] Gate 4 — Scenarios/templates/history — GREEN
 - [x] Gate 5 — Execution cockpit — GREEN
-- [ ] Gate 6 — Assessment & debrief workbench
+- [x] Gate 6 — Assessment & debrief workbench — GREEN
 - [ ] Gate 7 — Management & low-light polish
 - [ ] Gate 8 — Forensic UX audit & exact-head gate
 
@@ -60,6 +60,13 @@ Status: IN PROGRESS
 - Result: execution view is now an operational cockpit with lifecycle command region, anchor navigation, timeline-first hierarchy, append-only historical presentation and explicit assessment/resources/injects operational regions while preserving all existing forms and domain guards.
 
 ### Gate 6 — Assessment & debrief workbench
+- RED SHA: `a2b81b8a608eb2eba8048319fa2887a80887f517`
+- RED CI: #754 / run `31311842267` — two expected workbench failures; 285 existing tests passed in SQLite. RED proved missing section navigation/landmarks and insufficient frozen-state presentation.
+- GREEN SHA: `377a288f5d0f94ec2389c376a4b862f22c7d8490`
+- GREEN CI: #755 / run `31311983117` — SQLite, PostgreSQL 16, least-privilege role, M6 rollback/reapply, repeated concurrency invariants, Vite build and Pint green.
+- Result: assessment is a navigable institutional workbench with real section anchors, explicit draft/finalized state, finalization readiness/irreversibility messaging, frozen historical presentation after finalization and preserved authorized action-status follow-up.
+
+### Gate 7 — Management & low-light polish
 - RED SHA: pending
 - RED CI: pending
 - GREEN SHA: pending
