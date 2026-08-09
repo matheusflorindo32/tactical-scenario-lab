@@ -1,175 +1,174 @@
 # R1 Production Release & Operational Validation Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+**Goal:** convert the M1–M9 release-ready repository into verified Vercel + Neon staging evidence using a staging-first, fail-closed promotion model.
 
-**Goal:** Convert the M1–M9 release-ready repository into verified Vercel + Neon staging evidence using a staging-first, fail-closed promotion model.
+**Corrected architecture:** Vercel is the active R1 HTTPS/serverless compute/logging layer using `vercel.json`, `api/index.php` and `vercel-php@0.8.0` (PHP 8.4). Neon is the isolated PostgreSQL layer. The root M9 Dockerfile remains the provider-neutral release/container reference validated in CI; it is not executed by Vercel.
 
-**Architecture:** Vercel is the active R1 staging compute/HTTPS/logging layer and Neon is the isolated managed PostgreSQL layer. The existing Laravel/PHP 8.4 Docker contract remains authoritative; provider adaptation is limited to `Dockerfile.vercel` and narrowly-scoped Vercel configuration. Production is intentionally out of scope until Gates 1A–7 are GREEN and provider/plan terms are explicitly re-approved.
+**Tech stack:** Laravel/PHP 8.4, Blade/Vite, Vercel PHP community runtime, Neon PostgreSQL, root Docker reference, GitHub Actions.
 
-**Tech Stack:** Laravel/PHP 8.4, Docker/OCI, PostgreSQL 16, Vercel custom/container runtime, Vercel staging environment, Neon PostgreSQL, GitHub Actions.
+## Global constraints
 
-## Global Constraints
-
-- Production promotion is blocked until staging passes every applicable R1 promotion gate.
-- Vercel Hobby/free resources are staging/validation only; they are not treated as a commercial production SLA.
-- Staging never uses the authoritative production database or production PII by default.
-- Staging and production do not share `APP_KEY`, `PII_FINGERPRINT_KEY`, DB credentials or provider tokens.
-- HTTPS is mandatory for hosted authenticated traffic.
-- Runtime PostgreSQL identity must not require schema ownership/DDL for normal requests.
-- Migration capability must be controlled and must not remain in steady-state web runtime unnecessarily.
-- Exact Git SHA + Vercel deployment identity are required release evidence.
-- Any unresolved Critical/High finding or blocking UNKNOWN/FAIL prevents promotion.
-- Recovery claims require an executed isolated recovery drill; provider marketing is not evidence.
-- M9 Security, Container, SQLite, PostgreSQL and Pint matrix remains mandatory after repository-file changes.
-- No provider/deploy/restore/browser/production evidence may be fabricated.
+- production promotion is blocked until staging passes the applicable R1 gates;
+- Preview/free resources are staging/validation only and are not represented as a production SLA;
+- staging never uses production PII/database/secrets;
+- secrets remain outside Git/chat;
+- migration and steady-state runtime DB identities remain separated;
+- runtime PostgreSQL identity must not require schema ownership/DDL;
+- exact Git SHA + Vercel deployment identity are required evidence;
+- HTTP health output must be corroborated by runtime logs;
+- any unresolved Critical/High finding or blocking failure prevents promotion;
+- every repository write invalidates earlier exact-head CI as final evidence.
 
 ---
 
-### Task 1: Provider Revision — Vercel + Neon
+### Task 1 — Correct the Vercel execution model
 
 **Files:**
-- Modify: `docs/R1_PROVIDER_SCORECARD.md`
-- Modify: `docs/superpowers/sdd/r1-progress.md`
-- Modify: PR #13 metadata only after repository HEAD is frozen.
+- Create: `vercel.json`
+- Create: `api/index.php`
+- Modify: `package.json`
+- Modify: `tests/Feature/R1VercelContainerContractTest.php`
+- Delete: obsolete `Dockerfile.vercel`
+- Modify: `.github/workflows/tests.yml`
 
-**Produces:** Gate 1A evidence replacing AWS as active staging provider while preserving AWS as a future alternative.
+**Observed RED:** initial Vercel import built Vite successfully but failed because the project was misclassified as a static Vite app expecting `dist`.
 
-- [ ] Record authenticated Vercel workspace and absence of an existing Tactical Scenario Lab project.
-- [ ] Confirm current Vercel container/custom-environment/HTTPS/logging capabilities from official Vercel documentation.
-- [ ] Confirm Neon integration/provisioning path and staging recovery capability.
-- [ ] Score blocking criteria PASS/FAIL/UNKNOWN.
-- [ ] Mark Gate 1A GREEN only with zero blocking UNKNOWN for staging.
+**Required implementation:**
 
-### Task 2: Provider Container Contract
+- [x] disable Vite framework preset with `framework: null`;
+- [x] keep frontend build via `npm run build`;
+- [x] publish Laravel static boundary from `public`;
+- [x] execute Laravel through `api/index.php` and `vercel-php@0.8.0`;
+- [x] redirect serverless writable cache/view paths to `/tmp`;
+- [x] pin Node to 22.x;
+- [x] remove false Vercel-Docker runtime contract while preserving root Docker CI;
+- [x] add repository regression contract requiring the real adapter.
 
-**Files:**
-- Create: `Dockerfile.vercel`
-- Create: `tests/Feature/R1VercelContainerContractTest.php`
-- Modify only if required: `vercel.json`
-
-**Produces:** a Vercel-specific container entrypoint that preserves the M9 production container contract.
-
-- [ ] Write a failing repository contract test requiring `Dockerfile.vercel` to use PHP 8.4, `pdo_pgsql`, non-root runtime, built frontend assets, `$PORT`, and no `migrate` command in startup.
-- [ ] Run the test and confirm RED because `Dockerfile.vercel` does not yet exist.
-- [ ] Add the minimal `Dockerfile.vercel` based on the validated root `Dockerfile`.
-- [ ] Run the focused test and confirm GREEN.
-- [ ] Run the full M9 CI matrix on the exact resulting HEAD.
-
-### Task 3: Vercel Project + Isolated Staging Environment
-
-**Provider actions:**
-- Create/link project `tactical-scenario-lab` in authenticated Vercel workspace.
-- Create/use custom environment `staging` or an isolated preview equivalent if custom environments are unavailable on the active plan.
-
-**Produces:** real Vercel staging project boundary.
-
-- [ ] Confirm project ID and team ID.
-- [ ] Confirm staging environment target.
-- [ ] Confirm HTTPS deployment URL is provider-managed.
-- [ ] Record exact candidate SHA/deployment ID without recording secrets.
-
-### Task 4: Neon Staging PostgreSQL + Secrets
-
-**Provider actions:**
-- Provision a dedicated Neon database for staging through the Vercel marketplace/integration path when available.
-- Scope database/application environment variables to staging only.
-
-**Produces:** isolated managed PostgreSQL and external secret injection.
-
-- [ ] Create a staging-only Neon PostgreSQL database.
-- [ ] Configure `DB_CONNECTION=pgsql` and provider-issued connection parameters outside Git.
-- [ ] Configure staging-only `APP_KEY` and `PII_FINGERPRINT_KEY` outside Git.
-- [ ] Ensure no production database or secret is referenced.
-- [ ] Record Neon project/database identifiers only when secret-safe.
-
-### Task 5: Controlled Migration + Runtime Least Privilege
+### Task 2 — Revalidate Gate 1A documentation
 
 **Files:**
-- Create if required: `scripts/ops/r1/verify-runtime-role.sh`
-- Modify: `docs/R1_STAGING_RUNBOOK.md`
+- `docs/R1_PROVIDER_SCORECARD.md`
+- `docs/R1_STAGING_RUNBOOK.md`
+- `infra/vercel/staging/README.md`
+- R1 spec/plan/ledger
+- PR #13 body after evidence is frozen
 
-**Produces:** controlled schema migration and restricted steady-state runtime database role.
+- [x] remove claims that Vercel executes `Dockerfile.vercel`;
+- [x] document the observed PHP 8.4 serverless path;
+- [x] preserve root M9 Dockerfile as a separate provider-neutral release contract;
+- [ ] require exact corrected HEAD CI GREEN before Gate 1A is final GREEN.
 
-- [ ] Run `php artisan production:preflight` with staging production-like settings.
-- [ ] Apply migrations through a controlled migration session.
-- [ ] Create/use a runtime database role limited to required DML/sequence/schema-usage capabilities.
-- [ ] Prove runtime DDL denial with `CREATE TABLE r1_should_fail(...)` returning permission denied.
-- [ ] Ensure steady-state Vercel runtime uses restricted credentials.
+### Task 3 — Real Vercel project + isolated Preview
 
-### Task 6: Real Vercel Staging Deployment + Health Admission
+Observed provider evidence:
 
-**Produces:** a reachable exact-candidate HTTPS staging deployment.
+- [x] project `tactical-scenario-lab` exists;
+- [x] team/project IDs recorded secret-safely;
+- [x] R1 branch produces isolated Preview deployments;
+- [x] managed HTTPS path observed;
+- [x] exact Git SHA + deployment identity available.
 
-- [ ] Deploy the exact candidate SHA to Vercel staging.
-- [ ] Verify `/health/live` returns 200.
-- [ ] Verify `/health/ready` returns 200 and database readiness is healthy.
-- [ ] Confirm runtime logs are private and do not expose secret values.
-- [ ] Record Vercel deployment ID/URL + Git SHA as release evidence.
-- [ ] Mark Gate 2 GREEN only when HTTPS + isolated DB + exact identity are all proven.
+No Production deployment is used as R1 staging evidence.
 
-### Task 7: Recovery Drill
+### Task 4 — Neon staging PostgreSQL + external secrets
 
-**Files:**
-- Create: `docs/R1_RECOVERY_DRILL.md`
+Observed:
 
-**Produces:** executed Neon staging recovery evidence.
+- [x] dedicated project `tactical-scenario-lab-staging` exists;
+- [x] current provider PostgreSQL 18.4 observed;
+- [x] pre-migration schema confirmed empty;
+- [ ] configure Vercel Preview `APP_ENV=production`, `APP_DEBUG=false`;
+- [ ] configure unique `APP_KEY` and `PII_FINGERPRINT_KEY` outside Git/chat;
+- [ ] configure PostgreSQL runtime connection values outside Git/chat;
+- [ ] configure secure session and encrypted DB connection settings;
+- [ ] prove no production resource reuse.
 
-- [ ] Record the recovery/time-travel capability available on the active Neon plan.
-- [ ] Create an isolated recovery branch/target from an actual staging recovery point.
-- [ ] Validate migration state and representative M6 integrity invariants on the recovery target.
-- [ ] Record observed recovery behavior and free-tier retention limits without inventing an SLA.
-- [ ] Mark Gate 4 GREEN only after the recovery target is validated.
+### Task 5 — Controlled Laravel migrations + runtime least privilege
 
-### Task 8: Authenticated Smoke/E2E + Browser QA
+Use the canonical Laravel migration code, not ad-hoc reconstruction from generated SQL.
 
-**Files:**
-- Create if justified: `tests/e2e/r1-staging.spec.*`
-- Create: `docs/R1_BROWSER_QA.md`
+- [ ] establish trusted migration-capable environment/session;
+- [ ] run `php artisan production:preflight` with production-like staging settings;
+- [ ] run `php artisan migrate --force` against Neon staging;
+- [ ] provision/reuse restricted steady-state runtime role;
+- [ ] grant only required schema usage, table DML and sequence access;
+- [ ] prove runtime DDL denial;
+- [ ] configure Vercel to use only restricted runtime credentials after migrations.
 
-**Produces:** hosted authenticated/authorization/accessibility evidence.
+Because Neon currently exposes PostgreSQL 18.4 while CI's reference is PostgreSQL 16, successful real migrations/readiness are mandatory provider-version qualification.
 
-- [ ] Use disposable synthetic staging tenant/users/data only.
-- [ ] Cover login, organization context, dashboard, scenario/version, execution, assessment/debrief, history/report, Knowledge Center, people/access and logout.
-- [ ] Verify restricted identity receives expected forbidden behavior.
-- [ ] Verify skip link, keyboard/focus, reduced-motion and low-light persistence.
-- [ ] Qualify Chromium plus one independent engine before production promotion.
+### Task 6 — Real deployment + health admission
 
-### Task 9: Observability + Failure/Recovery Drill
+Existing partial evidence:
 
-**Files:**
-- Create: `docs/R1_FAILURE_DRILL.md`
+- [x] corrected adapter produced a READY Preview;
+- [x] HTTPS request reached Laravel under PHP 8.4.14;
+- [x] `/health/live` returned the expected JSON body;
+- [x] runtime logs were inspected;
+- [x] logs exposed the current missing-secret blocker (`MissingAppKeyException`) without exposing a secret value.
 
-**Produces:** operator detection/recovery evidence.
+Admission remains blocked until:
 
-- [ ] Inspect Vercel runtime errors/logs without exporting sensitive payloads to Git.
-- [ ] Confirm no secret, private DB URL, `APP_KEY`, `PII_FINGERPRINT_KEY` or raw PII appears in captured evidence.
-- [ ] Safely exercise DB-unavailable/readiness failure behavior where provider controls permit.
-- [ ] Re-deploy the same exact candidate and confirm stable recovery.
-- [ ] Record rollback/roll-forward decision path.
+- [ ] exact final repository candidate CI is GREEN;
+- [ ] required provider secrets are configured;
+- [ ] controlled migrations are current;
+- [ ] Vercel uses restricted runtime DB credentials;
+- [ ] `/health/live` is HTTP 200 with no fatal runtime error in logs;
+- [ ] `/health/ready` is HTTP 200 with database healthy;
+- [ ] exact final deployment ID/URL + Git SHA are recorded.
 
-### Task 10: Production Decision + R1 Closeout
+### Task 7 — Recovery drill
 
-**Files:**
-- Create: `docs/R1_PRODUCTION_CLOSEOUT.md`
+**Create:** `docs/R1_RECOVERY_DRILL.md`
 
-**Produces:** explicit production-provider decision and eventual production release evidence.
+- [ ] record actual history-retention/recovery capability of the active Neon project;
+- [ ] create an isolated recovery/branch target from real staging state;
+- [ ] validate migration state and representative M6 integrity invariants;
+- [ ] record observed limits without inventing SLA/PITR guarantees;
+- [ ] mark Gate 4 GREEN only after the real drill succeeds.
 
-- [ ] Require Gates 1A–7 GREEN.
-- [ ] Re-evaluate Vercel/Neon plan terms, expected load, commercial/institutional use, recovery needs and cost.
-- [ ] Select/approve the production provider/plan explicitly; free staging is not automatically promoted.
-- [ ] Keep production secrets/database independent from staging.
-- [ ] Require production recovery/PITR policy adequate for accepted risk.
-- [ ] Record exact release identity, migration state, health and smoke evidence.
-- [ ] Create a semantic tag only if an explicit versioning policy/version decision exists.
+### Task 8 — Authenticated smoke/E2E + browser QA
+
+Use disposable synthetic staging data only.
+
+- [ ] login + active organization;
+- [ ] dashboard;
+- [ ] scenario/version workspace;
+- [ ] execution cockpit;
+- [ ] assessment/debrief;
+- [ ] history/reports;
+- [ ] Knowledge Center;
+- [ ] people/organization/access for authorized test admin;
+- [ ] forbidden paths for restricted identity;
+- [ ] logout/session invalidation;
+- [ ] keyboard/focus/skip-link/low-light sanity;
+- [ ] Chromium plus one independent engine before production promotion.
+
+### Task 9 — Observability + failure/recovery drill
+
+- [ ] inspect Vercel runtime errors/logs without exporting sensitive values;
+- [ ] prove no secret/PII leakage;
+- [ ] safely exercise database-unavailable/readiness failure;
+- [ ] recover by same-candidate redeploy/runtime restoration;
+- [ ] document rollback/roll-forward decision path.
+
+### Task 10 — Production decision + closeout
+
+- [ ] require Gates 1A–7 GREEN;
+- [ ] explicitly approve provider/plan for commercial/institutional use;
+- [ ] keep production secrets/database independent;
+- [ ] approve production recovery/PITR posture;
+- [ ] record exact production release identity, migrations, health and minimal smoke;
+- [ ] create semantic tag only if an explicit version decision exists.
 
 ## Verification policy
 
-Any repository-file change during R1 requires the inherited M9 matrix on the exact candidate HEAD:
+The exact final R1 repository HEAD must pass the inherited M9 matrix:
 
-- Security — `composer audit --locked` + `npm audit --audit-level=high`;
-- real Docker image build/runtime contract;
+- Composer/npm security audits;
+- root Docker image build + PostgreSQL extension + non-root + built assets;
 - PHPUnit SQLite;
-- PHPUnit PostgreSQL 16 including least-privilege, rollback/reapply and concurrency;
+- PHPUnit PostgreSQL reference suite including least privilege, rollback/reapply and concurrency;
 - Pint.
 
-Operational gates use observe-not-green → smallest configuration/fix → rerun → secret-safe evidence. Failed checks are never reworded into PASS.
+Operational gates follow: observe failure → identify root cause → smallest safe change → rerun → capture secret-safe evidence. Failed checks are never reworded into PASS.
