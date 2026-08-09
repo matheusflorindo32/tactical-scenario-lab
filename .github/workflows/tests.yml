@@ -157,6 +157,10 @@ jobs:
           GRANT USAGE ON SCHEMA public TO tactical_runtime_test;
           GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO tactical_runtime_test;
           GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO tactical_runtime_test;
+          ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+            GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO tactical_runtime_test;
+          ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+            GRANT USAGE, SELECT ON SEQUENCES TO tactical_runtime_test;
           SQL
 
       - name: Run tests on PostgreSQL
