@@ -108,6 +108,8 @@ Unavailable response is HTTP 503:
 
 Readiness validates production configuration when the application is running in production and then performs a minimal database query. The endpoint deliberately does not expose hostnames, usernames, passwords, SQL, SQLSTATE values, stack traces, PII keys or underlying exception text.
 
+Both `/health/live` and `/health/ready` are registered outside Laravel's `web` middleware group. They do not start application sessions and therefore remain infrastructure probes even when production sessions are database-backed and the database is unavailable. Readiness still reports the database outage with HTTP 503; liveness remains independent of it.
+
 The legacy `GET /health` endpoint remains for backward compatibility in M6; infrastructure admission should use `/health/live` and `/health/ready`.
 
 ## 4. Migration and data-integrity boundaries
