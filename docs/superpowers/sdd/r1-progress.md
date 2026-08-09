@@ -5,7 +5,7 @@ PR: #13 — draft
 Baseline: M9 `main` merge `1d77b89ef273e97cc53c7901df2d0f405684df45`
 Spec: `docs/superpowers/specs/2026-08-09-r1-production-operational-validation-design.md`
 Plan: `docs/superpowers/plans/2026-08-09-r1-production-operational-validation.md`
-Status: GATE 1 VALIDATION
+Status: GATE 1 GREEN — GATE 2 PREPARED / EXTERNALLY BLOCKED
 
 ## Progress model
 
@@ -14,12 +14,12 @@ Status: GATE 1 VALIDATION
 - Gates 1–7: 10% each.
 - Gate 8 + production promotion/closeout: final 20%.
 
-Current earned progress before Gate 1 CI: **10%**.
+Current earned R1 progress: **20%**.
 
 ## Gates
 
-- [ ] Gate 1 — Provider & Environment Contract — CANDIDATE, awaiting exact repository CI.
-- [ ] Gate 2 — Isolated Staging + TLS.
+- [x] Gate 1 — Provider & Environment Contract — GREEN.
+- [ ] Gate 2 — Isolated Staging + TLS — PREPARED, blocked on authenticated AWS execution path.
 - [ ] Gate 3 — Secrets + Migration/Runtime Identity Separation.
 - [ ] Gate 4 — PostgreSQL + Backup/PITR + Restore Drill.
 - [ ] Gate 5 — Real Deployment + Health Admission.
@@ -28,8 +28,6 @@ Current earned progress before Gate 1 CI: **10%**.
 - [ ] Gate 8 — Production Promotion + Release Closeout.
 
 ## Gate 1 evidence
-
-### Provider comparison
 
 AWS, Google Cloud and Azure were compared against the blocking R1 provider contract using current official primary documentation.
 
@@ -49,22 +47,40 @@ Selected AWS stack:
 
 ### Critical finding and resolution
 
-The provider review found that Application Load Balancer may fail open when every target in a target group is unhealthy. R1 therefore does **not** use ALB health as the sole traffic-admission authority.
-
-The execution plan was hardened before Gate 1 completion:
-
-1. native ECS `BLUE_GREEN` deployment is mandatory;
-2. candidate green revision uses an alternate target group;
-3. candidate validation uses test routing before production shift;
-4. `/health/live`, `/health/ready`, least-privilege and smoke checks must pass before listener shift;
-5. blue remains available through a bake/rollback window.
+The provider review found that Application Load Balancer target health cannot be the sole traffic-admission authority. R1 therefore requires ECS native `BLUE_GREEN`, an alternate target group and test routing before any production listener shift. `/health/live`, `/health/ready`, runtime least privilege and smoke checks must pass before promotion, with blue retained through a bake/rollback window.
 
 Plan-hardening commit: `fee2ca0aa4b3b825567a6a3b14a49852140250fe`.
 
-### External boundary
+### Gate 1 CI
 
-No AWS account, credential, VPC, RDS instance, ECS service, DNS name or TLS certificate has been fabricated or claimed. Real resource creation belongs to Gate 2 and requires authenticated AWS access.
+Gate 1 GREEN was established on repository HEAD `ef09cc32ef3f0b685548a01ebaa920e985188431` with CI **#875 / run `31333058180`**:
 
-### Gate 1 promotion rule
+- Security `93294258906` — SUCCESS;
+- Container real `93294258902` — SUCCESS;
+- SQLite `93294258894` — SUCCESS;
+- PostgreSQL 16 `93294258879` — SUCCESS, including cacheability, migrations, least-privilege, rollback/reapply and M6 concurrency;
+- Pint `93294258899` — SUCCESS.
 
-Gate 1 becomes GREEN only when the final documentation HEAD passes the inherited M9 CI matrix. Until then, R1 remains at 10%.
+## Gate 2 preparation completed
+
+Repository-side handoff is prepared without pretending that provider resources exist:
+
+- `docs/R1_STAGING_RUNBOOK.md` — ordered AWS staging bootstrap and validation procedure;
+- `infra/aws/staging/README.md` — infrastructure contract and evidence boundaries;
+- GitHub Actions OIDC/STS is the preferred deployment authentication model; long-lived AWS keys are prohibited as the normal path;
+- staging topology is fixed to ECR -> ECS/Fargate native blue/green -> ALB/ACM -> RDS PostgreSQL 16 -> Secrets Manager -> CloudWatch;
+- staging and production must use distinct secrets/database identities and must not share authoritative production data;
+- `DB_SSLMODE=verify-full` with AWS RDS CA trust is required;
+- Gate 2 evidence requires real AWS resources, valid HTTPS, distinct RDS/secrets, exact deployed SHA+image digest, blue/green test routing and CloudWatch logging.
+
+## External access boundary
+
+This ChatGPT session currently has no authenticated AWS/ECS/RDS connector. Plugin discovery returned no AWS integration. Therefore no AWS account, credential, VPC, RDS instance, ECS service, DNS name, certificate or deploy is claimed.
+
+Gate 2 remains **BLOCKED — external access unavailable**, not PASS. Static AWS access keys must not be pasted into chat, committed to GitHub or added to PR evidence. Resume through a controlled AWS integration or OIDC/role-based staging execution path.
+
+## Process note
+
+During Gate 1 work, a temporary `__nonexistent__` file was accidentally created on the R1 branch and immediately deleted. Comparison from the pre-incident functional tree to the restored tree showed zero file differences. `main` was never modified.
+
+Any further repository-file change requires the inherited M9 Security + Container + SQLite + PostgreSQL + Pint matrix before it can be treated as a valid R1 candidate.
