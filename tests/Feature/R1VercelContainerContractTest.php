@@ -6,41 +6,62 @@ use Tests\TestCase;
 
 class R1VercelContainerContractTest extends TestCase
 {
-    public function test_vercel_container_preserves_release_runtime_contract(): void
+    public function test_vercel_staging_uses_php_runtime_instead_of_an_ignored_dockerfile(): void
     {
-        $path = base_path('Dockerfile.vercel');
+        $this->assertFileDoesNotExist(base_path('Dockerfile.vercel'));
+        $this->assertFileExists(base_path('vercel.json'));
+        $this->assertFileExists(base_path('api/index.php'));
 
-        $this->assertFileExists($path);
+        $config = json_decode(
+            file_get_contents(base_path('vercel.json')),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
 
-        $dockerfile = file_get_contents($path);
+        $this->assertNull($config['framework'] ?? 'missing');
+        $this->assertSame('npm run build', $config['buildCommand'] ?? null);
+        $this->assertSame('public', $config['outputDirectory'] ?? null);
+        $this->assertSame(
+            'vercel-php@0.8.0',
+            $config['functions']['api/index.php']['runtime'] ?? null,
+        );
 
-        $this->assertStringContainsString('FROM node:22-alpine AS frontend', $dockerfile);
-        $this->assertStringContainsString('npm ci', $dockerfile);
-        $this->assertStringContainsString('npm run build', $dockerfile);
-        $this->assertStringContainsString('FROM php:8.4-cli AS runtime', $dockerfile);
-        $this->assertStringContainsString('docker-php-ext-install pdo_pgsql', $dockerfile);
-        $this->assertStringContainsString('USER app', $dockerfile);
-        $this->assertStringContainsString('public/build', $dockerfile);
-        $this->assertStringContainsString('${PORT:-8080}', $dockerfile);
-        $this->assertDoesNotMatchRegularExpression('/CMD[^\n]*migrate\s+--force/i', $dockerfile);
-        $this->assertStringNotContainsString('database/database.sqlite', $dockerfile);
+        $routes = $config['routes'] ?? [];
+        $this->assertContains([
+            'src' => '/build/(.*)',
+            'dest' => '/build/$1',
+        ], $routes);
+        $this->assertContains([
+            'src' => '/(.*)',
+            'dest' => '/api/index.php',
+        ], $routes);
     }
 
-    public function test_ci_builds_and_inspects_the_vercel_container(): void
+    public function test_vercel_php_entrypoint_redirects_laravel_writable_paths_to_tmp(): void
     {
-        $workflow = file_get_contents(base_path('.github/workflows/tests.yml'));
+        $entrypoint = file_get_contents(base_path('api/index.php'));
 
-        $this->assertStringContainsString(
-            'docker build --file Dockerfile.vercel --tag tactical-scenario-lab:vercel-ci .',
-            $workflow,
+        $this->assertStringContainsString("'/tmp/views'", $entrypoint);
+        $this->assertStringContainsString('APP_CONFIG_CACHE', $entrypoint);
+        $this->assertStringContainsString('APP_EVENTS_CACHE', $entrypoint);
+        $this->assertStringContainsString('APP_PACKAGES_CACHE', $entrypoint);
+        $this->assertStringContainsString('APP_ROUTES_CACHE', $entrypoint);
+        $this->assertStringContainsString('APP_SERVICES_CACHE', $entrypoint);
+        $this->assertStringContainsString('LOG_CHANNEL', $entrypoint);
+        $this->assertStringContainsString("require __DIR__.'/../public/index.php';", $entrypoint);
+    }
+
+    public function test_vercel_build_matches_the_node_version_used_by_ci_and_php_runtime(): void
+    {
+        $package = json_decode(
+            file_get_contents(base_path('package.json')),
+            true,
+            flags: JSON_THROW_ON_ERROR,
         );
-        $this->assertStringContainsString(
-            'docker run --rm tactical-scenario-lab:vercel-ci php -m | grep -q pdo_pgsql',
-            $workflow,
-        );
-        $this->assertStringContainsString(
-            'docker run --rm tactical-scenario-lab:vercel-ci sh -lc',
-            $workflow,
-        );
+
+        $this->assertSame('22.x', $package['engines']['node'] ?? null);
+
+        $workflow = file_get_contents(base_path('.github/workflows/tests.yml'));
+        $this->assertStringNotContainsString('Dockerfile.vercel', $workflow);
     }
 }
