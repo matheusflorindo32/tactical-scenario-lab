@@ -74,7 +74,6 @@ class HealthReadinessTest extends TestCase
         $this->app->detectEnvironment(fn (): string => 'production');
         config([
             'app.env' => 'production',
-            'app.key' => null,
             'app.debug' => true,
         ]);
 
