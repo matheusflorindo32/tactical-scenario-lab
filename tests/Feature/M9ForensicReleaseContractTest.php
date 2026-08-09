@@ -31,8 +31,8 @@ class M9ForensicReleaseContractTest extends TestCase
 
         $this->assertStringContainsString('Container — build and runtime contract', $workflow);
         $this->assertStringContainsString('docker build --tag tactical-scenario-lab:ci .', $workflow);
-        $this->assertStringContainsString("docker run --rm tactical-scenario-lab:ci php -m", $workflow);
-        $this->assertStringContainsString("test \"$(id -u)\" -ne 0", $workflow);
+        $this->assertStringContainsString('docker run --rm tactical-scenario-lab:ci php -m', $workflow);
+        $this->assertStringContainsString('test "$(id -u)" -ne 0', $workflow);
     }
 
     public function test_final_release_contracts_remain_non_suppressive_and_migration_safe(): void
@@ -57,7 +57,7 @@ class M9ForensicReleaseContractTest extends TestCase
     {
         $path = base_path('docs/PHASE_M9_AUDIT.md');
 
-        if (! file_exists($path)) {
+        if (!file_exists($path)) {
             $this->markTestIncomplete('M9 audit artifact is not implemented yet.');
         }
 
