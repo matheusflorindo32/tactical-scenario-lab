@@ -6,14 +6,9 @@
 
 @php
 $routeName = request()->route()?->getName();
-$contextualGuideSlug = match (true) {
-    in_array($routeName, ['scenarios.index', 'scenarios.show', 'scenario-templates.index'], true) => 'scenarios-and-versioning',
-    $routeName === 'executions.show' => 'execution-cockpit',
-    $routeName === 'assessments.show' => 'assessment-and-debrief',
-    in_array($routeName, ['execution-history.index', 'dashboard.executive'], true) => 'history-and-reports',
-    in_array($routeName, ['people.index', 'organizations.index', 'access.index'], true) => 'people-organizations-access',
-    default => null,
-};
+$contextualGuideSlug = $routeName !== null
+    ? app(\App\Knowledge\KnowledgeRepository::class)->findByContext($routeName)?->slug
+    : null;
 @endphp
 
 <!doctype html>
