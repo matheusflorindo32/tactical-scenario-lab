@@ -12,7 +12,7 @@ Status: IMPLEMENTATION
 - [x] Gate 3 — Article experience — GREEN
 - [x] Gate 4 — Operational guide content — GREEN
 - [x] Gate 5 — Contextual help — GREEN
-- [ ] Gate 6 — Search & discovery hardening
+- [x] Gate 6 — Search & discovery hardening — GREEN
 - [ ] Gate 7 — Governance & content integrity
 - [ ] Gate 8 — Forensic audit & exact-head protected integration
 
@@ -62,7 +62,11 @@ Status: IMPLEMENTATION
 - Result: a reusable contextual-help component plus route-name mapping links scenarios, execution, assessment, history/reporting and management surfaces to the exact product guide; knowledge URLs contain no tenant identifiers.
 
 ### Gate 6 — Search & discovery hardening
-- RED/GREEN evidence: pending
+- RED SHA: `fd74af2f76ef6c75dd913818fa3ceda1f86e23b2`
+- RED CI: #808 / run `31321017041` — four new search contracts failed only because `KnowledgeRepository::search()` did not exist; SQLite retained 313 passing tests and Pint was green.
+- GREEN SHA: `e532f7cca6cbc731d7f1c59a270bef031f796676`
+- GREEN CI: #810 / run `31321182753` — SQLite, PostgreSQL 16, Pint, production Vite build, fresh migrations, least-privilege runtime role, M6 rollback/reapply and repeated concurrency invariants all green.
+- Result: server-side search is trim/squish/lower/ASCII normalized, accent-insensitive, weighted 100/60/40/20/10 across title/tags/summary-category/body, deterministic on ties, category-controlled, and wired to Hub `?q=` without external search infrastructure or persistence.
 
 ### Gate 7 — Governance & content integrity
 - RED/GREEN evidence: pending
