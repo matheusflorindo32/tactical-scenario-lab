@@ -6,6 +6,7 @@ use Database\Seeders\DemoSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\PostgresRuntimeRole;
 use Tests\TestCase;
@@ -41,8 +42,7 @@ class PostgresImmutabilityTest extends TestCase
 
     public function test_runtime_sql_can_change_draft_scenario_definition(): void
     {
-        $versionId = DB::table('scenario_versions')->where('publication_status', 'draft')->value('id');
-        $this->assertNotNull($versionId);
+        $versionId = $this->createDraftScenarioVersion();
 
         PostgresRuntimeRole::activateWithinTransaction(DB::connection());
 
@@ -204,6 +204,36 @@ class PostgresImmutabilityTest extends TestCase
             'debrief entry' => ['debrief_entries'],
             'action content' => ['action_items'],
         ];
+    }
+
+    private function createDraftScenarioVersion(): int
+    {
+        $published = DB::table('scenario_versions')
+            ->where('publication_status', 'published')
+            ->orderBy('id')
+            ->first();
+        $this->assertNotNull($published);
+
+        $nextVersion = ((int) DB::table('scenario_versions')
+            ->where('scenario_id', $published->scenario_id)
+            ->max('version_number')) + 1;
+
+        return (int) DB::table('scenario_versions')->insertGetId([
+            'uuid' => (string) Str::uuid(),
+            'scenario_id' => $published->scenario_id,
+            'version_number' => $nextVersion,
+            'environment' => $published->environment,
+            'threat_level' => $published->threat_level,
+            'mechanism' => $published->mechanism,
+            'estimated_casualty_count' => $published->estimated_casualty_count,
+            'resources' => $published->resources,
+            'learning_objectives' => $published->learning_objectives,
+            'expected_actions' => $published->expected_actions,
+            'critical_errors' => $published->critical_errors,
+            'publication_status' => 'draft',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     private function finalizedAssessmentId(): int
