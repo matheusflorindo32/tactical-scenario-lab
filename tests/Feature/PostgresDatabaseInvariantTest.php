@@ -74,9 +74,13 @@ class PostgresDatabaseInvariantTest extends TestCase
         ]);
     }
 
-    public function test_runtime_role_is_not_superuser_table_owner_or_schema_creator(): void
+    public function test_runtime_role_is_an_actual_non_privileged_login_and_not_table_owner_or_schema_creator(): void
     {
         $runtime = PostgresRuntimeRole::connection();
+
+        $identity = $runtime->selectOne('SELECT current_user AS current_role, session_user AS session_role');
+        $this->assertSame('tactical_runtime_test', $identity->current_role);
+        $this->assertSame('tactical_runtime_test', $identity->session_role);
 
         $role = $runtime->selectOne(<<<'SQL'
             SELECT rolsuper, rolcreatedb, rolcreaterole
