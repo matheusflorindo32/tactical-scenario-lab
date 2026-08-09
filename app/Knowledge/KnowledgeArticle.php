@@ -19,5 +19,6 @@ final readonly class KnowledgeArticle
         public string $markdown,
         public string $html,
         public string $searchText,
+        public array $toc,
     ) {}
 }
