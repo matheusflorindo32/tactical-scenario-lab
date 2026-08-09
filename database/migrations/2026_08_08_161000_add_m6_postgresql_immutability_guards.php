@@ -18,6 +18,7 @@ LANGUAGE plpgsql
 AS $$
 BEGIN
     IF OLD.publication_status = 'published' AND (
+        NEW.publication_status IS DISTINCT FROM OLD.publication_status OR
         NEW.environment IS DISTINCT FROM OLD.environment OR
         NEW.threat_level IS DISTINCT FROM OLD.threat_level OR
         NEW.mechanism IS DISTINCT FROM OLD.mechanism OR
