@@ -16,16 +16,16 @@ class M7ThemeContractTest extends TestCase
         $this->assertIsString($css);
         $this->assertIsString($topbar);
 
-        $this->assertStringContainsString("Alpine.store('theme'", $javascript);
-        $this->assertStringContainsString("localStorage.getItem('tsl-theme')", $javascript);
-        $this->assertStringContainsString("localStorage.setItem('tsl-theme'", $javascript);
-        $this->assertStringContainsString("dataset.theme", $javascript);
+        $this->assertStringContainsString('Alpine.store(\'theme\'', $javascript);
+        $this->assertStringContainsString('localStorage.getItem(\'tsl-theme\')', $javascript);
+        $this->assertStringContainsString('localStorage.setItem(\'tsl-theme\'', $javascript);
+        $this->assertStringContainsString('dataset.theme', $javascript);
         $this->assertStringNotContainsString('fetch(', $javascript);
         $this->assertStringNotContainsString('axios.', $javascript);
 
-        $this->assertStringContainsString("[data-theme='low-light']", $css);
+        $this->assertStringContainsString('[data-theme=\'low-light\']', $css);
         $this->assertStringContainsString('data-theme-toggle', $topbar);
-        $this->assertStringContainsString("$store.theme.toggle()", $topbar);
+        $this->assertStringContainsString('$store.theme.toggle()', $topbar);
         $this->assertStringContainsString('aria-pressed', $topbar);
     }
 
