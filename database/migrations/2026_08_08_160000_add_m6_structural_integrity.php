@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
-use RuntimeException;
 
 return new class extends Migration
 {
@@ -22,7 +21,7 @@ return new class extends Migration
             ->count();
 
         if ($mismatchedAssessments > 0) {
-            throw new RuntimeException(
+            throw new \RuntimeException(
                 "Cannot enforce M6 assessment tenant integrity: {$mismatchedAssessments} mismatched row(s) require explicit remediation.",
             );
         }
