@@ -50,7 +50,9 @@
     --color-ink-100: #dfe3ea;
     --color-ink-300: #9aa3b0;
     --color-ink-500: #55606f;
+    --color-ink-600: #424c5a;
     --color-ink-700: #2f3846;
+    --color-ink-800: #1f2834;
     --color-ink-900: #101822;
 
     /* --- Semânticos ---------------------------------------------- */
@@ -228,11 +230,11 @@
     border-color: var(--color-lowlight-border);
 }
 
-[data-theme='low-light'] :is(.text-navy-950, .text-navy-900, .text-ink-900, .text-ink-700) {
+[data-theme='low-light'] :is(.text-navy-950, .text-navy-900, .text-ink-900, .text-ink-800, .text-ink-700) {
     color: var(--color-lowlight-text);
 }
 
-[data-theme='low-light'] :is(.text-navy-700, .text-ink-500, .text-ink-300) {
+[data-theme='low-light'] :is(.text-navy-700, .text-ink-600, .text-ink-500, .text-ink-300) {
     color: var(--color-lowlight-muted);
 }
 
