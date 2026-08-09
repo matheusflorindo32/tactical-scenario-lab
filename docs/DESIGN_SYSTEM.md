@@ -54,7 +54,9 @@ Todos os tokens vivem em `resources/css/app.css`, dentro do bloco `@theme` do Ta
 | Token | Hex | Uso |
 |---|---|---|
 | `ink-900` | `#101822` | Texto principal |
+| `ink-800` | `#1f2834` | Texto forte em superfícies densas |
 | `ink-700` | `#2f3846` | Corpo |
+| `ink-600` | `#424c5a` | Texto intermediário e labels operacionais |
 | `ink-500` | `#55606f` | Texto secundário |
 | `ink-300` | `#9aa3b0` | Placeholder/estado de baixa ênfase |
 
@@ -81,6 +83,11 @@ O M7 adiciona tokens `lowlight-*` para uma apresentação de baixa luminosidade:
 - `lowlight-emergency`
 - `lowlight-clinical`
 - `lowlight-alert`
+- `lowlight-emergency-text`
+- `lowlight-clinical-text`
+- `lowlight-alert-text`
+
+As variantes de texto semântico low-light também vivem no `@theme`; seletores de apresentação consomem `var(...)` em vez de repetir hex fora da fonte de tokens.
 
 Regras:
 
