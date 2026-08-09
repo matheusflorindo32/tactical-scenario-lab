@@ -13,7 +13,7 @@ use App\Services\ExecutionInjectManager;
 use App\Services\ScenarioExecutionManager;
 use App\Services\ScenarioVersionManager;
 use Database\Seeders\DemoSeeder;
-use Illuminate\Foundation\Testing\DatabaseMigrations;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use LogicException;
 use Tests\Support\ConcurrentDatabaseOperation;
@@ -21,8 +21,6 @@ use Tests\TestCase;
 
 class PostgresConcurrencyTest extends TestCase
 {
-    use DatabaseMigrations;
-
     protected function setUp(): void
     {
         parent::setUp();
@@ -32,6 +30,8 @@ class PostgresConcurrencyTest extends TestCase
         }
 
         $this->assertTrue(function_exists('pcntl_fork'), 'pcntl must be available in PostgreSQL CI.');
+
+        Artisan::call('migrate:fresh', ['--force' => true]);
         (new DemoSeeder)->run();
     }
 
