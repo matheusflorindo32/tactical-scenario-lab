@@ -1,6 +1,6 @@
 # Tactical Scenario Lab
 
-**MVP web para instrutores de APH e treinamento operacional configurarem, executarem e debriefarem cenários de forma padronizada e reproduzível.**
+**Plataforma web institucional para configurar, executar, avaliar e debriefar cenários de APH e treinamento operacional com histórico rastreável.**
 
 [![CI](https://github.com/matheusflorindo32/tactical-scenario-lab/actions/workflows/tests.yml/badge.svg)](https://github.com/matheusflorindo32/tactical-scenario-lab/actions/workflows/tests.yml)
 [![PHP](https://img.shields.io/badge/PHP-%5E8.3-777bb4?logo=php&logoColor=white)](https://www.php.net/)
@@ -9,59 +9,41 @@
 
 ---
 
-## Sumário
+## O que o produto cobre
 
-- [Contexto](#contexto)
-- [Proposta de valor](#proposta-de-valor)
-- [Stack técnica](#stack-técnica)
-- [Requisitos](#requisitos)
-- [Instalação rápida](#instalação-rápida)
-- [Uso](#uso)
-- [Endpoints principais](#endpoints-principais)
-- [Testes](#testes)
-- [Docker](#docker)
-- [Arquitetura](#arquitetura)
-- [Roadmap](#roadmap)
-- [Contribuindo](#contribuindo)
-- [Segurança](#segurança)
-- [Licença](#licença)
+O Tactical Scenario Lab concentra em um único fluxo institucional:
 
----
+- criação determinística de cenários;
+- definições versionadas com publicação e revisão controladas;
+- templates institucionais;
+- execução com equipes, participantes, recursos, injects e timeline append-only;
+- avaliação estruturada com rubrica, evidências, erros críticos e tempos-chave;
+- debrief com fatos, interpretações, recomendações e plano de ação;
+- dashboards operacional e executivo;
+- histórico, CSV e PDF institucional;
+- pessoas, organizações e governança de acesso multi-organização.
 
-## Contexto
-
-Instrutores de Atendimento Pré-Hospitalar (APH), primeiros socorros e treinamento operacional dedicam tempo desproporcional para montar cenários, checklists e debriefings em documentos separados (Word, PDF, planilhas). Isso dificulta padronização entre turmas, perde histórico e reduz a rastreabilidade da avaliação.
-
-O **Tactical Scenario Lab** concentra configuração, execução e avaliação de um cenário em um fluxo web único, com geração determinística de objetivos de aprendizagem, ações esperadas e erros críticos a evitar. O critério de sucesso do piloto é: **um instrutor consegue gerar e finalizar um cenário em menos de cinco minutos, sem treinamento prévio na ferramenta.**
-
-Detalhes completos em [docs/PRODUCT.md](docs/PRODUCT.md) e [docs/BACKLOG.md](docs/BACKLOG.md).
-
-## Proposta de valor
-
-| Antes | Com o Tactical Scenario Lab |
-|---|---|
-| Cenário em Word, checklist em PDF, debrief em WhatsApp | Um único fluxo web com histórico |
-| Cada instrutor monta do zero | Gerador determinístico com base MARCH |
-| Avaliação sem rastreabilidade | Score e debrief notes persistidos |
-| Sem versão auditável | Migrations, testes e CI públicos |
+O critério original do piloto permanece documentado em [`docs/PRODUCT.md`](docs/PRODUCT.md). O backlog inicial em [`docs/BACKLOG.md`](docs/BACKLOG.md) é histórico e não representa sozinho o estado atual da arquitetura.
 
 ## Stack técnica
 
 - **Backend:** PHP 8.3+ · Laravel 13
-- **Persistência:** SQLite (padrão do MVP; PostgreSQL/MySQL suportados via config)
-- **Frontend:** Blade + Vite (Tailwind opcional)
-- **Testes:** PHPUnit 12 (Feature + Unit)
-- **Ferramentas de qualidade:** Pint (formatação), Pail (logs), Faker (seeders)
-- **Deploy:** Docker (Dockerfile PHP-CLI); alvos previstos Railway e Render
+- **Frontend:** Blade · Tailwind CSS v4 · Alpine.js · Vite 7
+- **Produção:** PostgreSQL, com preflight fail-closed e runtime role de menor privilégio
+- **Desenvolvimento/regressão:** SQLite continua suportado
+- **Testes:** PHPUnit 12 em SQLite e PostgreSQL 16 no CI
+- **Qualidade:** Pint · `composer validate --strict` · build Vite
+- **Relatórios:** Dompdf para PDF institucional
 
-## Requisitos
+## Requisitos locais
 
-- PHP **≥ 8.3** com extensões `pdo_sqlite`, `mbstring`, `openssl`
+- PHP **≥ 8.3**
 - Composer 2.x
-- Node.js 20+ e npm (para assets Vite)
-- Git
+- Node.js 20+ e npm
+- SQLite para setup local padrão, ou PostgreSQL quando quiser reproduzir o ambiente de produção
+- extensões PHP requeridas pelo Laravel/driver de banco escolhido
 
-## Instalação rápida
+## Instalação local rápida
 
 ```bash
 git clone https://github.com/matheusflorindo32/tactical-scenario-lab.git
@@ -80,97 +62,139 @@ npm run build
 php artisan serve
 ```
 
-Acesse **http://localhost:8000**.
+A aplicação local fica disponível, por padrão, em `http://localhost:8000`.
 
-Alternativa em um comando:
+Também existem os scripts Composer do projeto:
 
 ```bash
-composer run setup   # roda install + key + migrate + npm build
-composer run dev     # sobe server + queue + logs + vite em paralelo
+composer run setup
+composer run dev
 ```
 
-## Uso
+## Configuração de banco
 
-1. Acesse a raiz do site → é redirecionado para a listagem de cenários.
-2. **Criar cenário** — informe ambiente, nível de ameaça, mecanismo de lesão, número de vítimas e recursos disponíveis.
-3. O sistema gera **objetivos de aprendizagem**, **ações esperadas** (com ajuste automático para ameaça ativa) e **erros críticos**.
-4. **Executar** — marca início da simulação.
-5. **Avaliar** — registra score e notas de debrief.
+O `.env.example` mantém SQLite para desenvolvimento local:
 
-## Endpoints principais
+```dotenv
+DB_CONNECTION=sqlite
+```
 
-| Método | Rota | Descrição |
-|---|---|---|
-| GET | `/` | Redireciona para listagem |
-| GET | `/scenarios` | Lista cenários |
-| GET | `/scenarios/create` | Formulário de criação |
-| POST | `/scenarios` | Persiste cenário |
-| GET | `/scenarios/{scenario}` | Mostra cenário |
-| POST | `/scenarios/{scenario}/execute` | Marca execução |
-| POST | `/scenarios/{scenario}/evaluate` | Registra avaliação e debrief |
-| GET | `/health` | Healthcheck JSON `{"status":"ok"}` |
+Produção usa PostgreSQL e deve configurar explicitamente host, banco, usuário runtime e TLS. `DB_SSLMODE=disable` é recusado pela validação de produção; `verify-full` é a opção preferida quando o provedor oferece CA/hostname verificáveis.
 
-## Testes
+Exemplo de direção de configuração:
+
+```dotenv
+DB_CONNECTION=pgsql
+DB_HOST=your-managed-postgres-host
+DB_PORT=5432
+DB_DATABASE=tactical_scenario
+DB_USERNAME=tactical_runtime
+DB_PASSWORD=use-a-secret-manager
+DB_SSLMODE=verify-full
+```
+
+A chave `PII_FINGERPRINT_KEY` deve ser estável e independente de `APP_KEY`, pois participa da busca exata/duplicidade protegida de PII.
+
+## Fluxo operacional
+
+1. Autentique-se e opere dentro da organização ativa.
+2. Crie um cenário ou reutilize um template.
+3. Revise a versão em rascunho e publique a definição.
+4. Crie uma execução a partir da versão publicada.
+5. Configure equipe/participantes/recursos e conduza a operação pelo cockpit.
+6. Registre eventos e injects durante a execução.
+7. Conclua a execução e abra a avaliação.
+8. Preencha rubrica, evidências, erros críticos, tempos-chave e debrief.
+9. Finalize a avaliação; o conteúdo histórico fica congelado, enquanto o status autorizado das ações pode continuar evoluindo.
+10. Consulte dashboards, histórico e relatórios institucionais.
+
+## Rotas principais
+
+A aplicação possui mais rotas do que o MVP inicial. As famílias principais hoje são:
+
+| Área | Exemplos |
+|---|---|
+| Sessão | `/login`, `/logout` |
+| Dashboards | `/dashboard`, `/dashboard/executive` |
+| Cenários | `/scenarios`, `/scenarios/{scenario}` |
+| Templates | `/scenario-templates` |
+| Execuções | `/executions/{execution}` + transições `start`, `complete`, `cancel` |
+| Assessment | `/assessments/{assessment}` + critérios/evidências/debrief/plano de ação |
+| Histórico/relatórios | `/history/executions`, `/reports/executions.csv`, PDF por execução |
+| Gestão | `/people`, `/organizations`, `/access` |
+| Health | `/health` |
+
+A fonte da verdade das rotas é [`routes/web.php`](routes/web.php).
+
+## Interface M7 — Operational Command Center
+
+A experiência autenticada usa:
+
+- sidebar como navegação canônica e ability-aware;
+- topbar contextual com organização ativa e conta;
+- dashboard do instrutor ordenado por atenção operacional;
+- visão executiva orientada primeiro a risco/pendência;
+- workspace de cenários baseado na versão vigente, não em score legado;
+- cockpit da execução com timeline como verdade cronológica append-only;
+- assessment/debrief como workbench navegável;
+- modo institucional **low-light** opcional, salvo somente no `localStorage` do navegador.
+
+O design system está documentado em [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md).
+
+## Testes e gates de qualidade
+
+Localmente:
 
 ```bash
 composer test
-# ou
-php artisan test
+vendor/bin/pint --test
+npm run build
 ```
 
-Cobertura inicial focada no fluxo principal (`tests/Feature/ScenarioFlowTest.php`).
+O GitHub Actions valida, entre outros gates definidos no workflow:
 
-## Docker
+- metadados Composer;
+- build dos assets;
+- migrations do zero;
+- suíte PHPUnit em SQLite;
+- suíte PHPUnit em PostgreSQL 16;
+- provisionamento do runtime role de menor privilégio;
+- rollback/reapply dos guards de banco;
+- repetição dos invariantes de concorrência;
+- Pint.
 
-```bash
-docker build -t tactical-scenario-lab .
-docker run -p 8080:8080 tactical-scenario-lab
-```
+## Invariantes institucionais importantes
 
-Aplicação sobe em **http://localhost:8080**, com migrations aplicadas no boot.
+- tenant/organização ativa é derivado do contexto autenticado, não de `organization_id` livre do cliente;
+- versões publicadas não têm a definição reescrita;
+- a timeline histórica de execução é append-only;
+- avaliações finalizadas preservam verdade histórica;
+- conteúdo das ações fica congelado após finalização, mas transições de status autorizadas permanecem possíveis;
+- dashboards e histórico usam execução/assessment como verdade operacional, não `Scenario.score` legado;
+- relatórios seguem autorização e contexto da organização ativa;
+- interface ability-aware não substitui autorização backend.
 
-## Arquitetura
+## Documentação técnica relevante
 
-```
-app/
-├── Http/Controllers/ScenarioController.php   # camada web
-├── Models/Scenario.php                        # persistência
-├── Services/ScenarioGenerator.php             # regra determinística
-└── ...
-database/migrations/
-└── 2026_08_05_000001_create_scenarios_table.php
-routes/web.php                                 # 7 rotas, incluindo /health
-docs/PRODUCT.md                                # visão do produto
-docs/BACKLOG.md                                # P0 / P1 / P2
-```
-
-Princípios adotados:
-
-- **Determinismo** — o gerador não usa aleatoriedade nem IA; mesmo input produz mesmo cenário. Facilita padronização entre turmas.
-- **Fluxo em três estados** — `draft` → `execute` → `evaluate`, refletidos no campo `status`.
-- **Base clínica** — objetivos e ações espelham o protocolo **MARCH** (Massive hemorrhage, Airway, Respiration, Circulation, Hypothermia/Head injury), consenso operacional em cuidados táticos em combate (TCCC).
-
-> Referência do protocolo MARCH: Committee on Tactical Combat Casualty Care (CoTCCC). *TCCC Guidelines for Medical Personnel.* Deployed Medicine, 2024. https://deployedmedicine.com/market/11
-
-## Roadmap
-
-Extrato de [docs/BACKLOG.md](docs/BACKLOG.md):
-
-- **P0 (piloto deployável)** — geração determinística ✓, avaliação ✓, healthcheck ✓, Docker ✓, GitHub Actions ✓, deploy Railway/Render ⏳
-- **P1 (demonstração profissional)** — autenticação, impressão da ficha, templates, MARCH pontuado, seeds
-- **P2 (produto)** — organizações e turmas, indicadores por equipe, export PDF/CSV, auditoria
-
-## Contribuindo
-
-Ver [CONTRIBUTING.md](CONTRIBUTING.md). Em resumo: abra issue antes de PR para mudanças estruturais; PRs pequenos e focados; testes acompanham o código.
+- [`docs/PRODUCT.md`](docs/PRODUCT.md) — problema e objetivo do produto
+- [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md) — tokens, componentes e UX
+- [`docs/PRODUCTION.md`](docs/PRODUCTION.md) — operação/deploy de produção
+- [`docs/REPORTING.md`](docs/REPORTING.md) — semântica de reporting
+- [`docs/DEMO.md`](docs/DEMO.md) — ambiente/dados demonstrativos
+- [`docs/superpowers/specs/`](docs/superpowers/specs/) — specs por milestone
+- [`docs/superpowers/plans/`](docs/superpowers/plans/) — planos de implementação
 
 ## Segurança
 
-Encontrou uma falha? Não abra issue pública — ver [SECURITY.md](SECURITY.md) para o canal privado.
+Encontrou uma vulnerabilidade? Não abra issue pública. Consulte [`SECURITY.md`](SECURITY.md) para o canal apropriado.
+
+## Contribuindo
+
+Consulte [`CONTRIBUTING.md`](CONTRIBUTING.md). Mudanças estruturais devem preservar testes, isolamento de tenant e contratos históricos.
 
 ## Licença
 
-Distribuído sob a licença **MIT**. Ver [LICENSE](LICENSE) para detalhes.
+MIT. Consulte [`LICENSE`](LICENSE).
 
 ---
 
