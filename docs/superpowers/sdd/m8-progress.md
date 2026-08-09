@@ -11,7 +11,7 @@ Status: IMPLEMENTATION
 - [x] Gate 2 — Knowledge Hub — GREEN
 - [x] Gate 3 — Article experience — GREEN
 - [x] Gate 4 — Operational guide content — GREEN
-- [ ] Gate 5 — Contextual help
+- [x] Gate 5 — Contextual help — GREEN
 - [ ] Gate 6 — Search & discovery hardening
 - [ ] Gate 7 — Governance & content integrity
 - [ ] Gate 8 — Forensic audit & exact-head protected integration
@@ -55,7 +55,11 @@ Status: IMPLEMENTATION
 - Result: six reviewed product guides ship atomically with the allowlisted catalog, controlled audiences/categories, related/contextual metadata and explicit product-only boundaries; the execution guide states that it does not prescribe clinical or tactical conduct and documents timeline append-only behavior.
 
 ### Gate 5 — Contextual help
-- RED/GREEN evidence: pending
+- RED SHA: `5e307280f6796ddd6a746165c14be53c416164eb`
+- RED CI: #804 / run `31320776268` — three contextual-help contracts failed only because the operational pages lacked the guide link; SQLite retained 310 passing tests and Pint was green.
+- GREEN SHA: `3880f380495f526c377bded348a66d25c5b4c6c7`
+- GREEN CI: #806 / run `31320882046` — SQLite, PostgreSQL 16, Pint, production Vite build, fresh migrations, least-privilege runtime role, M6 rollback/reapply and repeated concurrency invariants all green.
+- Result: a reusable contextual-help component plus route-name mapping links scenarios, execution, assessment, history/reporting and management surfaces to the exact product guide; knowledge URLs contain no tenant identifiers.
 
 ### Gate 6 — Search & discovery hardening
 - RED/GREEN evidence: pending
