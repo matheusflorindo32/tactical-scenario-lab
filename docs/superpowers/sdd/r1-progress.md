@@ -73,6 +73,18 @@ Repository-side handoff is prepared without pretending that provider resources e
 - `DB_SSLMODE=verify-full` with AWS RDS CA trust is required;
 - Gate 2 evidence requires real AWS resources, valid HTTPS, distinct RDS/secrets, exact deployed SHA+image digest, blue/green test routing and CloudWatch logging.
 
+### Prepared-package CI
+
+After adding the staging runbook/infrastructure contract and synchronizing this ledger, repository HEAD `04d37751f8b6b32784bbb2e65311085d191cf1cc` passed CI **#878 / run `31333716473`**:
+
+- Security `93295954136` — SUCCESS;
+- Container real `93295954201` — SUCCESS;
+- SQLite `93295954116` — SUCCESS;
+- PostgreSQL 16 `93295954086` — SUCCESS, including cacheability, migrations, least-privilege, rollback/reapply and M6 concurrency;
+- Pint `93295954111` — SUCCESS.
+
+This verification proves the repository-side Gate 2 handoff preserves all inherited M9 contracts. It does not substitute for real AWS staging evidence.
+
 ## External access boundary
 
 This ChatGPT session currently has no authenticated AWS/ECS/RDS connector. Plugin discovery returned no AWS integration. Therefore no AWS account, credential, VPC, RDS instance, ECS service, DNS name, certificate or deploy is claimed.
