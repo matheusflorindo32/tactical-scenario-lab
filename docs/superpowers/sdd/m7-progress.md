@@ -10,7 +10,7 @@ Status: IN PROGRESS
 - [x] Gate 2 — Design-system primitives — GREEN
 - [x] Gate 3 — Dashboards — GREEN
 - [x] Gate 4 — Scenarios/templates/history — GREEN
-- [ ] Gate 5 — Execution cockpit
+- [x] Gate 5 — Execution cockpit — GREEN
 - [ ] Gate 6 — Assessment & debrief workbench
 - [ ] Gate 7 — Management & low-light polish
 - [ ] Gate 8 — Forensic UX audit & exact-head gate
@@ -53,6 +53,13 @@ Status: IN PROGRESS
 - Result: scenario workspace is version-first, removes `Scenario.score` from institutional presentation, exposes the lifecycle explicitly, makes Templates/Histórico canonical navigation contexts and uses the accessible table primitive for execution history.
 
 ### Gate 5 — Execution cockpit
+- RED SHA: `65242f469872ba8f9b32743eb2fefb71c06cc286`
+- RED CI: #751 / run `31311655068` — two expected cockpit-contract failures; 283 existing tests passed in SQLite. RED proved missing command-region structure, contextual section navigation and explicit assessment/timeline historical landmarks.
+- GREEN SHA: `29047e5d6982e3dc5f06dc646bee1e1f42d0d2b1`
+- GREEN CI: #752 / run `31311727396` — SQLite, PostgreSQL 16, least-privilege role, M6 rollback/reapply, repeated concurrency invariants, Vite build and Pint green.
+- Result: execution view is now an operational cockpit with lifecycle command region, anchor navigation, timeline-first hierarchy, append-only historical presentation and explicit assessment/resources/injects operational regions while preserving all existing forms and domain guards.
+
+### Gate 6 — Assessment & debrief workbench
 - RED SHA: pending
 - RED CI: pending
 - GREEN SHA: pending
