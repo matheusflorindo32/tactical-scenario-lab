@@ -84,6 +84,9 @@
     --color-lowlight-emergency: #3b1714;
     --color-lowlight-clinical: #102a20;
     --color-lowlight-alert: #332715;
+    --color-lowlight-emergency-text: #f7b4ac;
+    --color-lowlight-clinical-text: #a8dfc1;
+    --color-lowlight-alert-text: #f1cf8f;
 
     /* --- Raios ---------------------------------------------------- */
     --radius-xs: 0.25rem;
@@ -256,15 +259,15 @@
 }
 
 [data-theme='low-light'] :is(.text-emergency-700, .text-emergency-600) {
-    color: #f7b4ac;
+    color: var(--color-lowlight-emergency-text);
 }
 
 [data-theme='low-light'] :is(.text-clinical-700, .text-clinical-600) {
-    color: #a8dfc1;
+    color: var(--color-lowlight-clinical-text);
 }
 
 [data-theme='low-light'] :is(.text-alert-700, .text-alert-600) {
-    color: #f1cf8f;
+    color: var(--color-lowlight-alert-text);
 }
 
 [data-theme='low-light'] input,
