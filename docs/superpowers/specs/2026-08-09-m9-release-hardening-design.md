@@ -74,6 +74,8 @@ Rejected because several discovered gaps are executable/runtime concerns, especi
 10. External provider backup/PITR, TLS termination and infrastructure monitoring remain provider/operator responsibilities; the repository must document and verify its side of those contracts without pretending to configure an unavailable provider.
 11. No Git tag or hosted release is created merely because M9 code is complete. The repository first reaches a release-ready, exact-head verified `main`; version/tag publication is a separate final release action only if an unambiguous version and supported connector capability are available at that point.
 12. Visual claims are limited to what can be tested in this connected environment; do not claim pixel-perfect multi-browser validation without a real browser session.
+13. Application request-handling and Laravel writable paths must not depend on application code running as root. If the selected container base starts a privileged master process for port/process management, request workers and writable application paths must use the image's unprivileged application user (for example `www-data`).
+14. Release localization defaults are exactly `APP_LOCALE=pt_BR`, `APP_FALLBACK_LOCALE=pt_BR` and `APP_FAKER_LOCALE=pt_BR` in `.env.example`.
 
 ## 6. Release model
 
@@ -101,7 +103,7 @@ The RED contract must identify at least these current defects:
 
 - `SECURITY.md` must not say authentication is only planned;
 - `SECURITY.md` must not describe `main` as an unsupported MVP-only policy;
-- `.env.example` must identify the product as Tactical Scenario Lab and use `pt_BR`/Portuguese-oriented application defaults where supported by Laravel configuration;
+- `.env.example` must set `APP_NAME="Tactical Scenario Lab"`, `APP_LOCALE=pt_BR`, `APP_FALLBACK_LOCALE=pt_BR` and `APP_FAKER_LOCALE=pt_BR`;
 - `composer.json` description must identify Tactical Scenario Lab rather than Laravel skeleton metadata;
 - `Dockerfile` must not create/use `database/database.sqlite` as production runtime storage;
 - `Dockerfile` must not run `php artisan migrate --force` in the ordinary runtime `CMD`;
@@ -134,18 +136,18 @@ It must not claim authentication is future work.
 
 ### Dependency checks
 
-CI must execute repository-native package vulnerability checks when lockfiles support them:
+CI must execute repository-native package vulnerability checks without changing lockfiles:
 
-- Composer advisory/audit check using the installed Composer version;
-- npm audit at a severity threshold appropriate for release blocking.
+- `composer audit --locked --no-interaction` must return success;
+- `npm audit --audit-level=high` must return success.
 
-The implementation must avoid auto-fixing lockfiles in CI.
+CI must never run `composer update`, `npm audit fix` or another automatic dependency rewrite as part of the audit gate.
 
 If the current dependency graph contains a release-blocking advisory, M9 must either upgrade through a separately tested dependency commit or document a narrowly justified non-applicable advisory. Blanket ignore lists are forbidden.
 
 ### Acceptance
 
-Security/documentation tests plus dependency audit steps pass in CI without hiding vulnerabilities.
+Security/documentation tests plus both exact dependency audit commands pass in CI without hiding vulnerabilities.
 
 ## 9. Gate 3 — Production Container & Deployment Parity
 
@@ -163,9 +165,11 @@ The production image must:
 - install production PHP dependencies with optimized autoloading;
 - build or receive production frontend assets deterministically;
 - create only required writable Laravel runtime directories;
-- run the application as a non-root user where practical for the selected base image;
+- ensure request-handling and Laravel runtime writes use an unprivileged application identity such as `www-data`;
 - expose the application port without embedding environment-specific credentials;
 - keep deployment migrations as an explicit operator/deployment phase.
+
+The implementation may use the official PHP Apache or FPM family, but the selected runtime pattern must be fully documented and tested in the same gate; it must not fall back to an SQLite-only development container.
 
 ### Deployment contract
 
@@ -229,14 +233,14 @@ Do **not** use wall-clock timing thresholds in shared CI.
 Prefer deterministic budgets such as:
 
 - route/config cacheability;
-- bounded frontend production bundle artifacts if a stable measurable output is available;
+- bounded frontend production bundle artifacts only if the produced Vite files have a stable, repository-measurable size signal;
 - query-count regression tests only for a small number of known, deterministic read surfaces where existing factories make counts stable.
 
-If a proposed metric proves environment-dependent, omit it rather than institutionalizing a flaky release gate.
+A bundle-size or query-count budget is optional unless a stable deterministic signal is demonstrated during Gate 5. Gate 5 cannot be marked incomplete solely because an environment-dependent metric was intentionally rejected; route/config cacheability and health/core-workflow reliability are mandatory.
 
 ### Acceptance
 
-Reliability budgets pass consistently and do not weaken existing M6 hardening checks.
+Mandatory reliability budgets pass consistently and do not weaken existing M6 hardening checks.
 
 ## 12. Gate 6 — UX, Localization & Accessibility Finalization
 
@@ -246,8 +250,8 @@ Close release-level presentation inconsistencies without redesigning M7.
 
 ### Required checks
 
-- product name is Tactical Scenario Lab in environment/example metadata;
-- Brazilian Portuguese is the intended default application locale where application behavior depends on locale;
+- `.env.example` uses `APP_NAME="Tactical Scenario Lab"`;
+- release locale defaults are exactly `pt_BR` for app, fallback and Faker;
 - document/page titles identify the product consistently;
 - no canonical authenticated navigation item is a dead placeholder;
 - M8 Knowledge links remain authenticated and contextual;
