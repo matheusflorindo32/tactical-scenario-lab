@@ -9,6 +9,12 @@
 
 ---
 
+## Estado do produto
+
+M1–M8 consolidaram o domínio, hardening de produção, experiência operacional e Knowledge Center. O M9 fecha a linha **release-ready** com segurança/dependency audits, paridade de container, CI de release, cacheability, localização e procedimentos de release/recovery.
+
+A identidade de um release é o **SHA exato testado**, não apenas o nome de uma branch. Consulte [`docs/RELEASE.md`](docs/RELEASE.md) para o procedimento operacional e [`CHANGELOG.md`](CHANGELOG.md) para o histórico por milestone.
+
 ## O que o produto cobre
 
 O Tactical Scenario Lab concentra em um único fluxo institucional:
@@ -33,15 +39,16 @@ O critério original do piloto permanece documentado em [`docs/PRODUCT.md`](docs
 - **Produção:** PostgreSQL, com preflight fail-closed e runtime role de menor privilégio
 - **Desenvolvimento/regressão:** SQLite continua suportado
 - **Testes:** PHPUnit 12 em SQLite e PostgreSQL 16 no CI
-- **Qualidade:** Pint · `composer validate --strict` · build Vite
+- **Qualidade:** Pint · `composer validate --strict` · build Vite · Composer/npm security audit · config/route cacheability
 - **Relatórios:** Dompdf para PDF institucional
 - **Conhecimento:** catálogo PHP allowlisted + Markdown Git-versioned em `resources/knowledge/articles/`
+- **Container de referência:** frontend build determinístico, `pdo_pgsql`, processo runtime sem migrations automáticas e usuário não-root `app`
 
 ## Requisitos locais
 
 - PHP **≥ 8.3**
 - Composer 2.x
-- Node.js 20+ e npm
+- Node.js 22 e npm para reproduzir a linha de CI/frontend atual
 - SQLite para setup local padrão, ou PostgreSQL quando quiser reproduzir o ambiente de produção
 - extensões PHP requeridas pelo Laravel/driver de banco escolhido
 
@@ -113,7 +120,7 @@ A chave `PII_FINGERPRINT_KEY` deve ser estável e independente de `APP_KEY`, poi
 
 ## Rotas principais
 
-A aplicação possui mais rotas do que o MVP inicial. As famílias principais hoje são:
+As famílias principais hoje são:
 
 | Área | Exemplos |
 |---|---|
@@ -126,7 +133,7 @@ A aplicação possui mais rotas do que o MVP inicial. As famílias principais ho
 | Histórico/relatórios | `/history/executions`, `/reports/executions.csv`, PDF por execução |
 | Gestão | `/people`, `/organizations`, `/access` |
 | Conhecimento | `/knowledge`, `/knowledge/{slug}` |
-| Health | `/health` |
+| Health | `/health`, `/health/live`, `/health/ready` |
 
 A fonte da verdade das rotas é [`routes/web.php`](routes/web.php).
 
@@ -162,6 +169,19 @@ A arquitetura é **Git-versioned** e read-only em runtime:
 
 O M8 permanece **sem CMS**, sem editor WYSIWYG, sem upload livre, sem nova persistência de leitura e **sem IA/RAG**. A Base de Conhecimento não prescreve conduta clínica ou tática autônoma.
 
+## M9 — Release & Final Product Hardening
+
+O M9 não adiciona um novo domínio funcional. Ele endurece o pacote que será operado:
+
+- `SECURITY.md`, `.env.example`, metadata Composer e locale descrevem o produto atual;
+- CI bloqueia advisories com `composer audit --locked` e `npm audit --audit-level=high`;
+- o workflow principal representa apenas a linha `main` e preserva SQLite, PostgreSQL 16, least-privilege, rollback/reapply, concorrência, build e Pint;
+- Laravel `config:cache` e `route:cache` são verificados no CI;
+- o container de referência usa PostgreSQL, bundle frontend pré-construído, usuário não-root e não executa migrations no startup web;
+- release, rollback, PITR e admissão de tráfego são descritos em [`docs/RELEASE.md`](docs/RELEASE.md) e [`docs/PRODUCTION.md`](docs/PRODUCTION.md).
+
+O M9 não escolhe um provedor de deploy/APM e não fabrica nova tag sem política/versionamento inequívocos.
+
 O design system está documentado em [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md).
 
 ## Testes e gates de qualidade
@@ -172,12 +192,16 @@ Localmente:
 composer test
 vendor/bin/pint --test
 npm run build
+composer audit --locked
+npm audit --audit-level=high
 ```
 
 O GitHub Actions valida, entre outros gates definidos no workflow:
 
 - metadados Composer;
+- Composer/npm security audits;
 - build dos assets;
+- cacheability de configuração/rotas Laravel;
 - migrations do zero;
 - suíte PHPUnit em SQLite;
 - suíte PHPUnit em PostgreSQL 16;
@@ -185,7 +209,8 @@ O GitHub Actions valida, entre outros gates definidos no workflow:
 - rollback/reapply dos guards de banco;
 - repetição dos invariantes de concorrência;
 - Pint;
-- contratos de segurança, busca e integridade do Knowledge Center.
+- contratos de segurança, busca e integridade do Knowledge Center;
+- contratos de release M9.
 
 ## Invariantes institucionais importantes
 
@@ -198,13 +223,16 @@ O GitHub Actions valida, entre outros gates definidos no workflow:
 - relatórios seguem autorização e contexto da organização ativa;
 - interface ability-aware não substitui autorização backend;
 - a Base de Conhecimento é global, read-only e não contém conteúdo controlado por tenant;
-- conteúdo de conhecimento não pode ampliar autorização nem substituir protocolos institucionais.
+- conteúdo de conhecimento não pode ampliar autorização nem substituir protocolos institucionais;
+- migrations de produção e runtime web/queue usam identidades distintas.
 
 ## Documentação técnica relevante
 
 - [`docs/PRODUCT.md`](docs/PRODUCT.md) — problema e objetivo do produto
 - [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md) — tokens, componentes e UX
 - [`docs/PRODUCTION.md`](docs/PRODUCTION.md) — operação/deploy de produção
+- [`docs/RELEASE.md`](docs/RELEASE.md) — release, admissão, rollback e recovery
+- [`CHANGELOG.md`](CHANGELOG.md) — histórico por milestone/linha release-ready
 - [`docs/REPORTING.md`](docs/REPORTING.md) — semântica de reporting
 - [`docs/DEMO.md`](docs/DEMO.md) — ambiente/dados demonstrativos
 - [`docs/PHASE_M8_AUDIT.md`](docs/PHASE_M8_AUDIT.md) — auditoria forense do Knowledge Center
@@ -217,7 +245,7 @@ Encontrou uma vulnerabilidade? Não abra issue pública. Consulte [`SECURITY.md`
 
 ## Contribuindo
 
-Consulte [`CONTRIBUTING.md`](CONTRIBUTING.md). Mudanças estruturais devem preservar testes, isolamento de tenant, contratos históricos e integridade do catálogo de conhecimento.
+Consulte [`CONTRIBUTING.md`](CONTRIBUTING.md). Mudanças estruturais devem preservar testes, isolamento de tenant, contratos históricos, integridade do catálogo de conhecimento e contratos de release.
 
 ## Licença
 
