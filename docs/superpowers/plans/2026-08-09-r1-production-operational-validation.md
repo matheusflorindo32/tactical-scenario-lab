@@ -2,136 +2,94 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Turn the M1–M9 release-ready repository into verified staging and production operational evidence using a staging-first, fail-closed promotion model.
+**Goal:** Convert the M1–M9 release-ready repository into verified staging and production operational evidence using a staging-first, fail-closed promotion model.
 
-**Architecture:** Use AWS as the preferred R1 provider stack: Amazon ECS on Fargate for the validated Docker image, Application Load Balancer + ACM for HTTPS/traffic admission, Amazon RDS for PostgreSQL 16 with enforced TLS and PITR, AWS Secrets Manager for application/database secrets, Amazon ECR for immutable images, and CloudWatch Logs for private runtime logs. Staging and production are separate security boundaries; migration credentials are available only to controlled one-off migration tasks, while web/worker tasks use a distinct least-privilege database role.
+**Architecture:** AWS is the selected R1 stack: Amazon ECR for immutable image identity, Amazon ECS on Fargate using native `BLUE_GREEN` deployments, Application Load Balancer + ACM for HTTPS, Amazon RDS for PostgreSQL 16 with enforced TLS and PITR, AWS Secrets Manager for separate application/migration/runtime secrets, and CloudWatch Logs for protected runtime logs. Blue and green revisions use separate target groups; candidate traffic is exercised through a test listener/rule and the production listener does not shift until R1 admission checks pass.
 
 **Tech Stack:** Laravel/PHP 8.4, Docker, PostgreSQL 16, AWS ECS/Fargate, ECR, RDS, ALB, ACM, Secrets Manager, CloudWatch, GitHub Actions.
 
 ## Global Constraints
 
-- Production promotion is blocked until staging passes every applicable promotion gate.
+- Production promotion is blocked until staging passes every applicable R1 promotion gate.
 - Staging never uses the authoritative production database or production PII by default.
-- Staging and production do not share APP_KEY, PII_FINGERPRINT_KEY, database passwords, provider tokens or migration/runtime credentials.
+- Staging and production do not share `APP_KEY`, `PII_FINGERPRINT_KEY`, DB credentials, provider tokens or migration/runtime credentials.
 - HTTPS is mandatory for hosted authenticated traffic.
 - Production PostgreSQL must support PITR before promotion.
 - Backup configuration without a successful isolated restore drill is not GREEN.
 - Runtime PostgreSQL identity must not own schema objects or have DDL capability.
 - Migration credentials must not remain in web/worker runtime after deployment.
-- Release identity is an exact Git SHA plus immutable image digest; mutable `latest` is insufficient.
+- Release identity is exact Git SHA + immutable image digest; mutable `latest` is insufficient.
 - Any unresolved Critical/High finding or blocking UNKNOWN/FAIL prevents promotion.
-- M9 Security, Container, SQLite, PostgreSQL and Pint matrix remains mandatory after any repository-file change.
+- ALB target health is never the sole admission authority because ALB may fail open when every target is unhealthy.
+- Candidate revisions must stay on the alternate target group/test route until `/health/live`, `/health/ready`, least-privilege and release-critical smoke checks pass.
+- M9 Security, Container, SQLite, PostgreSQL and Pint matrix remains mandatory after repository-file changes.
 - No provider/deploy/restore/browser/production evidence may be fabricated.
 
 ---
 
-### Task 1: Provider Selection and R1 Evidence Ledger
+### Task 1: Provider Selection and Evidence Ledger
 
 **Files:**
 - Create: `docs/R1_PROVIDER_SCORECARD.md`
 - Create: `docs/superpowers/sdd/r1-progress.md`
-- Modify: PR #13 body only; no runtime files.
+- Modify: PR #13 metadata only.
 
-**Interfaces:**
-- Consumes: approved R1 spec and M9 production/release contracts.
-- Produces: selected provider architecture, blocking capability matrix, gate ledger and explicit external blocker list.
+**Produces:** selected provider architecture, blocking capability matrix and explicit external blockers.
 
-- [ ] **Step 1: Verify provider capabilities from current primary documentation**
+- [ ] Verify AWS/GCP/Azure capabilities from current primary documentation.
+- [ ] Score each blocking criterion PASS/FAIL/UNKNOWN.
+- [ ] Select AWS only if every required AWS criterion is PASS.
+- [ ] Record the provider-specific ALB fail-open finding and mandatory ECS native blue/green mitigation.
+- [ ] Create the R1 evidence ledger.
+- [ ] Run the full M9 CI matrix on the final Gate 1 repository HEAD.
+- [ ] Mark Gate 1 GREEN only after CI succeeds.
 
-Verify container runtime, managed PostgreSQL 16, TLS, secret management, environment isolation, traffic health checks, private logging, backup/PITR/restore, migration/runtime credential separation, immutable image identity and operator access.
-
-- [ ] **Step 2: Record a three-candidate scorecard**
-
-Score AWS, GCP and Azure as `PASS`, `FAIL` or `UNKNOWN` for each blocking requirement. Do not use popularity or cost to override a blocking requirement.
-
-- [ ] **Step 3: Select the provider**
-
-Select AWS only if every blocking requirement needed by this design is PASS. Preferred stack:
-
-```text
-GitHub exact SHA
-  -> ECR immutable image digest
-  -> ECS/Fargate service
-  -> ALB HTTPS listener + ACM certificate
-  -> RDS PostgreSQL 16 (TLS required, PITR enabled)
-  -> Secrets Manager
-  -> CloudWatch Logs
-```
-
-Use distinct staging and production services, databases and secrets. Prefer separate AWS accounts; if unavailable, require at least separate VPC/service/database/secret boundaries and document the residual risk.
-
-- [ ] **Step 4: Create the progress ledger**
-
-Record M9 baseline merge SHA `1d77b89ef273e97cc53c7901df2d0f405684df45`, R1 spec path, R1 plan path and Gate 1 evidence.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add docs/R1_PROVIDER_SCORECARD.md docs/superpowers/sdd/r1-progress.md
-git commit -m "docs(r1): select provider and establish operational ledger"
-```
-
-### Task 2: Isolated Staging Infrastructure Contract
+### Task 2: Isolated Staging + HTTPS
 
 **Files:**
 - Create: `docs/R1_STAGING_RUNBOOK.md`
-- Create if justified by provider access: `infra/aws/staging/README.md`
-- Test: repository contract test only if new executable configuration is added.
+- Create if provider access justifies it: `infra/aws/staging/README.md`
 
-**Interfaces:**
-- Consumes: AWS scorecard and exact release SHA/image digest.
-- Produces: staging topology and evidence checklist for Gate 2.
+**Produces:** hosted staging boundary and secret-safe evidence format.
 
-- [ ] **Step 1: Define staging resource boundary**
-
-Required logical resources:
+Required topology:
 
 ```text
-staging VPC/private subnets
-staging RDS PostgreSQL 16
-staging ECS cluster/service
-staging ALB target group
-staging ACM certificate + HTTPS listener
-staging Secrets Manager namespace
-staging CloudWatch log groups
-staging ECR image digest reference
+staging security boundary
+  -> ECR immutable release image
+  -> ECS/Fargate service using BLUE_GREEN
+       -> blue target group
+       -> green target group
+       -> HTTPS production listener/rule
+       -> HTTPS test listener/rule
+  -> staging RDS PostgreSQL 16
+  -> staging Secrets Manager secrets
+  -> staging CloudWatch log groups
+  -> ACM certificate + staging hostname
 ```
 
-- [ ] **Step 2: Define DNS/TLS acceptance checks**
+Acceptance checks after real resource creation:
 
 ```bash
-curl -fsS -o /dev/null -w '%{http_code}\n' https://STAGING_HOST/health/live
-curl -fsS https://STAGING_HOST/health/ready
-openssl s_client -connect STAGING_HOST:443 -servername STAGING_HOST </dev/null
+curl -fsS https://STAGING_TEST_HOST/health/live
+curl -fsS https://STAGING_TEST_HOST/health/ready
+openssl s_client -connect STAGING_TEST_HOST:443 -servername STAGING_TEST_HOST </dev/null
 ```
 
-Expected after deployment: valid certificate chain, HTTP 200 liveness, HTTP 200 readiness only when DB is ready.
+- [ ] Prove staging DB/service/secrets are distinct from production.
+- [ ] Prove valid HTTPS/TLS.
+- [ ] Prove deployed task definition maps to exact image digest/Git SHA.
+- [ ] Keep production listener/routing untouched by candidate validation.
 
-- [ ] **Step 3: Prove production resource non-reuse**
-
-Evidence must show distinct staging DB endpoint, secrets and application service identifiers. Never print secret values.
-
-- [ ] **Step 4: Commit runbook/config only after evidence format is deterministic**
-
-```bash
-git add docs/R1_STAGING_RUNBOOK.md infra/aws/staging/README.md
-git commit -m "docs(r1): define isolated staging deployment contract"
-```
-
-### Task 3: Secrets and Migration/Runtime Identity Separation
+### Task 3: Secrets + Migration/Runtime Identity Separation
 
 **Files:**
 - Create if needed: `scripts/ops/r1/verify-runtime-role.sh`
-- Modify only if a defect is proven: deployment docs/config.
-- Test: `tests/Feature/R1OperationalContractTest.php` for repository-visible contracts.
+- Create if needed: `tests/Feature/R1OperationalContractTest.php`
 
-**Interfaces:**
-- Consumes: staging RDS endpoint and external secrets.
-- Produces: secret-safe migration task and least-privilege runtime proof.
+**Produces:** migration-only and steady-state runtime identities with secret-safe proof.
 
-- [ ] **Step 1: Create separate PostgreSQL users**
-
-Use deployment-specific names. Required posture:
+PostgreSQL posture:
 
 ```sql
 CREATE ROLE <migration_role> LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE;
@@ -142,79 +100,44 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO <runtime_
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO <runtime_role>;
 ```
 
-- [ ] **Step 2: Store credentials in separate secret objects**
-
-Migration task references only migration secret; ECS web/worker task definitions reference only runtime secret plus application secrets.
-
-- [ ] **Step 3: Verify runtime cannot perform DDL**
+- [ ] Store migration and runtime DB credentials in separate Secrets Manager objects.
+- [ ] Migration one-off ECS task references migration credential only.
+- [ ] Web/worker task definitions reference runtime credential only.
+- [ ] Verify runtime DDL denial:
 
 ```bash
 psql "$RUNTIME_DATABASE_URL" -v ON_ERROR_STOP=1 -c 'CREATE TABLE r1_should_fail(id bigint);'
 ```
 
-Expected: permission denied. The failed table must not exist.
+Expected: permission denied.
 
-- [ ] **Step 4: Verify encrypted RDS connection**
+- [ ] Use RDS CA + `DB_SSLMODE=verify-full`.
+- [ ] Verify SSL in PostgreSQL without exposing credentials.
 
-Application uses `DB_SSLMODE=verify-full` and the RDS CA bundle. Validate with `pg_stat_ssl`/`sslinfo` without exposing credentials.
-
-- [ ] **Step 5: Commit only repository-side verification helpers**
-
-```bash
-git add scripts/ops/r1/verify-runtime-role.sh tests/Feature/R1OperationalContractTest.php
-git commit -m "test(r1): verify runtime identity separation"
-```
-
-### Task 4: PostgreSQL Backup, PITR and Restore Drill
+### Task 4: Backup/PITR + Isolated Restore Drill
 
 **Files:**
 - Create: `docs/R1_RECOVERY_DRILL.md`
-- No production dump files or credentials may enter the repository.
 
-**Interfaces:**
-- Consumes: staging RDS instance with automated backups/PITR.
-- Produces: isolated restore target and secret-safe integrity evidence.
+**Produces:** real recovery evidence, not backup-existence evidence.
 
-- [ ] **Step 1: Confirm PITR window**
+- [ ] Confirm RDS automated backups/PITR retention and earliest/latest restorable time.
+- [ ] Restore to a **new staging-recovery RDS instance** using point-in-time restore.
+- [ ] Never overwrite the source staging DB for the first drill.
+- [ ] Validate migration state and M6 tenant/history/integrity invariants on recovery target.
+- [ ] Record observed recovery duration as an observation, not a contractual RTO/SLA.
+- [ ] Keep dumps, passwords and private DB URLs out of GitHub artifacts.
 
-Use RDS console/API/CLI to record earliest/latest restorable time and backup retention without recording credentials.
-
-- [ ] **Step 2: Restore to a new isolated DB instance**
-
-Use `restore-db-instance-to-point-in-time` targeting a new staging-recovery identifier. Never overwrite the source staging DB for the first drill.
-
-- [ ] **Step 3: Validate restored schema/invariants**
-
-Run migration status and the M6 integrity checks against recovery-target credentials.
-
-- [ ] **Step 4: Record RTO/RPO observation as an observation, not an SLA**
-
-Do not invent contractual RTO/RPO values from a single drill.
-
-- [ ] **Step 5: Commit secret-safe recovery evidence template/results**
-
-```bash
-git add docs/R1_RECOVERY_DRILL.md
-git commit -m "docs(r1): record staging recovery drill"
-```
-
-### Task 5: Real Staging Deployment and Health Admission
+### Task 5: Real Staging Deployment + Candidate Admission
 
 **Files:**
 - Create if needed: `scripts/ops/r1/staging-smoke.sh`
-- Modify: `docs/R1_STAGING_RUNBOOK.md` with actual secret-safe evidence identifiers.
+- Modify: `docs/R1_STAGING_RUNBOOK.md` with secret-safe identifiers only.
 
-**Interfaces:**
-- Consumes: exact image digest, migration secret, runtime secret, TLS hostname and RDS.
-- Produces: admitted staging release with health evidence.
+**Produces:** green revision qualified before production-listener traffic shift.
 
-- [ ] **Step 1: Freeze exact candidate**
-
-Record Git SHA and ECR digest. Reconfirm repository CI on that SHA.
-
-- [ ] **Step 2: Run migration task separately**
-
-The one-off task executes:
+- [ ] Freeze Git SHA and ECR digest; reconfirm repository CI.
+- [ ] Launch controlled migration ECS task with migration credentials:
 
 ```bash
 php artisan production:preflight
@@ -223,104 +146,81 @@ php artisan config:cache
 php artisan route:cache
 ```
 
-- [ ] **Step 3: Start/update runtime service with runtime secrets only**
+- [ ] Deploy green ECS service revision to alternate target group with **zero production listener weight/traffic**.
+- [ ] Exercise candidate through test listener/rule.
+- [ ] Require `/health/live` HTTP 200.
+- [ ] Require `/health/ready` HTTP 200 with ready/database ok.
+- [ ] Reconfirm runtime task definition contains no migration credential reference.
+- [ ] Run minimum synthetic authenticated smoke against green.
+- [ ] Shift production listener only after all candidate admission checks pass.
+- [ ] Preserve blue revision through a bake/rollback window.
 
-No migration-role secret may be present in the runtime task definition.
-
-- [ ] **Step 4: Admit through health checks**
-
-ALB liveness target check uses `/health/live`. Operator separately requires `/health/ready` to return ready/database ok before functional QA.
-
-- [ ] **Step 5: Capture secret-safe deployment evidence**
-
-Record ECS task definition revision, ECR digest, release SHA, target health and migration state.
-
-### Task 6: Authenticated Smoke/E2E and Browser QA
+### Task 6: Authenticated Smoke/E2E + Browser QA
 
 **Files:**
-- Create if needed: `tests/e2e/r1-staging.spec.*`
+- Create if justified: `tests/e2e/r1-staging.spec.*`
 - Create: `docs/R1_BROWSER_QA.md`
 
-**Interfaces:**
-- Consumes: admitted staging environment and synthetic test identities.
-- Produces: authenticated workflow and authorization evidence.
+**Produces:** hosted authenticated/authorization/accessibility evidence.
 
-- [ ] **Step 1: Create disposable synthetic test identities/data**
+- [ ] Use disposable synthetic tenant/users/data only.
+- [ ] Cover login, organization context, dashboard, scenario/version, execution, assessment/debrief, history/report, Knowledge Center, people/access and logout.
+- [ ] Verify restricted identity receives expected forbidden behavior.
+- [ ] Verify skip link, keyboard/focus, reduced-motion and low-light persistence.
+- [ ] Qualify Chromium plus one independent browser engine where automation is available; otherwise record and complete a manual second-engine check before production promotion.
+- [ ] Treat release-critical failures as RED defects requiring fix + full CI + redeploy.
 
-No production PII.
-
-- [ ] **Step 2: Exercise release-critical flows**
-
-Cover login, organization context, dashboard, scenarios/versions, execution, assessment/debrief, history/report, Knowledge Center, people/access, restricted-user forbidden behavior and logout.
-
-- [ ] **Step 3: Run accessibility/browser sanity**
-
-Verify skip link, focus visibility, keyboard navigation, reduced motion and low-light persistence in Chromium plus one independent engine when available.
-
-- [ ] **Step 4: Record failures as release blockers**
-
-Any release-critical failure creates a RED defect and must be fixed/retested before Gate 6 is GREEN.
-
-### Task 7: Observability and Failure/Recovery Drill
+### Task 7: Observability + Failure/Recovery Drill
 
 **Files:**
 - Create: `docs/R1_FAILURE_DRILL.md`
-- Modify if necessary: staging runbook only.
 
-**Interfaces:**
-- Consumes: staging service, CloudWatch logs, RDS and recovery evidence.
-- Produces: failure-detection/recovery proof and decision tree evidence.
+**Produces:** operator detection/recovery evidence.
 
-- [ ] **Step 1: Inspect protected logs for secret/PII leakage**
+- [ ] Inspect CloudWatch logs for representative requests/errors without exporting raw sensitive logs to Git.
+- [ ] Confirm no secret, private DB URL, APP_KEY, PII_FINGERPRINT_KEY or raw PII is present in inspected evidence.
+- [ ] Safely induce a staging-only database-unavailable condition.
+- [ ] Confirm liveness remains process-oriented while readiness fails closed.
+- [ ] Restart/redeploy the same candidate digest and confirm stable recovery.
+- [ ] Exercise blue/green rollback to a known schema-compatible blue revision, or document incompatibility and rehearse approved roll-forward instead.
+- [ ] Tie failure drill to Gate 4 PITR/restore decision path.
 
-Check representative app and task logs. Do not export raw sensitive logs into Git.
-
-- [ ] **Step 2: Exercise database-unavailable behavior safely**
-
-Use a controlled staging-only mechanism. Expect `/health/live` to remain process-oriented and `/health/ready` to fail closed.
-
-- [ ] **Step 3: Redeploy/restart same candidate**
-
-Confirm stable recovery to the same SHA/image digest.
-
-- [ ] **Step 4: Exercise rollback or approved roll-forward rehearsal**
-
-Rollback only to a known schema-compatible candidate. If not compatible, document why and rehearse roll-forward instead.
-
-- [ ] **Step 5: Record operator decision path**
-
-Distinguish application rollback, schema rollback and PITR.
-
-### Task 8: Production Promotion and Release Closeout
+### Task 8: Production Promotion + Release Closeout
 
 **Files:**
 - Create: `docs/R1_PRODUCTION_CLOSEOUT.md`
-- Update: PR #13 body/comment only after repository evidence is frozen.
+- Update PR/evidence comments after repository evidence freeze only.
 
-**Interfaces:**
-- Consumes: Gates 1–7 GREEN, exact candidate SHA/image digest and separately configured production resources.
-- Produces: production release evidence and explicit version/tag decision.
+**Produces:** production evidence and explicit version/tag decision.
 
-- [ ] **Step 1: Reconfirm promotion preconditions**
+Preconditions:
 
-All Gates 1–7 GREEN; zero Critical/High findings; production secrets/roles/DB isolated; PITR available; repository CI still green.
+- Gates 1–7 GREEN.
+- Exact candidate SHA/digest unchanged.
+- Repository CI GREEN.
+- Zero unresolved Critical/High findings.
+- Production resources/secrets/roles isolated from staging.
+- Production PITR/recovery point confirmed.
 
-- [ ] **Step 2: Execute controlled production migration/runtime sequence**
+Sequence:
 
-Same identity split as staging; production never receives staging credentials.
+1. Run production migration task with production migration credentials.
+2. Deploy green production revision to alternate target group with no production traffic.
+3. Verify live/ready, runtime least privilege and minimal non-destructive authenticated smoke through test routing.
+4. Shift production listener to green only after admission.
+5. Keep blue revision for defined bake/rollback window.
+6. Inspect CloudWatch alarms/logs for release anomalies.
+7. Record Git SHA, ECR digest, ECS revision, migration state, RDS identity and health evidence.
+8. Create a semantic tag only if a versioning policy and exact version are explicitly chosen; otherwise SHA/digest remains release identity.
 
-- [ ] **Step 3: Verify production health and minimal non-destructive smoke**
+## Verification policy
 
-Confirm `/health/live`, `/health/ready`, login and one safe authenticated path.
+Any repository-file change during R1 requires the inherited M9 matrix on the exact candidate HEAD:
 
-- [ ] **Step 4: Capture release identity**
+- Security — `composer audit --locked` + `npm audit --audit-level=high`;
+- real Docker image build/runtime contract;
+- PHPUnit SQLite;
+- PHPUnit PostgreSQL 16 including least-privilege, rollback/reapply and concurrency;
+- Pint.
 
-Record Git SHA, image digest, migration state, production service/task revision and health outcome.
-
-- [ ] **Step 5: Make explicit version/tag decision**
-
-Create a semantic tag only if a versioning policy and exact version are explicitly chosen. Otherwise SHA remains the release identity.
-
-- [ ] **Step 6: Close R1**
-
-Update the PR/evidence ledger without moving a repository head after any final exact-head CI selected for integration.
+Operational gates use observe-not-green → smallest configuration/fix → rerun → secret-safe evidence. Failed checks are never reworded into PASS.
