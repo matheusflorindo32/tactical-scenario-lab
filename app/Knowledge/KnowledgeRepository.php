@@ -40,6 +40,7 @@ final class KnowledgeRepository
             'html_input' => 'strip',
             'allow_unsafe_links' => false,
         ]);
+        $safeHtml = $this->withoutLeadingMarkdownTitle($safeHtml);
         [$html, $toc] = $this->decorateHeadings($safeHtml);
 
         return new KnowledgeArticle(
@@ -59,6 +60,13 @@ final class KnowledgeRepository
             searchText: Str::squish(strip_tags($markdown)),
             toc: $toc,
         );
+    }
+
+    private function withoutLeadingMarkdownTitle(string $html): string
+    {
+        $withoutTitle = preg_replace('/^\s*<h1>.*?<\/h1>\s*/si', '', $html, 1);
+
+        return is_string($withoutTitle) ? $withoutTitle : $html;
     }
 
     private function decorateHeadings(string $html): array
