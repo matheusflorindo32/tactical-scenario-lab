@@ -39,6 +39,21 @@ class PostgresImmutabilityTest extends TestCase
         ]);
     }
 
+    public function test_runtime_sql_can_change_draft_scenario_definition(): void
+    {
+        $versionId = DB::table('scenario_versions')->where('publication_status', 'draft')->value('id');
+        $this->assertNotNull($versionId);
+
+        PostgresRuntimeRole::activateWithinTransaction(DB::connection());
+
+        $updated = DB::table('scenario_versions')->where('id', $versionId)->update([
+            'environment' => 'Valid draft runtime mutation',
+            'updated_at' => now(),
+        ]);
+
+        $this->assertSame(1, $updated);
+    }
+
     public function test_runtime_sql_cannot_change_finalized_assessment_row(): void
     {
         $assessmentId = $this->finalizedAssessmentId();
@@ -50,6 +65,48 @@ class PostgresImmutabilityTest extends TestCase
             'evaluator_adjustment' => 99,
             'updated_at' => now(),
         ]);
+    }
+
+    public function test_runtime_sql_cannot_delete_finalized_assessment_row(): void
+    {
+        $assessmentId = $this->finalizedAssessmentId();
+
+        PostgresRuntimeRole::activateWithinTransaction(DB::connection());
+        $this->expectException(QueryException::class);
+
+        DB::table('execution_assessments')->where('id', $assessmentId)->delete();
+    }
+
+    public function test_runtime_sql_can_change_draft_assessment_content(): void
+    {
+        $assessmentId = DB::table('execution_assessments')->where('status', 'draft')->value('id');
+        $this->assertNotNull($assessmentId);
+
+        $criterionId = DB::table('assessment_criteria')
+            ->where('execution_assessment_id', $assessmentId)
+            ->value('id');
+
+        if ($criterionId === null) {
+            $criterionId = DB::table('assessment_criteria')->insertGetId([
+                'uuid' => fake()->uuid(),
+                'execution_assessment_id' => $assessmentId,
+                'label' => 'Draft criterion',
+                'weight' => 100,
+                'max_score' => 10,
+                'position' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        PostgresRuntimeRole::activateWithinTransaction(DB::connection());
+
+        $updated = DB::table('assessment_criteria')->where('id', $criterionId)->update([
+            'label' => 'Valid draft criterion mutation',
+            'updated_at' => now(),
+        ]);
+
+        $this->assertSame(1, $updated);
     }
 
     #[DataProvider('finalizedContentMutations')]
@@ -68,6 +125,18 @@ class PostgresImmutabilityTest extends TestCase
             $column => $value,
             'updated_at' => now(),
         ]);
+    }
+
+    #[DataProvider('finalizedContentTables')]
+    public function test_runtime_sql_cannot_delete_finalized_assessment_content(string $table): void
+    {
+        $rowId = $this->historicalContentRowId($table, $this->finalizedAssessmentId());
+        $this->assertNotNull($rowId, "Demo graph must contain {$table} for the finalized assessment.");
+
+        PostgresRuntimeRole::activateWithinTransaction(DB::connection());
+        $this->expectException(QueryException::class);
+
+        DB::table($table)->where('id', $rowId)->delete();
     }
 
     public function test_runtime_sql_cannot_update_execution_timeline_event(): void
@@ -122,6 +191,18 @@ class PostgresImmutabilityTest extends TestCase
             'key time' => ['key_time_records', 'label', 'Forbidden key time rewrite'],
             'debrief entry' => ['debrief_entries', 'content', 'Forbidden debrief entry rewrite'],
             'action content' => ['action_items', 'action', 'Forbidden action rewrite'],
+        ];
+    }
+
+    public static function finalizedContentTables(): array
+    {
+        return [
+            'criterion' => ['assessment_criteria'],
+            'evidence' => ['assessment_evidence'],
+            'critical error' => ['critical_error_occurrences'],
+            'key time' => ['key_time_records'],
+            'debrief entry' => ['debrief_entries'],
+            'action content' => ['action_items'],
         ];
     }
 
