@@ -11,7 +11,7 @@ Status: IMPLEMENTATION
 - [x] Gate 2 — Security & Dependency Governance — GREEN
 - [x] Gate 3 — Production Container & Deployment Parity — GREEN
 - [x] Gate 4 — CI & Release Pipeline Hardening — GREEN
-- [ ] Gate 5 — Reliability & Deterministic Performance Budget
+- [x] Gate 5 — Reliability & Deterministic Performance Budget — GREEN
 - [ ] Gate 6 — UX, Localization & Accessibility Finalization
 - [ ] Gate 7 — Observability, Recovery & Release Documentation
 - [ ] Gate 8 — Final Forensic Audit & Protected Integration
@@ -58,10 +58,11 @@ Status: IMPLEMENTATION
 - Result: CI now represents the current release line and no longer carries the deprecated Node 20 action-runtime warning discovered by the RED run.
 
 ### Gate 5 — Reliability & Deterministic Performance Budget
-- RED SHA: pending
-- RED CI: pending
-- GREEN SHA: pending
-- GREEN CI: pending
+- RED SHA: `c44df7be1fa4075d528546a238c678e720e379e9`
+- RED CI: #848 / run `31326403341` — health/liveness/readiness assertions passed while the new reliability contract failed exactly because Laravel config/route cacheability commands were absent from CI. SQLite retained 332 passing tests with 31 PostgreSQL-specific tests skipped; Security and Pint were green.
+- GREEN SHA: `b71b7d913973f77fd9b227ca6e2691596620779e`
+- GREEN CI: #849 / run `31326470752` — Security job `93277544026`, SQLite job `93277543995`, PostgreSQL 16 job `93277544042` and Pint job `93277544052` all SUCCESS. Both database jobs successfully executed `config:cache`, `route:cache`, `config:clear` and `route:clear` before migrations/tests. PostgreSQL then passed least-privilege provisioning, rollback/reapply, repeated M6 concurrency invariants and the full suite.
+- Result: release cacheability is now deterministic in CI without wall-clock performance thresholds, while liveness remains database-independent and readiness remains minimal and secret-safe.
 
 ### Gate 6 — UX, Localization & Accessibility Finalization
 - RED SHA: pending
