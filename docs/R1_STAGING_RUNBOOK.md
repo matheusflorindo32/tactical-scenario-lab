@@ -1,163 +1,175 @@
-# R1 Staging Runbook — AWS
+# R1 Staging Runbook — Vercel + Neon
 
-Status: PREPARED — external AWS access required
+Status: PROVIDER REVISION IN EXECUTION
 
-This runbook executes Gate 2 and prepares Gate 3 without treating documentation as provider evidence. A gate is GREEN only after the real AWS resources and runtime checks exist.
+This runbook executes Gate 2 and prepares Gates 3–5. Documentation is not provider evidence: a gate is GREEN only after the real Vercel deployment, Neon database and runtime checks exist.
 
 ## Safety rules
 
-- Use a dedicated staging AWS account when available. If not, isolate staging with separate VPC, ECS service, RDS instance, Secrets Manager objects, log groups, target groups and IAM roles.
-- Never paste or commit long-lived AWS access keys, database passwords, `APP_KEY`, `PII_FINGERPRINT_KEY`, private database URLs or TLS private material.
-- Prefer GitHub Actions OIDC to an AWS deployment role instead of static AWS secrets.
-- Staging never connects to the authoritative production database and does not require production PII.
-- Every deploy is identified by exact Git SHA plus immutable ECR image digest. Do not deploy `latest` as release identity.
-- Migration credentials exist only in a controlled one-off migration task. Web/worker task definitions use the runtime database role only.
-- Production traffic promotion is out of scope until Gates 1–7 are GREEN.
+- Use only the authenticated Vercel workspace intended for this project.
+- Staging never connects to the authoritative production database and never requires production PII.
+- `APP_KEY`, `PII_FINGERPRINT_KEY`, database credentials and provider tokens are never committed, pasted into PR comments or baked into container images.
+- Staging application/database secrets are unique to staging.
+- The existing M9 Docker contract remains authoritative; `Dockerfile.vercel` is a provider adapter, not a new application runtime design.
+- No migration command runs automatically in the web container startup command.
+- Production is not created or promoted until Gates 1A–7 are GREEN and Gate 8 explicitly approves the provider/plan.
 
-## Required staging topology
+## Target topology
 
 ```text
-GitHub exact SHA
-  -> GitHub Actions OIDC -> AWS staging deploy role
-  -> ECR immutable image digest
-  -> ECS/Fargate service using native BLUE_GREEN
-       -> blue target group
-       -> green target group
-       -> HTTPS production listener/rule
-       -> HTTPS test listener/rule
-  -> ACM certificate + staging hostname
-  -> RDS PostgreSQL 16
-       -> TLS required
-       -> RDS CA available to application
-       -> automated backups/PITR enabled
-  -> Secrets Manager
-       -> application secrets
-       -> migration database credential
-       -> runtime database credential
-  -> CloudWatch Logs
+GitHub exact candidate SHA
+          |
+          v
+VERCEL PROJECT: tactical-scenario-lab
+          |
+          +-- custom staging environment (preferred)
+          |      or isolated Preview target
+          |
+          +-- Dockerfile.vercel container
+          +-- managed HTTPS deployment URL
+          +-- staging-only environment variables
+          +-- private runtime logs
+          |
+          v
+NEON STAGING
+  isolated PostgreSQL
+  staging-only credentials
+  controlled migration path
+  restricted runtime role
+  recovery/branch drill target
 ```
 
-## Phase A — AWS identity and access bootstrap
+## Phase A — Vercel project boundary
 
-1. Create/use a staging AWS account or explicitly documented staging boundary.
-2. Configure GitHub OIDC trust for this repository and a staging deployment role. Restrict the trust policy to this repository and the intended branch/environment; do not grant a generic organization-wide subject.
-3. Grant the deployment role only the actions required to push the release image and manage the staging resources used by this runbook.
-4. Keep human break-glass administration separate from the GitHub deployment role.
-5. Capture only secret-safe identifiers in R1 evidence: account alias/id suffix if safe, region, service names, resource ARNs with sensitive account details redacted when evidence is public.
+1. Create/link a Vercel project named `tactical-scenario-lab` in the authenticated team.
+2. Record the Vercel project ID and team ID as secret-safe provider identifiers.
+3. Prefer a custom environment named `staging` if the active plan permits it.
+4. If a custom environment is unavailable, use an isolated Preview deployment tied to the R1 branch/candidate; do not treat the provider's Production environment as staging.
+5. Confirm the project does not reference any existing production database or application secret.
 
-Gate evidence: OIDC role exists, workflow can obtain short-lived AWS credentials, and no long-lived AWS key is stored in GitHub repository variables/secrets for deployment.
+Gate evidence: project exists, environment boundary is identified, and future production remains logically separate.
 
-## Phase B — network and database boundary
+## Phase B — container and release identity
 
-1. Create a staging VPC boundary suitable for ECS and RDS.
-2. Keep RDS non-public unless an explicit reviewed exception is required.
-3. Security groups permit PostgreSQL only from the application/migration execution path that needs it.
-4. Create RDS PostgreSQL 16 with automated backups and PITR retention enabled.
-5. Require encrypted PostgreSQL transport. Application connection must use `DB_SSLMODE=verify-full` with the AWS RDS CA trust material available to the runtime.
-6. Create separate migration and runtime PostgreSQL roles.
-7. Runtime role must not own schema objects and must not have DDL privileges.
+1. Use repository `Dockerfile.vercel`.
+2. Freeze the candidate Git SHA after the inherited M9 matrix passes.
+3. Deploy that exact candidate; mutable branch state alone is insufficient evidence.
+4. Record Vercel deployment ID/URL together with the Git SHA.
+5. Confirm runtime listens on the provider `$PORT` and does not run migrations at web startup.
 
-Required verification after real creation:
+Repository contract test: `tests/Feature/R1VercelContainerContractTest.php`.
 
-```sql
-SELECT current_user;
-SHOW ssl;
-SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid();
+## Phase C — Neon staging database
+
+1. Provision/connect a dedicated Neon PostgreSQL resource through the Vercel Marketplace/integration path or an equivalent authenticated Neon path.
+2. Connect the resource only to staging/Preview scope required by this runbook.
+3. Configure Laravel for `pgsql` using provider-issued values outside Git.
+4. Ensure all database identifiers/URLs recorded in public evidence are secret-safe/redacted.
+5. Never reuse a future production Neon database as the staging database.
+
+## Phase D — staging application secrets
+
+Configure outside Git, scoped only to staging/Preview:
+
+- `APP_ENV=production` for production-like validation behavior;
+- `APP_DEBUG=false`;
+- unique `APP_KEY`;
+- unique `PII_FINGERPRINT_KEY`;
+- `DB_CONNECTION=pgsql`;
+- Neon connection values supplied by the provider/integration;
+- secure session/cookie settings required by `production:preflight`;
+- any mail/integration values needed for synthetic staging only.
+
+Do not print secret values during verification.
+
+## Phase E — controlled migrations and runtime role
+
+1. Establish a migration-capable database session only for preflight/schema deployment.
+2. Run:
+
+```bash
+php artisan production:preflight
+php artisan migrate --force
+php artisan config:cache
+php artisan route:cache
 ```
 
-Runtime DDL denial check:
+3. Create/use a restricted runtime role for steady-state web traffic.
+4. Grant only required connection, schema usage, table DML and sequence permissions.
+5. Runtime must not own schema objects or retain unnecessary DDL privilege.
+6. Prove denial:
 
 ```sql
 CREATE TABLE r1_should_fail(id bigint);
 ```
 
-Expected for runtime role: permission denied.
+Expected under runtime credentials: permission denied.
 
-## Phase C — secrets
+7. Configure the hosted application to use the restricted runtime identity after migrations.
 
-Create separate Secrets Manager objects for at least:
+## Phase F — HTTPS and health admission
 
-- staging application secret material (`APP_KEY`, `PII_FINGERPRINT_KEY` and other application-only secrets);
-- staging migration DB identity;
-- staging runtime DB identity.
-
-Rules:
-
-- migration DB secret is referenced only by the migration task definition/execution path;
-- web/worker task definitions reference only runtime DB credentials;
-- secrets are injected through the ECS secrets mechanism, not committed or placed in plaintext task-definition `environment` values;
-- rotating a secret requires launching a new ECS task/revision because injected environment values are read at task start.
-
-## Phase D — image and release identity
-
-1. Build the same Docker image contract already validated by M9.
-2. Push to staging ECR.
-3. Record Git SHA and resulting immutable image digest.
-4. Task definitions must reference an immutable release identity/digest for qualification.
-5. Reconfirm repository Security, Container, SQLite, PostgreSQL and Pint CI before using the candidate.
-
-## Phase E — ECS/Fargate blue-green
-
-1. Create an ECS/Fargate service using native `BLUE_GREEN` deployment strategy.
-2. Configure two ALB target groups: primary/blue and alternate/green.
-3. Configure HTTPS production routing and a distinct HTTPS test route/listener for green qualification.
-4. Health checks use application health paths appropriate to the deployment stage.
-5. Green receives no normal production traffic during qualification.
-6. Validate green through test routing first.
-7. Preserve blue for a bake/rollback window after any later traffic shift.
-
-Important: ALB target health is not the sole promotion authority. Application live/ready, runtime least privilege and smoke checks must all pass before any listener shift.
-
-## Phase F — TLS and hostname
-
-1. Create a staging hostname under a controlled domain.
-2. Issue/attach an ACM certificate valid for the staging hostname.
-3. Serve authenticated staging traffic only over HTTPS.
-4. Redirect or reject plaintext HTTP according to the selected ingress policy.
+Vercel-managed HTTPS is required for the deployed staging URL.
 
 Checks:
 
 ```bash
-curl -fsS https://STAGING_TEST_HOST/health/live
-curl -fsS https://STAGING_TEST_HOST/health/ready
-openssl s_client -connect STAGING_TEST_HOST:443 -servername STAGING_TEST_HOST </dev/null
+curl -fsS https://STAGING_URL/health/live
+curl -fsS https://STAGING_URL/health/ready
 ```
 
-Do not commit the real private hostname if it is intentionally non-public; secret-safe evidence can use a redacted identifier.
+Acceptance:
 
-## Phase G — CloudWatch logging
+- `/health/live` returns HTTP 200 with the minimal liveness contract;
+- `/health/ready` returns HTTP 200 only when database readiness is healthy;
+- no secret/private connection information is exposed;
+- exact Vercel deployment ID and candidate SHA are recorded;
+- no plaintext HTTP endpoint is used to serve authenticated staging traffic.
 
-1. Configure the ECS task with the `awslogs` driver.
-2. Use a staging-only log group with explicit retention.
-3. Confirm representative startup/request/error logs are visible to authorized operators.
-4. Inspect for accidental secret/PII leakage before Gate 2/3 promotion.
-5. Do not copy raw sensitive logs into GitHub artifacts or PR comments.
+## Phase G — logs and diagnostics
+
+1. Inspect Vercel runtime logs through authenticated project access.
+2. Check representative startup, health, login and controlled error paths.
+3. Verify there is no `APP_KEY`, `PII_FINGERPRINT_KEY`, raw DB connection string/password or raw PII in captured evidence.
+4. Record only summarized secret-safe observations in GitHub.
 
 ## Gate 2 acceptance evidence
 
-Gate 2 can be marked GREEN only when all of the following are observed in AWS/runtime:
+Gate 2 is GREEN only when all are observed:
 
-- isolated staging service exists;
-- staging RDS exists and is not the production DB;
-- staging secrets are distinct from production;
-- valid HTTPS/TLS is observed;
-- exact Git SHA and ECR digest are recorded;
-- ECS blue/green has separate blue/green target groups and test routing;
-- green can be addressed through the test path without shifting production routing;
-- CloudWatch receives staging logs;
-- no production credential/data reuse is detected.
+- Vercel Tactical Scenario Lab project exists;
+- isolated custom staging or Preview target exists;
+- dedicated Neon staging PostgreSQL exists;
+- staging-only secrets are configured outside Git;
+- valid HTTPS deployment is reachable;
+- exact Git SHA + Vercel deployment identity are recorded;
+- `/health/live` is healthy;
+- `/health/ready` is healthy with Neon available;
+- no production secret/database reuse is detected.
 
-Documentation or screenshots of a console configuration without the matching runtime checks are not enough by themselves.
+A Dockerfile, documentation, provider console listing or CI alone is not enough.
 
-## Gate 3 preparation
+## Gate 3 acceptance preparation
 
-After Gate 2 exists, immediately prove:
+Immediately after Gate 2:
 
-1. `php artisan production:preflight` under production-like staging configuration;
-2. migration task succeeds using migration credentials;
-3. web/worker runtime contains no migration credential reference;
-4. runtime DB identity can perform required DML;
-5. runtime DDL denial succeeds;
-6. PostgreSQL connection uses verified TLS.
+1. `production:preflight` succeeds in production-like staging configuration;
+2. migrations are run through the controlled migration path;
+3. steady-state runtime uses the restricted DB identity;
+4. runtime DDL denial succeeds;
+5. normal application DML works;
+6. logs show no secret leakage.
 
-Until these are observed on the real staging resources, Gate 3 remains not GREEN.
+## Gate 4 recovery preparation
+
+1. Determine the actual recovery/time-travel/branch capability of the provisioned Neon plan.
+2. Create a recovery target separate from the source staging branch/database.
+3. Recover from a real staging recovery point.
+4. Validate migration state and representative application/integrity invariants on that target.
+5. Record retention/plan limitations explicitly.
+
+A documented provider capability without an executed recovery drill is not GREEN.
+
+## Production boundary
+
+The free/Hobby staging setup is not automatically a production architecture. Gate 8 re-evaluates provider plan terms, commercial/institutional use, expected load, recovery retention and cost before any real production promotion.
