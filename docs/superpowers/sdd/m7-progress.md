@@ -2,7 +2,7 @@
 
 Branch: `feature/m7-operational-command-center`
 PR: #10 — draft
-Status: IN PROGRESS
+Status: FINAL EXACT-HEAD VALIDATION
 
 ## Gates
 
@@ -13,12 +13,13 @@ Status: IN PROGRESS
 - [x] Gate 5 — Execution cockpit — GREEN
 - [x] Gate 6 — Assessment & debrief workbench — GREEN
 - [x] Gate 7 — Management & low-light polish — GREEN
-- [ ] Gate 8 — Forensic UX audit & exact-head gate
+- [x] Gate 8 — Forensic UX audit — GREEN candidate; exact-head integration proof is attached to PR metadata after this ledger-bearing commit passes CI
 
 ## Baseline
 
 - Design spec: `docs/superpowers/specs/2026-08-09-m7-operational-command-center-design.md`
 - Implementation plan: `docs/superpowers/plans/2026-08-09-m7-operational-command-center.md`
+- Audit: `docs/PHASE_M7_AUDIT.md`
 - M7 changes are isolated from `main` until final protected merge.
 - No M8/M9 scope is permitted in this branch.
 
@@ -75,6 +76,10 @@ Status: IN PROGRESS
 - Result: management indexes use canonical Tactical Scenario Lab branding, navigation, `x-table` and defined design tokens; low-light mode is opt-in, accessible, browser-local through Alpine + `localStorage`, defaults to light on SSR and introduces no API/database persistence.
 
 ### Gate 8 — Forensic UX audit & exact-head gate
-- Audit SHA: pending
-- Exact-head CI: pending
-- Merge evidence: pending
+- First audit candidate: `d19a53c4bf72ff75762ef3c0256d647ae4eefb3b` / CI #771 run `31312786461` — rejected. The forensic contract detected canonical use of `ink-600`/`ink-800` without corresponding custom Tailwind tokens.
+- Remediation: added the missing ink tokens; made the forensic test dynamically require every custom color utility used by canonical M7 views to resolve to an `@theme` token; moved low-light semantic text colors into theme tokens; synchronized Design System and audit documentation.
+- GREEN audit candidate SHA: `d7410abb62e483222dad57324049ddee184df2de`
+- GREEN audit candidate CI: #776 / run `31313060335` — SQLite, PostgreSQL 16, production Vite build, Pint, least-privilege role, M6 rollback/reapply, repeated concurrency invariants and full dual-database suites all green.
+- Forensic result: no Critical/High M7 finding remains identified by source/contract audit. Pixel-level authenticated browser review is explicitly not claimed because this connected environment does not provide that browser surface.
+- Exact-head rule: this ledger update intentionally creates the final code/documentation HEAD. Its fresh CI evidence is recorded in PR #10 metadata instead of another repository commit, preventing the proof itself from moving the tested SHA.
+- Merge evidence: pending protected merge after the ledger-bearing exact HEAD passes and PR freshness/review conditions are re-read.
