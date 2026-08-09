@@ -16,8 +16,8 @@ Do not write directly to `main`. M6 integrates only through its own PR after exa
 |---|---|---|---|
 | 1 | PostgreSQL authoritative CI baseline | GREEN | CI #669: PostgreSQL 16 migrate:fresh + full PHPUnit success; SQLite full PHPUnit success; Pint success; npm build success |
 | 2 | Fail-closed production preflight | GREEN | RED #671; output-contract correction #676; GREEN #677 on SQLite + PostgreSQL 16 + Pint/build |
-| 3 | Structural integrity + runtime role | IN PROGRESS | Direct-SQL/runtime-role RED not yet committed |
-| 4 | PostgreSQL database immutability | PENDING | — |
+| 3 | Structural integrity + runtime role | GREEN | RED #680 proved cross-org direct SQL was possible; composite tenant FK + restricted runtime role; CI #691 green on PostgreSQL 16 + SQLite + Pint |
+| 4 | PostgreSQL database immutability | GREEN | TRUE RED #692; diagnostic #695 isolated PostgreSQL JSON + stale fixture defects; exact clean HEAD `cd0c61cc189865da0a513dd345f33f5f02f149a4`; CI #703 green on PostgreSQL 16 + SQLite + Pint |
 | 5 | Deterministic concurrency hardening | PENDING | — |
 | 6 | Liveness/readiness | PENDING | — |
 | 7 | Production operations contract | PENDING | — |
@@ -50,6 +50,27 @@ Do not write directly to `main`. M6 integrates only through its own PR after exa
 - CI `#676` narrowed to one output-format mismatch with 266 tests passing; command output was made one sanitized line per violation.
 - GREEN commit: `55a62707d51c02e05a51cbf7a7ce07ad2cfa8e29`.
 - GREEN CI `#677`: SQLite full PHPUnit success; PostgreSQL 16 full PHPUnit success; Pint success; Composer validation/install and npm build success.
+
+## Task 3 evidence — structural integrity + runtime role
+
+- RED CI `#680` proved direct SQL could attach an assessment to an execution from another organization.
+- `2026_08_08_160000_add_m6_structural_integrity.php` fails closed if historical mismatches exist and adds a composite `(id, organization_id)` uniqueness/FK path rather than rewriting data.
+- CI provisions `tactical_runtime_test` as `NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT`, with only runtime DML/table and sequence privileges and no table ownership or schema DDL.
+- Default privileges preserve the same runtime DML contract when Laravel test migrations recreate tables.
+- GREEN structural/style commit: `587856681b815ae1dc21dd9c384f4236598741b4`.
+- GREEN CI `#691`: PostgreSQL 16, SQLite and Pint all passed.
+
+## Task 4 evidence — PostgreSQL database immutability
+
+- TRUE RED CI `#692` proved the restricted runtime role could still perform the intended direct-SQL corruption attempts before DB guards existed.
+- PostgreSQL trigger guards freeze published scenario definition fields, finalized assessment rows and historical assessment content, while keeping draft content mutable.
+- Definition JSON fields are compared as `jsonb`, preserving semantic equality and avoiding PostgreSQL's lack of `json = json`.
+- Assessment criteria/evidence, observed critical errors, key times, debrief entries and action-item content are immutable after finalization; legitimate action-item status tracking remains allowed.
+- Execution timeline rows reject UPDATE/DELETE at the database layer.
+- A stale dashboard fixture was corrected to record observed critical errors before finalization; the guard was not weakened.
+- Temporary JUnit/Pint diagnostic instrumentation was removed before the gate closed.
+- Exact clean HEAD: `cd0c61cc189865da0a513dd345f33f5f02f149a4`.
+- GREEN CI `#703` (`31290814309`): PostgreSQL 16 full PHPUnit success, SQLite full PHPUnit success and Pint success on the same SHA.
 
 ## Baseline observations
 
