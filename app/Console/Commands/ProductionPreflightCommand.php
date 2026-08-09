@@ -4,7 +4,6 @@ namespace App\Console\Commands;
 
 use App\Support\ProductionConfigurationValidator;
 use Illuminate\Console\Command;
-use LogicException;
 
 class ProductionPreflightCommand extends Command
 {
@@ -14,10 +13,12 @@ class ProductionPreflightCommand extends Command
 
     public function handle(ProductionConfigurationValidator $validator): int
     {
-        try {
-            $validator->assertSafe();
-        } catch (LogicException $exception) {
-            $this->error($exception->getMessage());
+        $violations = $validator->violations();
+
+        if ($violations !== []) {
+            foreach ($violations as $violation) {
+                $this->error($violation);
+            }
 
             return self::FAILURE;
         }
