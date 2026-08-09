@@ -1,18 +1,18 @@
 # R1 Staging Runbook — Vercel + Neon
 
-Status: PROVIDER REVISION IN EXECUTION
+Status: REAL STAGING BOOTSTRAP IN PROGRESS
 
-This runbook executes Gate 2 and prepares Gates 3–5. Documentation is not provider evidence: a gate is GREEN only after the real Vercel deployment, Neon database and runtime checks exist.
+This runbook executes Gate 2 and prepares Gates 3–5. A gate is GREEN only after real provider/runtime evidence exists.
 
 ## Safety rules
 
-- Use only the authenticated Vercel workspace intended for this project.
-- Staging never connects to the authoritative production database and never requires production PII.
-- `APP_KEY`, `PII_FINGERPRINT_KEY`, database credentials and provider tokens are never committed, pasted into PR comments or baked into container images.
-- Staging application/database secrets are unique to staging.
-- The existing M9 Docker contract remains authoritative; `Dockerfile.vercel` is a provider adapter, not a new application runtime design.
-- No migration command runs automatically in the web container startup command.
-- Production is not created or promoted until Gates 1A–7 are GREEN and Gate 8 explicitly approves the provider/plan.
+- Use only the authenticated Vercel and Neon workspaces intended for this project.
+- Staging never connects to an authoritative production database and never requires production PII.
+- `APP_KEY`, `PII_FINGERPRINT_KEY`, database credentials and provider tokens are never committed or pasted into chat/PR evidence.
+- Staging secrets are unique to staging.
+- The root M9 `Dockerfile` remains the provider-neutral container reference, but Vercel staging uses `vercel.json` + `api/index.php` + `vercel-php`; do not describe Vercel as executing the Dockerfile.
+- No migration command runs from normal HTTP/serverless startup.
+- Production remains blocked until Gates 1A–7 are GREEN and Gate 8 explicitly approves the provider/plan.
 
 ## Target topology
 
@@ -22,154 +22,164 @@ GitHub exact candidate SHA
           v
 VERCEL PROJECT: tactical-scenario-lab
           |
-          +-- custom staging environment (preferred)
-          |      or isolated Preview target
-          |
-          +-- Dockerfile.vercel container
+          +-- isolated Preview target for R1
+          +-- vercel.json: framework=null, build -> public
+          +-- api/index.php -> PHP 8.4 community runtime
           +-- managed HTTPS deployment URL
           +-- staging-only environment variables
           +-- private runtime logs
           |
           v
-NEON STAGING
+NEON: tactical-scenario-lab-staging
   isolated PostgreSQL
-  staging-only credentials
-  controlled migration path
-  restricted runtime role
+  controlled migration identity/session
+  restricted steady-state runtime role
   recovery/branch drill target
 ```
 
-## Phase A — Vercel project boundary
+## Phase A — Vercel project boundary — OBSERVED
 
-1. Create/link a Vercel project named `tactical-scenario-lab` in the authenticated team.
-2. Record the Vercel project ID and team ID as secret-safe provider identifiers.
-3. Prefer a custom environment named `staging` if the active plan permits it.
-4. If a custom environment is unavailable, use an isolated Preview deployment tied to the R1 branch/candidate; do not treat the provider's Production environment as staging.
-5. Confirm the project does not reference any existing production database or application secret.
+Observed identifiers:
 
-Gate evidence: project exists, environment boundary is identified, and future production remains logically separate.
+- team: `team_QHEyDZZUIeF7hGokK8amHy4H`;
+- project: `prj_GK7BQot3xOYCKYA09AKMffesiSgj` (`tactical-scenario-lab`).
 
-## Phase B — container and release identity
+The R1 branch is deploying to isolated Preview targets. Do not use the imported `main` Production deployment as staging evidence.
 
-1. Use repository `Dockerfile.vercel`.
-2. Freeze the candidate Git SHA after the inherited M9 matrix passes.
-3. Deploy that exact candidate; mutable branch state alone is insufficient evidence.
-4. Record Vercel deployment ID/URL together with the Git SHA.
-5. Confirm runtime listens on the provider `$PORT` and does not run migrations at web startup.
+## Phase B — Vercel runtime adapter — IMPLEMENTED
 
-Repository contract test: `tests/Feature/R1VercelContainerContractTest.php`.
+Repository adapter:
 
-## Phase C — Neon staging database
+- `vercel.json` disables incorrect Vite SPA detection with `framework: null`;
+- `buildCommand` remains `npm run build`;
+- static output is `public`, containing Laravel public files and `public/build` assets;
+- `api/index.php` is the Laravel serverless entrypoint;
+- `vercel-php@0.8.0` provides PHP 8.4;
+- Laravel cache/view paths that require writes are redirected to `/tmp`;
+- no migration runs in the HTTP bootstrap path.
 
-1. Provision/connect a dedicated Neon PostgreSQL resource through the Vercel Marketplace/integration path or an equivalent authenticated Neon path.
-2. Connect the resource only to staging/Preview scope required by this runbook.
-3. Configure Laravel for `pgsql` using provider-issued values outside Git.
-4. Ensure all database identifiers/URLs recorded in public evidence are secret-safe/redacted.
-5. Never reuse a future production Neon database as the staging database.
+Regression contract: `tests/Feature/R1VercelContainerContractTest.php`.
 
-## Phase D — staging application secrets
+The original Vercel import failed because the provider detected Vite and expected `dist`. That diagnosis is closed only by the full-stack adapter above, not by publishing `public/build` as a standalone SPA.
 
-Configure outside Git, scoped only to staging/Preview:
+## Phase C — Neon staging database — OBSERVED / PRE-MIGRATION
 
-- `APP_ENV=production` for production-like validation behavior;
+Observed staging resource:
+
+- project name: `tactical-scenario-lab-staging`;
+- project ID: `curly-moon-55089444`;
+- database observed: `neondb`;
+- provider PostgreSQL observed: 18.4;
+- current public application tables: 0.
+
+The empty schema is intentional until the controlled migration step. Do not apply Laravel migrations by copying generated SQL manually unless that migration path has been explicitly audited; the canonical schema source remains Laravel migrations.
+
+## Phase D — staging application secrets — CURRENT BLOCKER
+
+Configure in Vercel Preview/environment settings, never in Git/chat:
+
+- `APP_ENV=production`;
 - `APP_DEBUG=false`;
 - unique `APP_KEY`;
 - unique `PII_FINGERPRINT_KEY`;
 - `DB_CONNECTION=pgsql`;
-- Neon connection values supplied by the provider/integration;
-- secure session/cookie settings required by `production:preflight`;
-- any mail/integration values needed for synthetic staging only.
+- Neon host/port/database/runtime username/runtime password;
+- provider-supported encrypted PostgreSQL connection setting (`DB_SSLMODE` must not be `disable`);
+- `SESSION_SECURE_COOKIE=true`;
+- `PRODUCTION_REQUIRE_SECURE_SESSION=true`.
 
 Do not print secret values during verification.
 
+Current evidence: the Preview runtime log recorded `MissingAppKeyException`, so this phase is not complete.
+
 ## Phase E — controlled migrations and runtime role
 
-1. Establish a migration-capable database session only for preflight/schema deployment.
-2. Run:
+1. Use a migration-capable Neon identity/session only for schema deployment.
+2. Run the canonical Laravel release checks/migrations from a trusted operator/CI environment that has PHP/Composer and staging migration credentials:
 
 ```bash
 php artisan production:preflight
 php artisan migrate --force
-php artisan config:cache
-php artisan route:cache
 ```
 
-3. Create/use a restricted runtime role for steady-state web traffic.
-4. Grant only required connection, schema usage, table DML and sequence permissions.
-5. Runtime must not own schema objects or retain unnecessary DDL privilege.
-6. Prove denial:
+3. Provision/use a separate restricted runtime role for Vercel steady-state traffic.
+4. Grant only required connection, schema usage, table DML and sequence access.
+5. Ensure the runtime role does not own application tables/schema and cannot create/alter/drop schema objects.
+6. Prove DDL denial under the runtime role using a harmless disposable attempt after migrations.
+7. Replace migration-owner credentials in Vercel with the restricted runtime credentials before health admission.
 
-```sql
-CREATE TABLE r1_should_fail(id bigint);
+Do not leave migration-owner credentials in the web runtime.
+
+## Phase F — exact deployment + HTTPS + health admission
+
+A qualifying deployment records:
+
+```text
+Git SHA + Vercel deployment ID + HTTPS deployment URL
 ```
 
-Expected under runtime credentials: permission denied.
+Current corrected-adapter evidence includes a real READY Preview and successful HTTPS routing into PHP/Laravel, but it is not yet admitted because secrets/database readiness are incomplete.
 
-7. Configure the hosted application to use the restricted runtime identity after migrations.
-
-## Phase F — HTTPS and health admission
-
-Vercel-managed HTTPS is required for the deployed staging URL.
-
-Checks:
+Acceptance checks:
 
 ```bash
-curl -fsS https://STAGING_URL/health/live
-curl -fsS https://STAGING_URL/health/ready
+GET https://STAGING_URL/health/live
+GET https://STAGING_URL/health/ready
 ```
 
-Acceptance:
+GREEN requires:
 
-- `/health/live` returns HTTP 200 with the minimal liveness contract;
-- `/health/ready` returns HTTP 200 only when database readiness is healthy;
-- no secret/private connection information is exposed;
-- exact Vercel deployment ID and candidate SHA are recorded;
-- no plaintext HTTP endpoint is used to serve authenticated staging traffic.
+- `/health/live` HTTP 200 with no fatal runtime error in provider logs;
+- `/health/ready` HTTP 200 with `database=ok`;
+- runtime logs contain no secret values;
+- exact deployment identity is recorded;
+- steady-state DB connection uses the restricted runtime identity.
+
+A browser/proxy status alone is insufficient if runtime logs show a fatal exception.
 
 ## Phase G — logs and diagnostics
 
-1. Inspect Vercel runtime logs through authenticated project access.
-2. Check representative startup, health, login and controlled error paths.
-3. Verify there is no `APP_KEY`, `PII_FINGERPRINT_KEY`, raw DB connection string/password or raw PII in captured evidence.
-4. Record only summarized secret-safe observations in GitHub.
+Inspect Vercel runtime logs through authenticated access after every health/smoke gate. Record only secret-safe summaries.
+
+Specifically reject admission if logs expose or report:
+
+- missing/unsafe production configuration;
+- uncaught exceptions;
+- raw connection strings/passwords;
+- `APP_KEY` or `PII_FINGERPRINT_KEY` values;
+- raw PII.
 
 ## Gate 2 acceptance evidence
 
 Gate 2 is GREEN only when all are observed:
 
-- Vercel Tactical Scenario Lab project exists;
-- isolated custom staging or Preview target exists;
-- dedicated Neon staging PostgreSQL exists;
-- staging-only secrets are configured outside Git;
-- valid HTTPS deployment is reachable;
-- exact Git SHA + Vercel deployment identity are recorded;
-- `/health/live` is healthy;
-- `/health/ready` is healthy with Neon available;
-- no production secret/database reuse is detected.
+- [x] Vercel Tactical Scenario Lab project exists;
+- [x] isolated R1 Preview target exists;
+- [x] dedicated Neon staging PostgreSQL exists;
+- [ ] staging-only secrets configured outside Git;
+- [x] HTTPS deployment path is real;
+- [x] exact deployment identity can be recorded;
+- [ ] `/health/live` is clean in both HTTP response and runtime logs;
+- [ ] `/health/ready` is healthy against Neon;
+- [ ] controlled migration has initialized the staging schema;
+- [ ] steady-state runtime role is restricted;
+- [x] no production resource reuse has been asserted or observed.
 
-A Dockerfile, documentation, provider console listing or CI alone is not enough.
-
-## Gate 3 acceptance preparation
+## Gate 3 preparation
 
 Immediately after Gate 2:
 
-1. `production:preflight` succeeds in production-like staging configuration;
-2. migrations are run through the controlled migration path;
-3. steady-state runtime uses the restricted DB identity;
-4. runtime DDL denial succeeds;
-5. normal application DML works;
+1. `production:preflight` succeeds under production-like staging configuration;
+2. migrations are current;
+3. Vercel uses restricted DB credentials;
+4. runtime DDL denial is proven;
+5. representative normal DML works;
 6. logs show no secret leakage.
 
 ## Gate 4 recovery preparation
 
-1. Determine the actual recovery/time-travel/branch capability of the provisioned Neon plan.
-2. Create a recovery target separate from the source staging branch/database.
-3. Recover from a real staging recovery point.
-4. Validate migration state and representative application/integrity invariants on that target.
-5. Record retention/plan limitations explicitly.
-
-A documented provider capability without an executed recovery drill is not GREEN.
+The active Neon project currently exposes a finite history-retention window. Gate 4 must execute an actual isolated branch/recovery drill and validate application/migration integrity there. Provider capability alone is not GREEN.
 
 ## Production boundary
 
-The free/Hobby staging setup is not automatically a production architecture. Gate 8 re-evaluates provider plan terms, commercial/institutional use, expected load, recovery retention and cost before any real production promotion.
+The current Preview/free staging setup is not automatically a production architecture. Gate 8 re-evaluates plan terms, commercial/institutional use, expected load, recovery retention and cost before real production promotion.
