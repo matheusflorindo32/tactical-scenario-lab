@@ -9,6 +9,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Tests\Support\PostgresRuntimeRole;
 use Tests\TestCase;
 
 class PostgresDatabaseInvariantTest extends TestCase
@@ -71,6 +72,33 @@ class PostgresDatabaseInvariantTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    public function test_runtime_role_is_not_superuser_table_owner_or_schema_creator(): void
+    {
+        $runtime = PostgresRuntimeRole::connection();
+
+        $role = $runtime->selectOne(<<<'SQL'
+            SELECT rolsuper, rolcreatedb, rolcreaterole
+            FROM pg_roles
+            WHERE rolname = current_user
+            SQL);
+
+        $this->assertFalse((bool) $role->rolsuper);
+        $this->assertFalse((bool) $role->rolcreatedb);
+        $this->assertFalse((bool) $role->rolcreaterole);
+
+        $ownedTables = $runtime->selectOne(<<<'SQL'
+            SELECT count(*) AS aggregate
+            FROM pg_tables
+            WHERE schemaname = 'public'
+              AND tableowner = current_user
+            SQL);
+
+        $this->assertSame(0, (int) $ownedTables->aggregate);
+
+        $this->expectException(QueryException::class);
+        $runtime->statement('CREATE TABLE m6_runtime_forbidden (id integer)');
     }
 
     private function execution(): ScenarioExecution
