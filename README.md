@@ -21,7 +21,8 @@ O Tactical Scenario Lab concentra em um único fluxo institucional:
 - debrief com fatos, interpretações, recomendações e plano de ação;
 - dashboards operacional e executivo;
 - histórico, CSV e PDF institucional;
-- pessoas, organizações e governança de acesso multi-organização.
+- pessoas, organizações e governança de acesso multi-organização;
+- **Knowledge & Documentation Center** autenticado, pesquisável e contextual para orientar o uso do próprio produto.
 
 O critério original do piloto permanece documentado em [`docs/PRODUCT.md`](docs/PRODUCT.md). O backlog inicial em [`docs/BACKLOG.md`](docs/BACKLOG.md) é histórico e não representa sozinho o estado atual da arquitetura.
 
@@ -34,6 +35,7 @@ O critério original do piloto permanece documentado em [`docs/PRODUCT.md`](docs
 - **Testes:** PHPUnit 12 em SQLite e PostgreSQL 16 no CI
 - **Qualidade:** Pint · `composer validate --strict` · build Vite
 - **Relatórios:** Dompdf para PDF institucional
+- **Conhecimento:** catálogo PHP allowlisted + Markdown Git-versioned em `resources/knowledge/articles/`
 
 ## Requisitos locais
 
@@ -107,6 +109,7 @@ A chave `PII_FINGERPRINT_KEY` deve ser estável e independente de `APP_KEY`, poi
 8. Preencha rubrica, evidências, erros críticos, tempos-chave e debrief.
 9. Finalize a avaliação; o conteúdo histórico fica congelado, enquanto o status autorizado das ações pode continuar evoluindo.
 10. Consulte dashboards, histórico e relatórios institucionais.
+11. Use a Base de Conhecimento para compreender o comportamento da interface e os invariantes do produto sem sair da experiência autenticada.
 
 ## Rotas principais
 
@@ -122,6 +125,7 @@ A aplicação possui mais rotas do que o MVP inicial. As famílias principais ho
 | Assessment | `/assessments/{assessment}` + critérios/evidências/debrief/plano de ação |
 | Histórico/relatórios | `/history/executions`, `/reports/executions.csv`, PDF por execução |
 | Gestão | `/people`, `/organizations`, `/access` |
+| Conhecimento | `/knowledge`, `/knowledge/{slug}` |
 | Health | `/health` |
 
 A fonte da verdade das rotas é [`routes/web.php`](routes/web.php).
@@ -138,6 +142,25 @@ A experiência autenticada usa:
 - cockpit da execução com timeline como verdade cronológica append-only;
 - assessment/debrief como workbench navegável;
 - modo institucional **low-light** opcional, salvo somente no `localStorage` do navegador.
+
+## M8 — Knowledge & Documentation Center
+
+O M8 integra a documentação do produto à experiência autenticada sem criar uma segunda fonte de verdade clínica ou operacional.
+
+A arquitetura é **Git-versioned** e read-only em runtime:
+
+- `config/knowledge.php` é o catálogo allowlisted de slugs, arquivos, categorias, audiências, relações e contextos;
+- os artigos vivem como Markdown versionado em `resources/knowledge/articles/`;
+- slugs recebidos pela rota nunca são interpretados como caminhos de arquivo;
+- o repositório restringe fontes à pasta allowlisted e falha de forma fechada quando a definição é inválida;
+- Markdown é renderizado com HTML cru removido e links inseguros bloqueados;
+- títulos H2/H3 recebem âncoras determinísticas e TOC quando há profundidade útil;
+- a busca é server-side, case/accent-insensitive e possui ranking determinístico por título, tags, resumo/categoria e corpo;
+- `contextual_for` no catálogo é a fonte única dos links **Como usar esta tela**;
+- as rotas de conhecimento exigem autenticação e conta ativa;
+- o conteúdo inicial explica uso do produto, versionamento, cockpit, avaliação/debrief, histórico/relatórios e governança.
+
+O M8 permanece **sem CMS**, sem editor WYSIWYG, sem upload livre, sem nova persistência de leitura e **sem IA/RAG**. A Base de Conhecimento não prescreve conduta clínica ou tática autônoma.
 
 O design system está documentado em [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md).
 
@@ -161,7 +184,8 @@ O GitHub Actions valida, entre outros gates definidos no workflow:
 - provisionamento do runtime role de menor privilégio;
 - rollback/reapply dos guards de banco;
 - repetição dos invariantes de concorrência;
-- Pint.
+- Pint;
+- contratos de segurança, busca e integridade do Knowledge Center.
 
 ## Invariantes institucionais importantes
 
@@ -172,7 +196,9 @@ O GitHub Actions valida, entre outros gates definidos no workflow:
 - conteúdo das ações fica congelado após finalização, mas transições de status autorizadas permanecem possíveis;
 - dashboards e histórico usam execução/assessment como verdade operacional, não `Scenario.score` legado;
 - relatórios seguem autorização e contexto da organização ativa;
-- interface ability-aware não substitui autorização backend.
+- interface ability-aware não substitui autorização backend;
+- a Base de Conhecimento é global, read-only e não contém conteúdo controlado por tenant;
+- conteúdo de conhecimento não pode ampliar autorização nem substituir protocolos institucionais.
 
 ## Documentação técnica relevante
 
@@ -181,6 +207,7 @@ O GitHub Actions valida, entre outros gates definidos no workflow:
 - [`docs/PRODUCTION.md`](docs/PRODUCTION.md) — operação/deploy de produção
 - [`docs/REPORTING.md`](docs/REPORTING.md) — semântica de reporting
 - [`docs/DEMO.md`](docs/DEMO.md) — ambiente/dados demonstrativos
+- [`docs/PHASE_M8_AUDIT.md`](docs/PHASE_M8_AUDIT.md) — auditoria forense do Knowledge Center
 - [`docs/superpowers/specs/`](docs/superpowers/specs/) — specs por milestone
 - [`docs/superpowers/plans/`](docs/superpowers/plans/) — planos de implementação
 
@@ -190,7 +217,7 @@ Encontrou uma vulnerabilidade? Não abra issue pública. Consulte [`SECURITY.md`
 
 ## Contribuindo
 
-Consulte [`CONTRIBUTING.md`](CONTRIBUTING.md). Mudanças estruturais devem preservar testes, isolamento de tenant e contratos históricos.
+Consulte [`CONTRIBUTING.md`](CONTRIBUTING.md). Mudanças estruturais devem preservar testes, isolamento de tenant, contratos históricos e integridade do catálogo de conhecimento.
 
 ## Licença
 
