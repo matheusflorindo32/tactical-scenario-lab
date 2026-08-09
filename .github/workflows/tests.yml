@@ -163,6 +163,13 @@ jobs:
             GRANT USAGE, SELECT ON SEQUENCES TO tactical_runtime_test;
           SQL
 
+      - name: Repeat M6 concurrency invariants
+        run: |
+          for attempt in 1 2 3; do
+            echo "M6 concurrency attempt ${attempt}/3"
+            php artisan test tests/Feature/PostgresConcurrencyTest.php
+          done
+
       - name: Run tests on PostgreSQL
         run: php artisan test
 
