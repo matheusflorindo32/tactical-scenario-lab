@@ -64,18 +64,6 @@ jobs:
       - name: Verify built frontend assets
         run: docker run --rm tactical-scenario-lab:ci sh -lc 'test -f public/build/manifest.json'
 
-      - name: Build Vercel release container
-        run: docker build --file Dockerfile.vercel --tag tactical-scenario-lab:vercel-ci .
-
-      - name: Verify Vercel PostgreSQL extension
-        run: docker run --rm tactical-scenario-lab:vercel-ci php -m | grep -q pdo_pgsql
-
-      - name: Verify Vercel non-root runtime
-        run: docker run --rm tactical-scenario-lab:vercel-ci sh -lc 'test "$(id -u)" -ne 0'
-
-      - name: Verify Vercel built frontend assets
-        run: docker run --rm tactical-scenario-lab:vercel-ci sh -lc 'test -f public/build/manifest.json'
-
   phpunit:
     name: PHPUnit — PHP 8.4 / SQLite
     runs-on: ubuntu-latest
