@@ -10,7 +10,7 @@ Status: IMPLEMENTATION
 - [x] Gate 1 — Global M1–M8 Release Baseline Audit — GREEN
 - [x] Gate 2 — Security & Dependency Governance — GREEN
 - [x] Gate 3 — Production Container & Deployment Parity — GREEN
-- [ ] Gate 4 — CI & Release Pipeline Hardening
+- [x] Gate 4 — CI & Release Pipeline Hardening — GREEN
 - [ ] Gate 5 — Reliability & Deterministic Performance Budget
 - [ ] Gate 6 — UX, Localization & Accessibility Finalization
 - [ ] Gate 7 — Observability, Recovery & Release Documentation
@@ -50,14 +50,18 @@ Status: IMPLEMENTATION
 - Result: repository container semantics now match the existing M6 production runbook's separated migration/runtime model while preserving all inherited database hardening.
 
 ### Gate 4 — CI & Release Pipeline Hardening
+- RED SHA: `47952a96d6f6a2995b1f4ba9f6bd4c265e13001e`
+- RED CI: #844 / run `31326160289` — the required release-quality gate contract passed, while the branch-policy contract failed exactly because `develop` remained in the primary push trigger. SQLite retained 329 passing tests with 31 PostgreSQL-specific tests skipped; Security and Pint were green.
+- Additional release finding: the #844 runner warned that `actions/checkout@v4` and `actions/setup-node@v4` targeted the deprecated Node 20 action runtime. Official action documentation was verified before changing versions; current v6 lines use the Node 24 action runtime.
+- GREEN SHA: `ce3d0b79b361462d90a4d81b351e8bf8f75e8aab`
+- GREEN CI: #846 / run `31326277134` — Security job `93277058573`, SQLite job `93277058614`, PostgreSQL 16 job `93277058613` and Pint job `93277058618` all SUCCESS. Primary workflow now targets pushes/PRs on `main`, removes `develop` and historical feature exceptions, uses `actions/checkout@v6` and `actions/setup-node@v6`, and retains Composer/npm audits, production asset build, fresh migrations, least-privilege role verification, M6 rollback/reapply, repeated concurrency invariants and full suites.
+- Result: CI now represents the current release line and no longer carries the deprecated Node 20 action-runtime warning discovered by the RED run.
+
+### Gate 5 — Reliability & Deterministic Performance Budget
 - RED SHA: pending
 - RED CI: pending
 - GREEN SHA: pending
 - GREEN CI: pending
-
-### Gate 5 — Reliability & Deterministic Performance Budget
-- RED SHA: pending
-- GREEN SHA: pending
 
 ### Gate 6 — UX, Localization & Accessibility Finalization
 - RED SHA: pending
