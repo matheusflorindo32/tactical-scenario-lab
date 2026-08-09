@@ -16,6 +16,16 @@ class M9CiReleaseContractTest extends TestCase
         $this->assertStringNotContainsString('feature/phase-2-', $workflow);
     }
 
+    public function test_release_pipeline_uses_current_node24_action_runtime(): void
+    {
+        $workflow = file_get_contents(base_path('.github/workflows/tests.yml'));
+
+        $this->assertStringContainsString('actions/checkout@v6', $workflow);
+        $this->assertStringContainsString('actions/setup-node@v6', $workflow);
+        $this->assertStringNotContainsString('actions/checkout@v4', $workflow);
+        $this->assertStringNotContainsString('actions/setup-node@v4', $workflow);
+    }
+
     public function test_release_pipeline_retains_all_required_quality_gates(): void
     {
         $workflow = file_get_contents(base_path('.github/workflows/tests.yml'));
