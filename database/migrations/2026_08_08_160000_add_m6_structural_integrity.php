@@ -6,7 +6,6 @@ use Illuminate\Support\Facades\DB;
 return new class extends Migration
 {
     private const EXECUTION_ORGANIZATION_UNIQUE = 'scenario_executions_id_organization_unique';
-
     private const ASSESSMENT_EXECUTION_ORGANIZATION_FK = 'execution_assessments_execution_organization_fk';
 
     public function up(): void
