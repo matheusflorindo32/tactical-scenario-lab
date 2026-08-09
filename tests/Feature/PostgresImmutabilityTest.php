@@ -118,10 +118,9 @@ class PostgresImmutabilityTest extends TestCase
         return [
             'criterion' => ['assessment_criteria', 'label', 'Forbidden criterion rewrite'],
             'evidence' => ['assessment_evidence', 'statement', 'Forbidden evidence rewrite'],
-            'critical error' => ['critical_error_occurrences', 'label', 'Forbidden critical error rewrite'],
-            'key time' => ['key_time_records', 'name', 'Forbidden key time rewrite'],
-            'debrief' => ['execution_debriefs', 'summary', 'Forbidden debrief rewrite'],
-            'debrief note' => ['debrief_notes', 'content', 'Forbidden debrief note rewrite'],
+            'critical error' => ['critical_error_occurrences', 'catalog_label_snapshot', 'Forbidden critical error rewrite'],
+            'key time' => ['key_time_records', 'label', 'Forbidden key time rewrite'],
+            'debrief entry' => ['debrief_entries', 'content', 'Forbidden debrief entry rewrite'],
             'action content' => ['action_items', 'action', 'Forbidden action rewrite'],
         ];
     }
@@ -150,13 +149,10 @@ class PostgresImmutabilityTest extends TestCase
             'key_time_records' => DB::table('key_time_records')
                 ->where('execution_assessment_id', $assessmentId)
                 ->value('id'),
-            'execution_debriefs' => DB::table('execution_debriefs')
-                ->where('execution_assessment_id', $assessmentId)
-                ->value('id'),
-            'debrief_notes' => DB::table('debrief_notes as notes')
-                ->join('execution_debriefs as debriefs', 'debriefs.id', '=', 'notes.execution_debrief_id')
+            'debrief_entries' => DB::table('debrief_entries as entries')
+                ->join('execution_debriefs as debriefs', 'debriefs.id', '=', 'entries.execution_debrief_id')
                 ->where('debriefs.execution_assessment_id', $assessmentId)
-                ->value('notes.id'),
+                ->value('entries.id'),
             'action_items' => DB::table('action_items as actions')
                 ->join('execution_debriefs as debriefs', 'debriefs.id', '=', 'actions.execution_debrief_id')
                 ->where('debriefs.execution_assessment_id', $assessmentId)
