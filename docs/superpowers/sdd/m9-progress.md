@@ -3,7 +3,7 @@
 Plan: `docs/superpowers/plans/2026-08-09-m9-release-hardening.md`
 Branch: `feature/m9-release-hardening`
 PR: #12 — draft
-Status: IMPLEMENTATION
+Status: FINAL AUDIT
 
 ## Gates
 
@@ -13,7 +13,7 @@ Status: IMPLEMENTATION
 - [x] Gate 4 — CI & Release Pipeline Hardening — GREEN
 - [x] Gate 5 — Reliability & Deterministic Performance Budget — GREEN
 - [x] Gate 6 — UX, Localization & Accessibility Finalization — GREEN
-- [ ] Gate 7 — Observability, Recovery & Release Documentation
+- [x] Gate 7 — Observability, Recovery & Release Documentation — GREEN
 - [ ] Gate 8 — Final Forensic Audit & Protected Integration
 
 ## Baseline
@@ -72,12 +72,16 @@ Status: IMPLEMENTATION
 - Result: application fallback identity is Tactical Scenario Lab and locale/fallback/faker defaults are `pt_BR`. Existing M7/M8 skip-link, Knowledge navigation/contextual help, reduced-motion and browser-local low-light contracts remained green; no visual redesign or domain behavior change was introduced.
 
 ### Gate 7 — Observability, Recovery & Release Documentation
-- RED SHA: pending
-- RED CI: pending
-- GREEN SHA: pending
-- GREEN CI: pending
+- RED SHA: `798f3a48a96ff2e8f18b1c2ffdc14277b6d85f96`
+- RED CI: #854 / run `31326868056` — the release documentation contract failed only on release artifacts/synchronization: `docs/RELEASE.md` absent, stale milestone coverage in `CHANGELOG.md`, and missing release links in README. Existing application/security gates remained healthy.
+- GREEN SHA: `c4f07e0ac4ea1dedb8f7d2ff156b617d1a52dbf7`
+- GREEN CI: #858 / run `31327018573` — Security job `93278899984`, SQLite job `93278900010`, PostgreSQL 16 job `93278900020` and Pint job `93278899997` all SUCCESS. Release docs, changelog milestone history, README links, production container/runbook parity, cacheability, fresh migrations, least-privilege provisioning, rollback/reapply, M6 concurrency and full suites all passed.
+- Result: `docs/RELEASE.md` now defines release SHA evidence, migration/runtime identities, traffic admission, application rollback, schema rollback and PITR; `CHANGELOG.md` preserves historical `0.1.0` while documenting M1–M9 without inventing a new semantic version; README/PRODUCTION/SECURITY are synchronized with release-ready behavior and no APM/cloud provider is fabricated.
 
 ### Gate 8 — Final Forensic Audit & Protected Integration
+- RED SHA: pending
+- RED CI: pending
 - Candidate SHA: pending
+- Candidate CI: pending
 - Exact-head CI: pending
 - Merge evidence: pending
