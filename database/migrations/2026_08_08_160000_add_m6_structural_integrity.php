@@ -5,9 +5,6 @@ use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
-    private const EXECUTION_ORGANIZATION_UNIQUE = 'scenario_executions_id_organization_unique';
-    private const ASSESSMENT_EXECUTION_ORGANIZATION_FK = 'execution_assessments_execution_organization_fk';
-
     public function up(): void
     {
         if (DB::getDriverName() !== 'pgsql') {
@@ -25,15 +22,13 @@ return new class extends Migration
             );
         }
 
-        DB::statement(sprintf(
-            'ALTER TABLE scenario_executions ADD CONSTRAINT %s UNIQUE (id, organization_id)',
-            self::EXECUTION_ORGANIZATION_UNIQUE,
-        ));
+        DB::statement(
+            'ALTER TABLE scenario_executions ADD CONSTRAINT scenario_executions_id_organization_unique UNIQUE (id, organization_id)',
+        );
 
-        DB::statement(sprintf(
-            'ALTER TABLE execution_assessments ADD CONSTRAINT %s FOREIGN KEY (scenario_execution_id, organization_id) REFERENCES scenario_executions (id, organization_id) ON DELETE CASCADE',
-            self::ASSESSMENT_EXECUTION_ORGANIZATION_FK,
-        ));
+        DB::statement(
+            'ALTER TABLE execution_assessments ADD CONSTRAINT execution_assessments_execution_organization_fk FOREIGN KEY (scenario_execution_id, organization_id) REFERENCES scenario_executions (id, organization_id) ON DELETE CASCADE',
+        );
     }
 
     public function down(): void
@@ -42,14 +37,12 @@ return new class extends Migration
             return;
         }
 
-        DB::statement(sprintf(
-            'ALTER TABLE execution_assessments DROP CONSTRAINT IF EXISTS %s',
-            self::ASSESSMENT_EXECUTION_ORGANIZATION_FK,
-        ));
+        DB::statement(
+            'ALTER TABLE execution_assessments DROP CONSTRAINT IF EXISTS execution_assessments_execution_organization_fk',
+        );
 
-        DB::statement(sprintf(
-            'ALTER TABLE scenario_executions DROP CONSTRAINT IF EXISTS %s',
-            self::EXECUTION_ORGANIZATION_UNIQUE,
-        ));
+        DB::statement(
+            'ALTER TABLE scenario_executions DROP CONSTRAINT IF EXISTS scenario_executions_id_organization_unique',
+        );
     }
 };
