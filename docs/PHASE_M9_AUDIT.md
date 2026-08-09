@@ -4,160 +4,71 @@ Date: 2026-08-09
 Baseline: M8 merge on `main` at `a093da910c246e5186ea53f0720c7f239713fe95`
 Branch: `feature/m9-release-hardening`
 PR: #12
-Status: CANDIDATE AUDIT — exact-head verification pending
+Status: CANDIDATE GREEN — exact-head verification pending
 
-## 1. Audit objective
+## 1. Objective and scope
 
-M9 closes the planned M1–M9 product program by proving that the feature-complete Tactical Scenario Lab can be packaged, tested, described and operated as a release-ready application without adding a new product domain.
+M9 turns the M1–M8 feature-complete Tactical Scenario Lab into a release-ready repository without adding a new product domain. It aligns release metadata, dependency security, CI, container packaging, production/recovery documentation, reliability and localization while preserving M1–M8 authorization, tenant, historical and PostgreSQL invariants.
 
-The audit asks whether repository behavior, release documentation, CI, dependency security, container packaging and production runbooks agree with one another and preserve the M1–M8 authorization, tenant, historical and PostgreSQL hardening invariants.
+Pre-candidate comparison against `main` showed the M9 branch ahead and `0 behind`. The delta is confined to release/config metadata, CI, Dockerfile, security/operations documentation, M9 spec/plan/ledger and M9 contract tests. No migration, Eloquent model, controller, domain service or business-domain write path is introduced by M9.
 
-## 2. Scope and delta
+## 2. Preserved invariants
 
-Pre-candidate comparison against `main` showed the M9 branch ahead with no divergence from the M8 baseline. The delta is confined to:
+The inherited matrix continues to cover authenticated organization context, backend authorization, tenant isolation, published scenario-version immutability, append-only execution timeline, finalized assessment historical freeze, authorized action-status evolution, PostgreSQL least-privilege runtime, M6 rollback/reapply and concurrency, M7 accessibility/low-light and M8 Knowledge Center security/search/content integrity.
 
-- product/release metadata (`.env.example`, `composer.json`, `config/app.php`);
-- CI/release workflow;
-- reference `Dockerfile`;
-- `SECURITY.md`, README, CHANGELOG, production/release documentation;
-- M9 spec, implementation plan and evidence ledger;
-- M9 release-contract tests.
+## 3. Gate evidence
 
-No migration, Eloquent model, controller, domain service or business-domain write path is introduced by M9. The milestone is release hardening, not feature expansion.
+- **Gate 1:** RED `103c10f58...`, CI #829; GREEN `215414681...`, CI #834. Release metadata, locale, security language, Docker baseline and obsolete branch triggers were corrected.
+- **Gate 2:** RED `b788e762...`, CI #836; GREEN `9f380d0d...`, CI #839. `composer audit --locked` and `npm audit --audit-level=high` became release-blocking. Candidates #837/#838 were rejected and corrected rather than suppressed.
+- **Gate 3:** RED `64e63d96...`, CI #841; GREEN `721daffb...`, CI #842. PostgreSQL-capable deterministic frontend/container contract and non-root runtime were established.
+- **Gate 4:** RED `47952a96...`, CI #844; GREEN `ce3d0b79...`, CI #846. CI now represents the `main` release line and uses current action runtime lines while retaining all M6 gates.
+- **Gate 5:** RED `c44df7be...`, CI #848; GREEN `b71b7d91...`, CI #849. Config/route cacheability is verified in both database jobs without wall-clock thresholds; health remains secret-safe.
+- **Gate 6:** RED `f721a178...`, CI #851; GREEN `3b85929a...`, CI #852. Product/locale fallbacks are Tactical Scenario Lab / `pt_BR`; M7/M8 UX contracts remain green without redesign.
+- **Gate 7:** RED `798f3a48...`, CI #854; GREEN `c4f07e0a...`, CI #858. Release SHA evidence, migration/runtime identities, traffic admission, application rollback, schema rollback, PITR and provider-neutral observability are documented.
+- **Gate 8 official RED:** SHA `81e67e6218ab45da735174c0aacfdb6071891049`, CI #863 / run `31327290746`. Security and Pint passed; SQLite/PostgreSQL reached final suites after inherited release/hardening checks, then failed on intentionally absent final forensic contracts. Preliminary #861/#862 were rejected as invalid RED evidence because Pint failed.
 
-## 3. Invariants preserved
+## 4. Green forensic candidate
 
-M9 must not weaken and the inherited test matrix continues to cover:
+Candidate tree before this audit synchronization: `8eabd649d128c2337a302711aed7ad80f20032d9`, CI **#865 / run `31327553818`**.
 
-- authenticated organization context and backend authorization;
-- tenant isolation;
-- published scenario-version immutability;
-- append-only execution timeline behavior;
-- finalized assessment historical freeze semantics;
-- authorized post-finalization action-status evolution;
-- PostgreSQL least-privilege runtime role;
-- M6 structural/immutability migration rollback and reapply;
-- repeated PostgreSQL concurrency invariants;
-- M7 shell/accessibility/low-light behavior;
-- M8 safe repository-backed Knowledge Center, search and content integrity.
+All five release jobs passed:
 
-## 4. Gate evidence
+- Security — Composer and npm audit: job `93280222083` — SUCCESS;
+- Container — build and runtime contract: job `93280222127` — SUCCESS;
+- PHPUnit SQLite: job `93280222097` — SUCCESS;
+- PHPUnit PostgreSQL 16: job `93280222123` — SUCCESS;
+- Pint: job `93280222072` — SUCCESS.
 
-### Gate 1 — Release baseline
+The container job built the actual Docker image and proved `pdo_pgsql`, non-root default runtime and compiled frontend assets. PostgreSQL also passed release cacheability, fresh migrations, least-privilege provisioning, M6 rollback/reapply, repeated concurrency invariants and the full suite.
 
-- RED: `103c10f58cd4d3c8108300be7ef102a34f11e2e8`, CI #829 / run `31325365945`.
-- GREEN: `21541468161bedcc54c7880eaca63c85ebf72753`, CI #834 / run `31325504446`.
-- Result: stale MVP/authentication claims, generic Laravel identity/locale, SQLite/migrate-on-start production drift and historical branch triggers were removed from the release baseline.
+This document and the progress ledger are the final evidence synchronization before the frozen exact-head SHA. No repository-file commit is permitted after the exact-head run selected for integration.
 
-### Gate 2 — Security and dependencies
+## 5. Security and severity disposition
 
-- RED: `b788e7624f316b3a588eea56ca374eeeb64f830e`, CI #836 / run `31325649447`.
-- Rejected candidates #837 and #838 were not promoted: one exposed an incorrect Composer audit invocation; the next exposed an accidental PostgreSQL sequence-GRANT regression. Both were corrected without suppression.
-- GREEN: `9f380d0d62959740e69922bf4c45e9c789a5bafa`, CI #839 / run `31325858072`.
-- Result: `composer audit --locked` and `npm audit --audit-level=high` are release-blocking and non-suppressive; no blanket ignore list or CI auto-fix is used.
+Composer lockfile advisories and npm high-severity vulnerabilities block release. No blanket advisory ignore, npm audit fix or lockfile mutation is used in CI. `SECURITY.md` reflects the authenticated multi-organization product and includes authorization, tenant isolation, PII, injection/session/auth and Knowledge rendering risks.
 
-### Gate 3 — Container/deployment parity
-
-- RED: `64e63d96308819dead8cd5d21a92790d03952eaa`, CI #841 / run `31325985498`.
-- GREEN: `721daffb05894fc1a22a2f7f79e57725b19bf239`, CI #842 / run `31326047120`.
-- Result: reference container declares PostgreSQL support, deterministic frontend build, production Composer install, non-root runtime and no migrate-on-web-startup behavior.
-
-### Gate 4 — CI/release pipeline
-
-- RED: `47952a96d6f6a2995b1f4ba9f6bd4c265e13001e`, CI #844 / run `31326160289`.
-- GREEN: `ce3d0b79b361462d90a4d81b351e8bf8f75e8aab`, CI #846 / run `31326277134`.
-- Result: the primary CI release line targets `main`, historical branch exceptions are gone, dependency/security/build/database/Pint gates remain present, and GitHub Actions checkout/setup-node were modernized after the RED run surfaced the deprecated Node 20 action-runtime warning.
-
-### Gate 5 — Reliability/cacheability
-
-- RED: `c44df7be1fa4075d528546a238c678e720e379e9`, CI #848 / run `31326403341`.
-- GREEN: `b71b7d913973f77fd9b227ca6e2691596620779e`, CI #849 / run `31326470752`.
-- Result: config/route cacheability is deterministic in both database jobs; liveness remains database-independent and readiness remains coarse and secret-safe. No wall-clock performance threshold was institutionalized.
-
-### Gate 6 — UX/localization/accessibility
-
-- RED: `f721a1786e418bf53c5ffeb85e46dcdcdfa4352c`, CI #851 / run `31326632581`.
-- GREEN: `3b85929ab7c35450f65e762139435e3b0dccd726`, CI #852 / run `31326693188`.
-- Result: fallback product identity and locale are Tactical Scenario Lab / `pt_BR`; inherited skip-link, Knowledge navigation, reduced-motion and browser-local low-light contracts remain green without an M7 redesign.
-
-### Gate 7 — Release/recovery documentation
-
-- RED: `798f3a48a96ff2e8f18b1c2ffdc14277b6d85f96`, CI #854 / run `31326868056`.
-- GREEN: `c4f07e0ac4ea1dedb8f7d2ff156b617d1a52dbf7`, CI #858 / run `31327018573`.
-- Result: release SHA evidence, migration/runtime identity split, traffic admission, application rollback, schema rollback, PITR and provider-neutral observability boundaries are documented. CHANGELOG preserves the historical 0.1.0 record and does not fabricate a new semantic version.
-
-### Gate 8 — Forensic candidate
-
-Two preliminary attempts (#861 and #862) were rejected before being treated as official RED evidence because Pint detected style violations in the new forensic test. No release requirement was weakened.
-
-Official RED:
-
-- SHA: `81e67e6218ab45da735174c0aacfdb6071891049`
-- CI: #863 / run `31327290746`
-- Security: SUCCESS
-- Pint: SUCCESS
-- SQLite/PostgreSQL reached their final suites only after release cacheability, migrations and PostgreSQL hardening steps had succeeded, then failed on the intentionally absent final forensic contracts.
-
-The remediation adds a real container-build/runtime job and this audit artifact. Candidate and exact-head evidence remain pending until those checks pass on a frozen SHA.
-
-## 5. Security and dependency posture
-
-The release line explicitly blocks on Composer lockfile advisories and npm vulnerabilities at high severity or above. M9 does not use broad advisory ignores, lockfile auto-fix or forced audit remediation inside CI.
-
-`SECURITY.md` reflects the current authenticated, multi-organization product and includes tenant isolation, PII, authorization, session/auth, injection and Knowledge rendering in scope.
-
-No production secret, database password, certificate private key, `APP_KEY` or `PII_FINGERPRINT_KEY` is introduced into source control by M9.
+No known unresolved **Critical** or **High** M9 finding remains in the green candidate. A future Critical or High finding blocks promotion rather than being accepted silently.
 
 ## 6. Container and production parity
 
-The M9 reference image is required to build in CI. CI additionally inspects that:
+The real reference image now builds in CI. CI verifies `pdo_pgsql`, non-root runtime and `public/build` output. Ordinary web startup does not run migrations. `docs/RELEASE.md` and `docs/PRODUCTION.md` separate the privileged migration identity from the least-privilege runtime identity.
 
-- `pdo_pgsql` exists in the built runtime;
-- the default runtime UID is not root;
-- compiled frontend assets are present.
+The image is a reference application runtime, not a complete cloud topology. Ingress, TLS termination, managed PostgreSQL networking and provider-specific controls remain external responsibilities.
 
-The container does not run migrations on ordinary web startup. `docs/RELEASE.md` and `docs/PRODUCTION.md` require the migration identity to execute preflight/migrations separately from the least-privilege runtime identity.
+## 7. Reliability, observability and recovery
 
-The reference container is not represented as a complete production topology. Ingress, TLS termination, process supervision, managed PostgreSQL networking and provider-specific controls remain infrastructure responsibilities.
+CI verifies frontend build, Laravel config/route cacheability, both databases and PostgreSQL hardening. Public health probes remain minimal; detailed diagnosis belongs in protected logs/provider telemetry. M9 does not fabricate an APM, SIEM or logging-provider integration.
 
-## 7. Reliability and observability
+Recovery documentation distinguishes application rollback, schema rollback and backup/PITR **restore**. A real production restore/PITR drill is a **provider**/operator responsibility and is not executed by repository CI.
 
-CI verifies Laravel config/route cacheability, frontend build, fresh migrations, both database suites and PostgreSQL hardening.
+## 8. UX/accessibility validation boundary
 
-Public health probes remain intentionally minimal. Detailed diagnosis belongs in protected logs/provider telemetry; M9 does not fabricate an APM, SIEM or logging-provider integration.
+Feature/source contracts cover semantic navigation, skip link, current state, Knowledge help, reduced motion and browser-local low-light behavior. This environment does not provide an authenticated multi-browser **pixel**-by-pixel visual audit, so no pixel-perfect cross-browser claim is made.
 
-## 8. Recovery posture
+## 9. Final exact-head and integration policy
 
-The repository documents three distinct decisions:
+After this audit and ledger are synchronized, the resulting HEAD is frozen. A fresh **exact-head** CI must pass Security, Container, SQLite, PostgreSQL 16 and Pint on that exact SHA. No file commit may occur afterward.
 
-1. application rollback when the previous application is schema-compatible;
-2. schema rollback only after compatibility/data-integrity review;
-3. backup/PITR restore when data recovery is required.
+Before protected merge, PR #12 must be mergeable, `0 behind` current `main`, free of unresolved review threads and limited to the expected M9 release-hardening delta. Merge must use `expected_head_sha=<frozen verified SHA>`. Post-merge verification must prove `main` identical to the actual merge commit and, where available, zero file differences between the tested synthetic merge tree and actual merge tree.
 
-A real production **restore** or PITR drill is provider/operator work and is not executed by this repository CI. The documentation explicitly requires periodic recovery testing rather than treating a backup job as proof of recoverability.
-
-## 9. UX/accessibility audit boundary
-
-Source contracts and rendered feature tests cover authored accessibility behavior such as semantic navigation, skip link, labels/current state, reduced motion and M7/M8 interaction contracts.
-
-This connected environment does not provide a real authenticated multi-browser session for a **pixel**-by-pixel visual audit. Therefore M9 does not claim pixel-perfect validation across browser engines, viewport classes or operating systems.
-
-## 10. Provider/deployment boundary
-
-No real production **provider** deployment is executed by this audit. CI proves repository-side packaging and runtime contracts. Provider-specific TLS, secrets, backup/PITR, network policy, observability and traffic routing must still be configured and verified by the production operator.
-
-## 11. Severity disposition
-
-Candidate promotion requires that no known **Critical** or **High** M9 finding remain open. Security advisories at release-blocking severity must be remediated rather than suppressed.
-
-At this pre-candidate stage, no known unresolved Critical or High finding has been accepted for release; final disposition is confirmed only after the candidate and exact-head matrices are fully green.
-
-## 12. Final integration policy
-
-The final candidate must be frozen after audit/ledger synchronization. A fresh **exact-head** CI must then pass on that exact SHA. No repository-file commit may occur after the exact-head run used for integration.
-
-Before protected merge, the PR must be mergeable, zero commits behind current `main`, free of unresolved review threads and contain only the expected M9 release-hardening delta.
-
-Merge uses `expected_head_sha=<frozen verified SHA>`. Post-merge verification must prove `main` is identical to the actual merge commit and, where available, that the tested synthetic merge tree and real merge tree have zero file differences.
-
-A hosted tag/release is not required for M9 completion and will not be fabricated without an unambiguous versioning decision.
+No new semantic version/tag is fabricated by M9. Release readiness is defined by the exact tested repository state.
