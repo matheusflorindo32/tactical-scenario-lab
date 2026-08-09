@@ -9,7 +9,7 @@ Status: IMPLEMENTATION
 
 - [x] Gate 1 — Global M1–M8 Release Baseline Audit — GREEN
 - [x] Gate 2 — Security & Dependency Governance — GREEN
-- [ ] Gate 3 — Production Container & Deployment Parity
+- [x] Gate 3 — Production Container & Deployment Parity — GREEN
 - [ ] Gate 4 — CI & Release Pipeline Hardening
 - [ ] Gate 5 — Reliability & Deterministic Performance Budget
 - [ ] Gate 6 — UX, Localization & Accessibility Finalization
@@ -43,14 +43,17 @@ Status: IMPLEMENTATION
 - Result: dependency security is now an explicit release-blocking CI gate. No advisory was suppressed; npm reported zero vulnerabilities and Composer lockfile audit passed.
 
 ### Gate 3 — Production Container & Deployment Parity
+- RED SHA: `64e63d96308819dead8cd5d21a92790d03952eaa`
+- RED CI: #841 / run `31325985498` — the runbook separation contract passed while the new container contract failed exactly because the Dockerfile lacked the Node 22 frontend build stage; 327 tests passed, 31 PostgreSQL-specific tests were skipped in SQLite, and Security/Pint remained green.
+- GREEN SHA: `721daffb05894fc1a22a2f7f79e57725b19bf239`
+- GREEN CI: #842 / run `31326047120` — Security job `93276477248`, SQLite job `93276477257`, PostgreSQL 16 job `93276477275` and Pint job `93276477241` all SUCCESS. The container contract now proves PostgreSQL driver support, no SQLite production runtime, no migration-on-start, deterministic Node/Vite asset stage, copied `public/build`, Composer production install and non-root `USER app` runtime.
+- Result: repository container semantics now match the existing M6 production runbook's separated migration/runtime model while preserving all inherited database hardening.
+
+### Gate 4 — CI & Release Pipeline Hardening
 - RED SHA: pending
 - RED CI: pending
 - GREEN SHA: pending
 - GREEN CI: pending
-
-### Gate 4 — CI & Release Pipeline Hardening
-- RED SHA: pending
-- GREEN SHA: pending
 
 ### Gate 5 — Reliability & Deterministic Performance Budget
 - RED SHA: pending
