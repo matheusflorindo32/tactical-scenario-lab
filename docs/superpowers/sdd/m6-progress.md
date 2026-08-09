@@ -1,28 +1,30 @@
 # M6 — Production & Database Hardening Progress
 
-Branch: `feature/m6-production-hardening`
-Base: `main` @ `b96273edcc057ce9645416dacd497f551a40dee2`
+Branch de implementação: `feature/m6-production-hardening`
+Base original: `main` @ `b96273edcc057ce9645416dacd497f551a40dee2`
+Head auditado da implementação: `a78e0abb404f90be6ca8a77f18bc5ec734e248df`
+Merge em `main`: `2689e9892e16d031676878178658dba5a2fa1cf7`
 Design: `docs/superpowers/specs/2026-08-08-m6-production-database-hardening-design.md`
 Plan: `docs/superpowers/plans/2026-08-08-m6-production-database-hardening.md`
 Audit: `docs/superpowers/audits/2026-08-08-m6-production-database-hardening-audit.md`
-PR: `#8 — M6 — Production & Database Hardening` (draft)
+PR: `#8 — M6 — Production & Database Hardening` — MERGED
 
 ## Integration rule
 
-Do not write directly to `main`. M6 integrates only through its own PR after exact-head dual-database CI, forensic audit, branch synchronization, zero unresolved review threads, and merge protection using the expected branch HEAD. Gate 8 becomes GREEN only after the final unchanged HEAD satisfies every closing condition; the merge itself still requires the user's explicit decision.
+M6 foi desenvolvido fora de `main` e integrado somente por PR após dual-database CI, auditoria forense, branch synchronization, zero itens de revisão pendentes e merge protegido pelo SHA esperado. O merge foi autorizado explicitamente pelo usuário e executado exigindo o head auditado `a78e0abb404f90be6ca8a77f18bc5ec734e248df`.
 
 ## Task ledger
 
 | Task | Scope | State | Evidence |
 |---|---|---|---|
-| 1 | PostgreSQL authoritative CI baseline | GREEN | CI #669: PostgreSQL 16 migrate.fresh + full PHPUnit success; SQLite full PHPUnit success; Pint success; npm build success |
+| 1 | PostgreSQL authoritative CI baseline | GREEN | CI #669: PostgreSQL 16 migrate:fresh + full PHPUnit success; SQLite full PHPUnit success; Pint success; npm build success |
 | 2 | Fail-closed production preflight | GREEN | RED #671; output-contract correction #676; GREEN #677 on SQLite + PostgreSQL 16 + Pint/build |
 | 3 | Structural integrity + real least-privilege runtime login | GREEN | RED #680 proved cross-org direct SQL was possible; composite tenant FK; forensic hardening replaced owner-session/SET ROLE assurance with an actual `tactical_runtime_test` LOGIN; remediation baseline CI #725 fully green |
 | 4 | PostgreSQL database immutability | GREEN | TRUE RED #692; CI #703 initial DB-level guards; forensic RED exposed published→draft bypass; trigger now makes published state terminal; remediation baseline CI #725 fully green |
 | 5 | Deterministic concurrency hardening | GREEN | Real forked-process barrier harness; 7 race contracts; CI #709 repeated all 7 races 3x, then full PostgreSQL suite, SQLite and Pint all green on `7f6853058b664ed004aa1f8bb3b2477d9847ff0c`; no production service changes required |
 | 6 | Stateless liveness/readiness | GREEN | RED #711 established endpoint contract; forensic RED #720 proved web-session coupling; probes moved outside `web` middleware; remediation baseline CI #725 fully green |
 | 7 | Production operations contract | GREEN | `docs/PRODUCTION.md` covers role separation, TLS, preflight, stateless probes, PITR/restore and rollback boundaries; CI #716 initial runbook regression green; forensic update documents stateless probe topology |
-| 8 | Forensic audit + exact-head integration gate | FINAL VERIFICATION | Audit found/remediated 3 High/assurance findings; CI #725 proved remediation baseline; final HEAD must additionally prove path-scoped M6 migration rollback/reapply + all existing gates, then branch/review checks must remain clean |
+| 8 | Forensic audit + exact-head integration gate | GREEN | Final implementation HEAD `a78e0abb404f90be6ca8a77f18bc5ec734e248df`; CI #729 fully green; branch 0 behind; no PR discussion/review items; protected merge accepted; `main` at `2689e9892e16d031676878178658dba5a2fa1cf7` |
 
 ## Task 1 evidence — PostgreSQL baseline
 
@@ -59,7 +61,7 @@ Do not write directly to `main`. M6 integrates only through its own PR after exa
 - Default privileges preserve runtime DML and sequence access when Laravel test migrations recreate tables.
 - Initial CI role assurance used `SET ROLE`; the Gate 8 forensic audit classified that as an assurance gap because the session still originated as the owner identity.
 - Final CI provisioning creates `tactical_runtime_test` as `LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT` with test-only credentials, DML/sequence access, no table ownership and no schema DDL privilege.
-- The runtime connection now authenticates as that role; tests require both `session_user` and `current_user` to be `tactical_runtime_test`, verify the restricted role attributes/ownership and require `CREATE TABLE` to fail.
+- The runtime connection authenticates as that role; tests require both `session_user` and `current_user` to be `tactical_runtime_test`, verify the restricted role attributes/ownership and require `CREATE TABLE` to fail.
 - Remediation baseline CI `#725` (`31291994554`) passed PostgreSQL 16, 21 repeated concurrency races, the full PostgreSQL suite, SQLite and Pint on HEAD `c332ffc20e9d41918ed1c7b8be51dc7960996b39`.
 
 ## Task 4 evidence — PostgreSQL database immutability
@@ -96,7 +98,7 @@ Do not write directly to `main`. M6 integrates only through its own PR after exa
 - Readiness failure returns HTTP 503 with only `status=unavailable` and `database=unavailable`; host, credentials, SQL, SQLSTATE, PII key names and exception messages are not returned.
 - Readiness logging is coarse (`readiness_unavailable`) and does not attach the caught exception.
 - Initial endpoint implementation passed CI #714.
-- Gate 8 forensic RED #720 then proved `/health/live` inherited `StartSession` from `routes/web.php`, so database-backed sessions could make liveness fail with 500 during a database outage before the controller ran.
+- Gate 8 forensic RED #720 proved `/health/live` inherited `StartSession` from `routes/web.php`, so database-backed sessions could make liveness fail with 500 during a database outage before the controller ran.
 - Probes are now registered outside the `web` middleware group in `bootstrap/app.php`. A regression test sets database-backed sessions plus an unavailable database and requires live=200 while ready=503.
 - Remediation baseline CI #725 fully passed the stateless probe contract.
 
@@ -112,30 +114,39 @@ Do not write directly to `main`. M6 integrates only through its own PR after exa
 - Initial runbook HEAD `f9209af3d73a7dc38ca864253ca0718de4db196e` passed CI #716.
 - Gate 8 updated the runbook to state explicitly that infrastructure probes are outside web/session middleware and remain meaningful during a database outage.
 
-## Task 8 evidence — forensic audit and exact-head gate
+## Task 8 evidence — forensic audit and protected integration
 
 - Versioned audit: `docs/superpowers/audits/2026-08-08-m6-production-database-hardening-audit.md`.
 - RED CI #720 exposed the stateless-liveness defect and accompanied direct contracts for published downgrade and real runtime-login assurance.
 - Three findings were remediated without feature-scope expansion: published state terminal at DB layer; actual least-privilege runtime LOGIN; stateless infrastructure probes.
 - Remediation baseline HEAD `c332ffc20e9d41918ed1c7b8be51dc7960996b39` passed CI #725 completely.
-- Final CI now additionally exercises path-scoped rollback and reapply of both M6 PostgreSQL migrations before repeated concurrency and the complete PostgreSQL suite.
-- Before this final documentation freeze, PR #8 was mergeable, the branch was 0 commits behind `main`, and the PR discussion timeline contained no comments/reviews. These conditions must be rechecked against the final unchanged HEAD.
-- No unresolved Critical/High finding remained after remediation at the time of the audit. Exact-head CI and final PR synchronization/review checks are the remaining closing evidence.
+- Final implementation HEAD `a78e0abb404f90be6ca8a77f18bc5ec734e248df` passed CI #729 (`31292237441`).
+- CI #729 proved SQLite full suite, Pint, PostgreSQL 16 `migrate:fresh`, real runtime LOGIN provisioning, path-scoped rollback/reapply of both M6 migrations, all seven concurrency contracts repeated three times, and the complete PostgreSQL suite (303 tests / 1335 assertions).
+- Immediately before merge, `feature/m6-production-hardening` was 0 commits behind `main`, PR #8 was mergeable and had zero comments/review items.
+- PR #8 was marked ready and its body was updated without changing the implementation HEAD.
+- Merge was executed with `expected_head_sha=a78e0abb404f90be6ca8a77f18bc5ec734e248df`; GitHub accepted the protected merge and created `2689e9892e16d031676878178658dba5a2fa1cf7`.
+- `main` was then compared against `2689e9892e16d031676878178658dba5a2fa1cf7` and returned `identical`, proving the branch tip of `main` was the merge commit.
+- The green GitHub PR merge ref `c0d56cb24189b5705db144a48b881b5537f42b45` and the actual merge commit `2689e9892e16d031676878178658dba5a2fa1cf7` were compared and returned zero changed files. They differ only in merge-commit identity/metadata, not repository content.
+- No unresolved Critical/High finding remained at integration.
 
-## Final verification target
+## Final verification result
 
-After this ledger commit, do not alter the branch before evaluating the final gate. Gate 8 is GREEN only if the final unchanged HEAD proves all of the following:
+M6 is **8/8 GREEN and integrated**.
 
-- SQLite full PHPUnit success;
-- Pint success;
-- PostgreSQL 16 service + `migrate:fresh` success;
-- real `tactical_runtime_test` LOGIN provisioning success;
-- path-scoped rollback/reapply of `160000` and `161000` success;
-- all seven concurrency contracts repeated three times successfully;
-- full PostgreSQL PHPUnit success;
-- `behind_by = 0` against `main`;
-- PR mergeable;
-- zero unresolved PR discussion/review items;
-- no unintended M7/M8/M9 or unrelated feature leakage in the changed-file inventory.
+Final evidence:
 
-If all conditions pass, M6 is technically 8/8 complete and ready for the user's explicit merge decision. Do not merge solely because the gate is green.
+- SQLite full PHPUnit: GREEN;
+- Pint: GREEN;
+- PostgreSQL 16 service + `migrate:fresh`: GREEN;
+- real `tactical_runtime_test` LOGIN: GREEN;
+- path-scoped rollback/reapply of `160000` and `161000`: GREEN;
+- seven concurrency contracts × three runs: GREEN;
+- full PostgreSQL PHPUnit: 303 tests / 1335 assertions GREEN;
+- final implementation branch: 0 behind `main` before merge;
+- PR #8: mergeable before integration, zero discussion/review items;
+- changed-file inventory: M6-only, no M7/M8/M9 leakage;
+- protected merge: accepted using exact expected head SHA;
+- `main`: integrated at `2689e9892e16d031676878178658dba5a2fa1cf7`;
+- tested merge tree vs actual merge tree: zero file differences.
+
+This document is the post-integration closeout record for M6.
