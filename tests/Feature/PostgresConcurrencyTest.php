@@ -35,6 +35,15 @@ class PostgresConcurrencyTest extends TestCase
         (new DemoSeeder)->run();
     }
 
+    protected function tearDown(): void
+    {
+        if (app()->bound('db') && DB::getDriverName() === 'pgsql') {
+            Artisan::call('migrate:fresh', ['--force' => true]);
+        }
+
+        parent::tearDown();
+    }
+
     public function test_start_start_same_execution_has_exactly_one_winner(): void
     {
         $execution = app(ScenarioExecutionManager::class)->create($this->publishedVersion());
