@@ -20,6 +20,7 @@ use App\Http\Controllers\ExecutionTeamController;
 use App\Http\Controllers\ExecutiveDashboardController;
 use App\Http\Controllers\InstructorDashboardController;
 use App\Http\Controllers\KeyTimeRecordController;
+use App\Http\Controllers\KnowledgeController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OrganizationMembershipController;
 use App\Http\Controllers\PersonContactController;
@@ -52,6 +53,9 @@ Route::get('/dashboard/executive', ExecutiveDashboardController::class)
     ->name('dashboard.executive');
 
 Route::middleware(['auth', 'account.active'])->group(function () {
+    Route::get('/knowledge', [KnowledgeController::class, 'index'])->name('knowledge.index');
+    Route::get('/knowledge/{slug}', [KnowledgeController::class, 'show'])->name('knowledge.show');
+
     Route::get('/history/executions', ExecutionHistoryController::class)->name('execution-history.index');
     Route::get('/reports/executions.csv', ExecutionCsvController::class)->name('reports.executions.csv');
     Route::get('/reports/executions/{execution}/pdf', ExecutionReportController::class)->name('reports.executions.pdf');

@@ -1,6 +1,6 @@
 # Design System — Tactical Scenario Lab
 
-Versão: **0.2.0** · Última revisão: **2026-08-09**
+Versão: **0.3.0** · Última revisão: **2026-08-09**
 
 Este documento é a fonte da verdade para identidade visual, tokens, componentes Blade e padrões de interação do Tactical Scenario Lab. Toda decisão visual reutilizável deve ser refletida aqui junto com a implementação.
 
@@ -15,8 +15,11 @@ O produto atende instrutores de APH, primeiros socorros e treinamento operaciona
 - **Sobriedade tática** — sem neon, parallax gratuito ou gradientes decorativos.
 - **Foco na atenção** — prioridade operacional vem antes de decoração.
 - **Verdade histórica** — conteúdo congelado, append-only ou mutável deve ser visualmente distinguível.
+- **Orientação contextual** — ajuda de produto aparece próxima da tarefa sem competir com a operação.
 
 O M7 organiza a aplicação como um **Operational Command Center**: sidebar canônica, topbar contextual, dashboards orientados a atenção, cockpit de execução e workbench de avaliação/debrief.
+
+O M8 adiciona uma **Base de Conhecimento** institucional, autenticada e integrada ao mesmo shell. O conteúdo explica o uso do produto e seus invariantes, sem se apresentar como protocolo clínico ou tático autônomo.
 
 ---
 
@@ -153,6 +156,7 @@ Vivem em `resources/views/components/` e são consumidos via `<x-nome />`.
 | `x-table` | `table.blade.php` | `label`, `empty`, `emptyTitle`, `emptyDescription`, slot de tabela |
 | `x-section-nav` | `section-nav.blade.php` | `items`, `label`; links âncora nativos e estado atual |
 | `x-attention-item` | `attention-item.blade.php` | `title`, `metadata`, `variant`, `href`, slot |
+| `x-contextual-help` | `contextual-help.blade.php` | `slug`, `label`; link global para guia catalogado |
 | `x-topbar` | `topbar.blade.php` | contexto global, organização ativa, tema, conta |
 | `x-sidebar` | `sidebar.blade.php` | `current`; navegação canônica por abilities |
 | `x-breadcrumb` | `breadcrumb.blade.php` | `items` |
@@ -176,7 +180,15 @@ Usar em workbenches longos. `items` contém `label`, `href` e opcionalmente `sta
 
 Usar em filas operacionais do dashboard. `variant` é semântico (`navy`, `emergency`, `clinical`, `alert`). O componente vira link apenas quando `href` existe.
 
-### 3.2 Convenções
+### 3.2 Componente M8
+
+#### `x-contextual-help`
+
+Usar para conduzir o usuário da superfície operacional ao artigo relevante da **Base de Conhecimento**. O componente recebe somente um slug global já resolvido pelo catálogo e nunca deve carregar `organization_id`, pessoa, execução ou outro identificador de tenant.
+
+O shell resolve a relação pela metadata `contextual_for` do catálogo. Não manter uma segunda tabela de rota → slug em Blade.
+
+### 3.3 Convenções
 
 - Ícones: SVG inline `viewBox="0 0 24 24"`, traço coerente e `aria-hidden` quando decorativos.
 - Estados vazios: usar `x-empty-state`.
@@ -184,6 +196,7 @@ Usar em filas operacionais do dashboard. `variant` é semântico (`navy`, `emerg
 - Feedback: `x-alert`/`x-toast`, não texto solto sem contexto.
 - Navegação canônica: sidebar; topbar não replica um segundo menu completo.
 - Nenhum item canônico de navegação pode usar `href="#"` como placeholder.
+- Ajuda contextual deve explicar a aplicação, não ampliar abilities nem revelar tenant data.
 
 ---
 
@@ -197,6 +210,7 @@ Usar em filas operacionais do dashboard. `variant` é semântico (`navy`, `emerg
 - `x-topbar` contextual;
 - `x-sidebar` como navegação principal;
 - região `main`;
+- ajuda contextual quando a rota está mapeada no catálogo M8;
 - `x-toast`;
 - estado SSR de tema claro.
 
@@ -208,6 +222,33 @@ Usar em filas operacionais do dashboard. `variant` é semântico (`navy`, `emerg
 - **Execução:** cockpit com lifecycle, timeline append-only, equipes, recursos, injects e assessment.
 - **Assessment:** workbench com resumo, rubrica/evidências, erros críticos, tempos-chave, debrief, plano de ação e finalização.
 - **Gestão:** Pessoas, Organizações e Acessos compartilham tabela, badges, filtros e linguagem institucional.
+
+### 4.3 Hierarquia M8 — Base de Conhecimento
+
+O Knowledge Center possui duas superfícies principais:
+
+**Hub `/knowledge`**
+- identidade clara de Base de Conhecimento;
+- busca GET server-side;
+- filtro por categoria controlada;
+- contagem semântica de resultados;
+- cards com título, resumo, audiência e data de revisão;
+- estado vazio acessível;
+- funciona sem JavaScript para descoberta e navegação.
+
+**Leitor `/knowledge/{slug}`**
+- breadcrumb de retorno ao Hub;
+- H1 vindo do catálogo como título autoritativo;
+- resumo, categoria, audiência e data de revisão;
+- Markdown previamente sanitizado;
+- largura de leitura controlada;
+- H2/H3 com IDs determinísticos;
+- **TOC** nativo por âncoras quando existem pelo menos dois headings elegíveis;
+- artigos relacionados resolvidos somente pelo catálogo;
+- bloco explícito informando que o guia não substitui protocolo ou decisão clínica/tática;
+- impressão limpa, removendo navegação auxiliar quando prático.
+
+Markdown é conteúdo de produto versionado no Git. HTML cru é removido, links inseguros são bloqueados e o resultado não é executado como Blade/PHP.
 
 ---
 
@@ -228,7 +269,12 @@ Requisitos:
 - status comunicado por texto além da cor;
 - tabelas com cabeçalhos e `aria-label`/contexto acessível;
 - `prefers-reduced-motion` respeitado;
-- ausência de `div onclick` para ações canônicas.
+- ausência de `div onclick` para ações canônicas;
+- search do Knowledge Hub deve possuir label real e funcionar por GET;
+- TOC usa links nativos de âncora;
+- article prose não exige scroll horizontal em viewport móvel;
+- metadados de audiência/revisão não dependem somente de cor;
+- ajuda contextual usa texto significativo, não um ícone isolado.
 
 ---
 
@@ -236,10 +282,13 @@ Requisitos:
 
 - Português brasileiro.
 - CTAs com verbos claros: *Criar cenário*, *Iniciar execução*, *Finalizar avaliação*.
+- Ajuda contextual usa texto explícito como *Como usar esta tela*.
 - Sem promessa quantitativa sem evidência.
 - Sem adjetivos genéricos de marketing.
 - Mensagens de erro devem dizer o que ocorreu e, quando possível, o próximo passo.
 - Estados imutáveis devem usar linguagem explícita como **conteúdo histórico congelado** ou **registro histórico · somente acréscimo**.
+- Artigos M8 descrevem comportamento do produto; não devem prescrever tratamento, protocolo clínico ou ação tática autônoma.
+- Data de revisão indica transparência editorial e não deve ser apresentada como certificação clínica de atualidade.
 
 ---
 
@@ -255,7 +304,7 @@ Movimento existe apenas quando aumenta compreensão:
 | Modal | ~150 ms |
 | Progress | ~300 ms |
 
-Nunca usar parallax gratuito, texto letra por letra ou elementos flutuando sem função operacional.
+Nunca usar parallax gratuito, texto letra por letra ou elementos flutuando sem função operacional. O leitor M8 não depende de animação para navegação entre seções.
 
 ---
 
@@ -268,11 +317,19 @@ Implementado no M7:
 - [x] `x-attention-item` para filas de prioridade operacional.
 - [x] modo institucional low-light, local ao navegador e sem backend.
 
-Próximas extensões possíveis — **fora do escopo M7**:
+Implementado no M8:
+
+- [x] `x-contextual-help` para conexão segura entre tela operacional e guia global.
+- [x] Base de Conhecimento com Hub, reader, TOC determinístico e artigos relacionados.
+- [x] busca GET server-side e accent-insensitive.
+- [x] comportamento de impressão limpa para conteúdo institucional.
+
+Próximas extensões possíveis — fora do contrato M8 atual:
 
 - [ ] ordenação/paginação enriquecida dentro do contrato de `x-table` quando houver requisito real;
 - [ ] tokens de foco distintos por família de controle, se necessários;
-- [ ] catálogo visual/Storybook para componentes Blade.
+- [ ] catálogo visual/Storybook para componentes Blade;
+- [ ] evolução editorial somente quando houver requisito validado; não introduzir CMS por conveniência.
 
 ---
 
@@ -286,3 +343,6 @@ Ao criar ou alterar uma tela:
 4. Novos componentes entram na tabela da seção 3.
 5. Mudanças visuais devem preservar autorização backend, tenant isolation e invariantes de histórico; esconder um botão nunca substitui autorização.
 6. Testes de contrato devem acompanhar navegação, estados imutáveis e comportamentos críticos sempre que viável.
+7. Novo conteúdo do Knowledge Center entra no catálogo e no arquivo Markdown correspondente na mesma mudança e deve satisfazer os testes de integridade.
+8. Relações contextuais são definidas em `contextual_for`; não criar um mapa paralelo no shell.
+9. Conteúdo M8 permanece global, read-only e sem dados específicos de organização.

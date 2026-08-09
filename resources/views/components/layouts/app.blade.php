@@ -4,6 +4,13 @@
     'current' => null,
 ])
 
+@php
+$routeName = request()->route()?->getName();
+$contextualGuideSlug = $routeName !== null
+    ? app(\App\Knowledge\KnowledgeRepository::class)->findByContext($routeName)?->slug
+    : null;
+@endphp
+
 <!doctype html>
 <html lang="pt-BR" class="h-full">
 <head>
@@ -78,6 +85,12 @@
                     {{ $header }}
                 </header>
             @endisset
+
+            @if ($contextualGuideSlug !== null)
+                <div class="-mt-4 mb-6 flex justify-end print:hidden">
+                    <x-contextual-help :slug="$contextualGuideSlug" />
+                </div>
+            @endif
 
             {{ $slot }}
         </main>
