@@ -10,7 +10,7 @@ Status: IMPLEMENTATION
 - [x] Gate 1 — Secure knowledge contract — GREEN
 - [x] Gate 2 — Knowledge Hub — GREEN
 - [x] Gate 3 — Article experience — GREEN
-- [ ] Gate 4 — Operational guide content
+- [x] Gate 4 — Operational guide content — GREEN
 - [ ] Gate 5 — Contextual help
 - [ ] Gate 6 — Search & discovery hardening
 - [ ] Gate 7 — Governance & content integrity
@@ -48,7 +48,11 @@ Status: IMPLEMENTATION
 - Result: catalog title is authoritative H1, safe Markdown is rendered inside an institutional reader, H2/H3 receive deterministic ASCII anchors with duplicate suffixes, TOC appears only for at least two eligible headings, related guides stay catalog-resolved and source paths remain private.
 
 ### Gate 4 — Operational guide content
-- RED/GREEN evidence: pending
+- RED SHA: `3e78ebf4acc18c4aa270a354e56a4ff794d374d2`
+- RED CI: #801 / run `31320346843` — three expected content-contract failures because the initial catalog was empty; SQLite retained 307 passing tests and Pint was green.
+- GREEN SHA: `c96b393efefa42335e6231ca09e6a6687d6b74b4`
+- GREEN CI: #802 / run `31320621435` — SQLite, PostgreSQL 16, Pint, production Vite build, fresh migrations, least-privilege runtime role, M6 rollback/reapply and repeated concurrency invariants all green.
+- Result: six reviewed product guides ship atomically with the allowlisted catalog, controlled audiences/categories, related/contextual metadata and explicit product-only boundaries; the execution guide states that it does not prescribe clinical or tactical conduct and documents timeline append-only behavior.
 
 ### Gate 5 — Contextual help
 - RED/GREEN evidence: pending
