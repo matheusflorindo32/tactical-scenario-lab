@@ -62,6 +62,21 @@ Every PostgreSQL-specific migration must:
 - fail clearly on unsupported assumptions;
 - avoid destructive transformations unless the previous data has been validated first.
 
+### 4.4 Production PostgreSQL security posture
+
+The deployment contract must document and validate a least-privilege posture:
+
+- the normal application runtime account must not be a PostgreSQL superuser;
+- the runtime account should not own the database/schema or have broad DDL privileges;
+- schema migration privileges should be used only by the deployment/migration path, preferably through separate credentials where the hosting model supports it;
+- production must reject `DB_SSLMODE=disable`;
+- managed/provider deployments should use the strongest certificate-verifying mode they support (`verify-full` preferred when trust material and hostname validation are available);
+- credentials and connection URLs must never be logged or committed.
+
+Database-owner or migration credentials are not an application bypass feature. Normal web/queue runtime must exercise the same constraints and triggers that M6 claims as defense in depth.
+
+M6 will not introduce PostgreSQL Row-Level Security as a broad tenant mechanism unless the structural audit identifies a narrowly justified case; current application tenant isolation remains authoritative and is reinforced selectively by relational constraints.
+
 ## 5. Critical invariants to enforce
 
 M6 will audit the schema and implement database enforcement only for invariants that are both critical and stable.
@@ -70,7 +85,7 @@ M6 will audit the schema and implement database enforcement only for invariants 
 
 Once a `ScenarioVersion` is published, fields that define that version must not be altered.
 
-Application-level guards remain. PostgreSQL must reject an update that changes immutable definition fields on a published version even through direct SQL or a future unguarded code path.
+Application-level guards remain. PostgreSQL must reject an update that changes immutable definition fields on a published version even through direct SQL or a future unguarded code path executed with the normal runtime database role.
 
 Allowed operational metadata changes, if any exist, must be explicitly enumerated instead of using a broad allow-all exception.
 
@@ -84,9 +99,9 @@ Action-item lifecycle transitions remain mutable according to the domain state m
 
 ### 5.3 Timeline append-only behavior
 
-Operational timeline/history rows that are defined as append-only must not be updated or deleted by normal application/database roles after insertion.
+Operational timeline/history rows that are defined as append-only must not be updated or deleted by the normal runtime database role after insertion.
 
-The design must preserve legitimate migration/maintenance needs through a deliberately separate privileged maintenance path, not by weakening normal runtime constraints.
+Legitimate schema/data maintenance is performed through the controlled migration/maintenance credential path, not through a web-accessible bypass and not by weakening runtime constraints.
 
 ### 5.4 Tenant relational integrity
 
@@ -142,6 +157,7 @@ At minimum, production must reject unsafe/missing values for:
 - `APP_DEBUG=true`;
 - unsupported production database driver;
 - insecure placeholder database configuration where detectable;
+- `DB_SSLMODE=disable`;
 - session/cookie transport settings that contradict HTTPS deployment expectations;
 - any other secret/critical variable already required by existing security code.
 
@@ -203,7 +219,7 @@ Prove all migrations build from zero on PostgreSQL and the existing suite remain
 
 ### 12.2 Database-invariant tests
 
-Add direct-database mutation tests that intentionally bypass model/service protections and verify PostgreSQL rejects forbidden mutations.
+Add direct-database mutation tests that intentionally bypass model/service protections and verify PostgreSQL rejects forbidden mutations using the same privilege class expected for normal runtime.
 
 These are required for any invariant claimed to be database-enforced.
 
@@ -258,7 +274,7 @@ Add PostgreSQL CI service, `pdo_pgsql`, environment wiring, and clean migration/
 
 ### Task 2 — Production configuration preflight
 
-Implement and test fail-closed production configuration validation plus safe `.env.example`/deployment documentation.
+Implement and test fail-closed production configuration validation plus safe `.env.example`/deployment documentation, including TLS and least-privilege database guidance.
 
 ### Task 3 — Structural integrity audit
 
@@ -278,11 +294,11 @@ Add privacy-safe liveness/readiness behavior and tests.
 
 ### Task 7 — Production operations documentation
 
-Document PostgreSQL settings, migrations, preflight, deployment sequence, rollback expectations, backup responsibility boundaries, and health checks. No secrets in repository examples.
+Document PostgreSQL/TLS posture, runtime vs migration privilege boundaries, migrations, preflight, deployment sequence, rollback expectations, backup responsibility boundaries, and health checks. No secrets in repository examples.
 
 ### Task 8 — Forensic M6 audit and final gate
 
-Audit tenant isolation, immutability, concurrency, migration reversibility/safety, secret handling, CI parity, and scope boundaries. Resolve all Critical/High findings before integration.
+Audit tenant isolation, immutability, concurrency, migration reversibility/safety, secret handling, database privileges/TLS, CI parity, and scope boundaries. Resolve all Critical/High findings before integration.
 
 ## 17. Acceptance criteria
 
@@ -294,6 +310,7 @@ M6 is complete only when all of the following are true:
 - priority races have deterministic concurrent tests and correct final state;
 - no duplicate critical side effects occur in tested races;
 - production configuration fails closed for defined unsafe states without leaking secrets;
+- production contract rejects disabled PostgreSQL TLS and documents least-privilege runtime credentials;
 - liveness/readiness endpoints expose no sensitive data;
 - no M7/M8/M9 product scope is mixed into the branch;
 - final exact-HEAD CI is green;
