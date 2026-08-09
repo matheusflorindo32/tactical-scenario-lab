@@ -9,7 +9,7 @@ Status: IMPLEMENTATION
 
 - [x] Gate 1 — Secure knowledge contract — GREEN
 - [x] Gate 2 — Knowledge Hub — GREEN
-- [ ] Gate 3 — Article experience
+- [x] Gate 3 — Article experience — GREEN
 - [ ] Gate 4 — Operational guide content
 - [ ] Gate 5 — Contextual help
 - [ ] Gate 6 — Search & discovery hardening
@@ -41,7 +41,11 @@ Status: IMPLEMENTATION
 - Result: authenticated Knowledge Hub, canonical sidebar entry, GET discovery form, controlled category filter, audience/review metadata, result count and accessible empty state are implemented without new persistence.
 
 ### Gate 3 — Article experience
-- RED/GREEN evidence: pending
+- RED SHA: `6ccbe563ff2e6c940b1b54a974fffa7e4e3a6832`
+- RED CI: #794 / run `31319997213` — secure unknown-slug 404 remained green while two new reader/TOC contracts failed; SQLite retained 305 passing tests and Pint was green.
+- GREEN SHA: `119012469ff7ca09e2dcd31a51a24791400835c5`
+- GREEN CI: #799 / run `31320223534` — SQLite, PostgreSQL 16, Pint, production Vite build, fresh migrations, least-privilege runtime role, M6 rollback/reapply and repeated concurrency invariants all green.
+- Result: catalog title is authoritative H1, safe Markdown is rendered inside an institutional reader, H2/H3 receive deterministic ASCII anchors with duplicate suffixes, TOC appears only for at least two eligible headings, related guides stay catalog-resolved and source paths remain private.
 
 ### Gate 4 — Operational guide content
 - RED/GREEN evidence: pending
