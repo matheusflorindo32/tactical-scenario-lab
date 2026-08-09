@@ -22,10 +22,10 @@ BEGIN
         NEW.threat_level IS DISTINCT FROM OLD.threat_level OR
         NEW.mechanism IS DISTINCT FROM OLD.mechanism OR
         NEW.estimated_casualty_count IS DISTINCT FROM OLD.estimated_casualty_count OR
-        NEW.resources IS DISTINCT FROM OLD.resources OR
-        NEW.learning_objectives IS DISTINCT FROM OLD.learning_objectives OR
-        NEW.expected_actions IS DISTINCT FROM OLD.expected_actions OR
-        NEW.critical_errors IS DISTINCT FROM OLD.critical_errors
+        NEW.resources::jsonb IS DISTINCT FROM OLD.resources::jsonb OR
+        NEW.learning_objectives::jsonb IS DISTINCT FROM OLD.learning_objectives::jsonb OR
+        NEW.expected_actions::jsonb IS DISTINCT FROM OLD.expected_actions::jsonb OR
+        NEW.critical_errors::jsonb IS DISTINCT FROM OLD.critical_errors::jsonb
     ) THEN
         RAISE EXCEPTION 'Published scenario version definition is immutable.' USING ERRCODE = '23514';
     END IF;
