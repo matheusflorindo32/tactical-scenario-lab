@@ -54,26 +54,34 @@
     --color-ink-900: #101822;
 
     /* --- Semânticos ---------------------------------------------- */
-    /* Emergência (vermelho médico, não rosa) */
     --color-emergency-50: #fdf1f0;
     --color-emergency-100: #f9dcd8;
     --color-emergency-500: #c21807;
     --color-emergency-600: #a51305;
     --color-emergency-700: #7a0c04;
 
-    /* Clínico (verde institucional) */
     --color-clinical-50: #ecf6f0;
     --color-clinical-100: #cfe7d8;
     --color-clinical-500: #0f7a4a;
     --color-clinical-600: #0b6039;
     --color-clinical-700: #08472a;
 
-    /* Alerta (âmbar) */
     --color-alert-50: #fdf4e3;
     --color-alert-100: #f8e2b0;
     --color-alert-500: #b7791f;
     --color-alert-600: #925e15;
     --color-alert-700: #6e470f;
+
+    /* --- Low-light institucional --------------------------------- */
+    --color-lowlight-canvas: #060f1c;
+    --color-lowlight-surface: #0b1a2c;
+    --color-lowlight-elevated: #12283f;
+    --color-lowlight-border: #234876;
+    --color-lowlight-text: #f7f5f1;
+    --color-lowlight-muted: #adc4e2;
+    --color-lowlight-emergency: #3b1714;
+    --color-lowlight-clinical: #102a20;
+    --color-lowlight-alert: #332715;
 
     /* --- Raios ---------------------------------------------------- */
     --radius-xs: 0.25rem;
@@ -134,14 +142,12 @@
         color: #fff;
     }
 
-    /* Foco visível global (acessibilidade) */
     :focus-visible {
         outline: none;
         box-shadow: var(--shadow-focus);
         border-radius: var(--radius-sm);
     }
 
-    /* Respeita preferência de menos movimento */
     @media (prefers-reduced-motion: reduce) {
         *,
         *::before,
@@ -170,7 +176,6 @@
         }
     }
 
-    /* Grade sutil de fundo tático (para hero) */
     .tsl-grid-bg {
         background-image:
             linear-gradient(rgba(11, 26, 44, 0.04) 1px, transparent 1px),
@@ -178,7 +183,6 @@
         background-size: 32px 32px;
     }
 
-    /* Divisor com marca tática */
     .tsl-divider {
         position: relative;
         border-top: 1px solid var(--color-stone-200);
@@ -193,6 +197,85 @@
         height: 2px;
         background: var(--color-navy-700);
     }
+}
+
+/* -----------------------------------------------------------------
+   Low-light institucional — opt-in local, sem alterar semântica.
+   O seletor de atributo mantém light como baseline do SSR.
+   ----------------------------------------------------------------- */
+[data-theme='low-light'] {
+    color-scheme: dark;
+}
+
+[data-theme='low-light'] body {
+    background-color: var(--color-lowlight-canvas);
+    color: var(--color-lowlight-text);
+}
+
+[data-theme='low-light'] :is(.bg-white, [class~='bg-white/90'], [class~='bg-white/85']) {
+    background-color: var(--color-lowlight-surface);
+}
+
+[data-theme='low-light'] :is(.bg-stone-25, .bg-stone-50, [class~='bg-stone-50/70']) {
+    background-color: var(--color-lowlight-canvas);
+}
+
+[data-theme='low-light'] :is(.bg-stone-100, [class~='hover:bg-stone-100']:hover) {
+    background-color: var(--color-lowlight-elevated);
+}
+
+[data-theme='low-light'] :is(.border-stone-100, .border-stone-200, .border-stone-300) {
+    border-color: var(--color-lowlight-border);
+}
+
+[data-theme='low-light'] :is(.text-navy-950, .text-navy-900, .text-ink-900, .text-ink-700) {
+    color: var(--color-lowlight-text);
+}
+
+[data-theme='low-light'] :is(.text-navy-700, .text-ink-500, .text-ink-300) {
+    color: var(--color-lowlight-muted);
+}
+
+[data-theme='low-light'] .bg-navy-50,
+[data-theme='low-light'] [class~='bg-navy-50/60'] {
+    background-color: var(--color-lowlight-elevated);
+}
+
+[data-theme='low-light'] .bg-emergency-50 {
+    background-color: var(--color-lowlight-emergency);
+}
+
+[data-theme='low-light'] .bg-clinical-50 {
+    background-color: var(--color-lowlight-clinical);
+}
+
+[data-theme='low-light'] .bg-alert-50 {
+    background-color: var(--color-lowlight-alert);
+}
+
+[data-theme='low-light'] :is(.text-emergency-700, .text-emergency-600) {
+    color: #f7b4ac;
+}
+
+[data-theme='low-light'] :is(.text-clinical-700, .text-clinical-600) {
+    color: #a8dfc1;
+}
+
+[data-theme='low-light'] :is(.text-alert-700, .text-alert-600) {
+    color: #f1cf8f;
+}
+
+[data-theme='low-light'] input,
+[data-theme='low-light'] select,
+[data-theme='low-light'] textarea {
+    background-color: var(--color-lowlight-surface);
+    border-color: var(--color-lowlight-border);
+    color: var(--color-lowlight-text);
+}
+
+[data-theme='low-light'] input::placeholder,
+[data-theme='low-light'] textarea::placeholder {
+    color: var(--color-lowlight-muted);
 }
 
 /* -----------------------------------------------------------------
