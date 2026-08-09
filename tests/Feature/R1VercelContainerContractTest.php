@@ -18,7 +18,8 @@ class R1VercelContainerContractTest extends TestCase
             flags: JSON_THROW_ON_ERROR,
         );
 
-        $this->assertNull($config['framework'] ?? 'missing');
+        $this->assertArrayHasKey('framework', $config);
+        $this->assertNull($config['framework']);
         $this->assertSame('npm run build', $config['buildCommand'] ?? null);
         $this->assertSame('public', $config['outputDirectory'] ?? null);
         $this->assertSame(
