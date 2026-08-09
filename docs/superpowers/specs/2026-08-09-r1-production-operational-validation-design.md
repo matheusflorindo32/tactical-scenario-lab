@@ -1,167 +1,204 @@
 # R1 — Production Release & Operational Validation
 
 Date: 2026-08-09
-Status: DESIGN APPROVED — WRITTEN SPEC REVIEW
+Status: DESIGN APPROVED — REVISED WRITTEN SPEC REVIEW
 Baseline: `main` after M9 protected merge
 Branch: `feature/r1-production-operational-validation`
+Selected staging stack: **Vercel + Neon**
 
 ## Objective
 
-R1 converts the repository-level readiness proven by M1–M9 into **real operational evidence** through a staging-first release process.
+R1 converts the repository-level readiness proven by M1–M9 into real operational evidence through a **staging-first, fail-closed** release process.
 
-R1 adds no new product domain. It validates hosting, TLS, secrets, PostgreSQL identities, backup/recovery, deployment, health admission, authenticated smoke/E2E, observability and production promotion while preserving all M6–M9 security and integrity contracts.
+R1 adds no new product domain. It validates hosting, TLS, secrets, PostgreSQL identities, recovery, deployment, health admission, authenticated smoke/E2E, observability and eventual production promotion while preserving all M6–M9 security and integrity contracts.
 
 **Primary rule:** production promotion is blocked until staging has passed every applicable R1 promotion gate.
 
 No CI simulation may be represented as a real provider deployment, restore drill, browser session or production result.
 
-## Selected strategy
+## Selected provider architecture
 
-**Staging-first with explicit production promotion** is the selected model.
+For the current validation phase, R1 uses:
 
-Direct-to-production is rejected because it combines first-time provider, database, secret, migration and application risks in the live environment. A provider-neutral rehearsal alone is also insufficient because TLS, managed PostgreSQL, backup/PITR and traffic admission require provider evidence.
+```text
+GitHub exact candidate SHA
+          |
+          v
+       Vercel
+ custom staging environment
+ OCI/Docker container runtime
+ HTTPS / deployment identity
+ provider-private logs
+          |
+          v
+        Neon
+ isolated PostgreSQL staging
+ external connection secret
+ recovery/restore capability
+```
+
+### Why Vercel + Neon
+
+The stack is selected because it minimizes current operating cost and provider complexity while preserving the essential release contracts:
+
+- Vercel supports container services/OCI images and `Dockerfile.vercel` patterns;
+- Vercel supports preview/custom environments and environment-scoped variables;
+- Vercel provides hosted deployment URLs and HTTPS;
+- Vercel exposes deployment identity and runtime logs;
+- Neon integrates with Vercel as managed PostgreSQL;
+- staging can be created independently from any future production environment;
+- the existing Laravel/PHP 8.4/PostgreSQL container contract remains the baseline rather than rewriting the application for a provider-specific framework runtime.
+
+AWS remains documented as a future higher-control option, not the active R1 staging provider. It is rejected for the current phase because ECS/Fargate + ALB + RDS + Secrets Manager + CloudWatch adds unnecessary cost and operational surface before real user load/SLA requirements justify it.
 
 ## Hard boundaries
 
 - staging and production are separate security boundaries;
 - staging never uses the authoritative production database;
-- production PII is not required or copied into staging by default;
-- staging and production do not share application secrets, DB credentials or provider tokens;
-- migration credentials are temporary and are removed from application runtime;
-- runtime uses a least-privilege PostgreSQL identity with no schema ownership/DDL capability;
-- production PostgreSQL must support PITR before promotion;
+- production PII is not copied into staging by default;
+- staging and production do not share application secrets or DB credentials;
+- database credentials are injected through provider environment/secrets, never committed;
+- migration capability and runtime application capability remain logically separated;
+- runtime must not require schema-owner/DDL capability for normal requests;
 - HTTPS is mandatory for hosted authenticated traffic;
-- exact Git SHA/image identity is required; branch names and mutable `latest` tags are insufficient;
+- exact deployed Git SHA/deployment identity is required;
 - unresolved Critical/High findings block promotion;
 - failed restore, readiness, authorization or release-critical smoke checks block promotion;
+- free-tier limitations are acceptable for staging but are not represented as a production SLA;
 - no provider, restore, TLS, browser or production evidence is fabricated;
 - no unrelated feature work, AI/RAG, clinical/tactical automation or broad refactor belongs to R1.
 
-## Provider selection contract
+## Provider evidence contract
 
-Gate 1 compares candidate stacks only after they satisfy these **blocking requirements**:
+The active Vercel + Neon stack must prove these blocking capabilities before Gate 2 can become GREEN:
 
-1. supported Laravel/PHP or validated Docker execution;
-2. managed PostgreSQL compatible with the M6/M9 contract;
-3. encrypted application and database transport;
-4. external secret management;
-5. isolated staging and production environments;
-6. health-check/traffic-admission capability or controlled equivalent;
-7. private persistent logs/diagnostics;
-8. backups with a documented restore path;
-9. PITR capability for the production PostgreSQL service;
-10. migration/runtime database credential separation;
-11. exact deployed SHA/image identification;
-12. operator access without committing provider credentials.
+1. validated execution of the Laravel container through Vercel container runtime;
+2. isolated Neon PostgreSQL compatible with the existing PostgreSQL 16 contracts;
+3. HTTPS on the hosted application endpoint;
+4. environment-scoped secret injection outside Git;
+5. staging separated from future production;
+6. exact Vercel deployment identity tied to the candidate SHA;
+7. private runtime logs/diagnostics;
+8. documented Neon recovery/restore path sufficient for the staging drill;
+9. runtime database permissions restricted from unnecessary DDL;
+10. no provider credentials committed to the repository.
 
-Each item is recorded as **PASS**, **FAIL** or **UNKNOWN**. FAIL or UNKNOWN on a blocking requirement prevents provider selection. Cost, region and convenience rank only providers that have passed the blocking safety requirements.
+Each item is recorded as PASS, FAIL or UNKNOWN. FAIL/UNKNOWN blocks the applicable gate.
 
 ## Environment model
 
 ```text
-exact candidate SHA / immutable image
-              |
-       +------+------+
-       |             |
-       v             v
-    STAGING       PRODUCTION
- separate app     separate app
- separate secrets separate secrets
- migration role   migration role
- runtime role     runtime role
- separate PG      separate PG
- HTTPS/TLS        HTTPS/TLS
- private logs     private logs
- restore target   backup + PITR
+exact candidate SHA
+       |
+       v
+VERCEL PROJECT: tactical-scenario-lab
+       |
+       +-- staging environment
+       |      |
+       |      +-- staging-only APP_KEY / secrets
+       |      +-- container deployment
+       |      +-- HTTPS endpoint
+       |      +-- private logs
+       |      |
+       |      v
+       |   NEON STAGING
+       |   isolated PostgreSQL
+       |   disposable test data
+       |   recovery drill target
+       |
+       +-- production environment (NOT required yet)
+              separate secrets/database
+              only after Gates 1–7
 ```
 
 Production does not need to exist before staging Gates 1–7 are green.
 
-## Gate 1 — Provider & Environment Contract
+## Gate 1A — Provider Re-selection & Environment Contract
 
-**Goal:** select the hosting/database stack only after mandatory capabilities are verified.
+**Goal:** replace the earlier AWS staging design with the approved zero/near-zero-cost Vercel + Neon design without weakening any M9 release contract.
 
 Evidence:
 
-- provider scorecard;
-- supported application/container deployment method;
-- managed PostgreSQL, backup, restore and PITR capabilities;
-- TLS, secrets, environment isolation, health and logging capabilities;
-- selected staging architecture;
-- explicit unresolved-item list.
+- Vercel workspace authenticated;
+- absence/existence of an existing Tactical Scenario Lab Vercel project recorded;
+- official container/custom-environment capability confirmed;
+- Neon integration path documented;
+- AWS retained only as historical/future alternative;
+- no production or paid resource is created implicitly.
 
-GREEN requires zero blocking FAIL/UNKNOWN, confirmed production PITR capability and documented staging/production isolation. Provider credentials remain outside Git.
+GREEN requires a written, internally consistent provider design and no blocking UNKNOWN about container execution, staging isolation, HTTPS, secret injection or PostgreSQL connectivity.
 
-## Gate 2 — Isolated Staging + TLS
+## Gate 2 — Real Isolated Staging + TLS
 
 **Goal:** create a real hosted staging environment isolated from production.
 
-Evidence:
+Required sequence:
 
-- hosted staging application;
-- separate staging PostgreSQL;
-- staging hostname and valid HTTPS/TLS;
-- if plaintext HTTP is exposed, it redirects to HTTPS and never serves authenticated application traffic;
-- no production database or secret reuse;
-- exact deployed SHA/image is identifiable.
+1. create or link the Tactical Scenario Lab Vercel project;
+2. introduce only the provider configuration required for container execution (for example `Dockerfile.vercel` and narrowly-scoped Vercel config if required);
+3. create/use a custom `staging` environment or equivalent isolated preview target;
+4. provision/link a Neon staging database;
+5. configure staging-only application/database environment values outside Git;
+6. deploy the exact candidate SHA;
+7. verify HTTPS and deployment identity;
+8. verify that no production secret/database is referenced.
 
-GREEN requires HTTPS staging, isolated data/trust boundaries and immutable release identity evidence.
+GREEN requires a reachable HTTPS staging deployment, isolated Neon database and exact release identity evidence.
 
-## Gate 3 — Secrets + Migration/Runtime Identity Separation
+## Gate 3 — Secrets + Database Runtime Least Privilege
 
 **Goal:** prove production-style authorization boundaries in staging.
 
 Evidence:
 
-- application secrets injected outside Git/artifacts;
-- migration role can perform required migration operations;
-- runtime role supports normal application DML but cannot own/alter schema;
-- migration credentials are absent from running web/worker runtime after deployment;
-- `production:preflight` succeeds with production-like staging settings.
+- staging secrets injected through Vercel environment configuration/integration;
+- no secret material committed or echoed to public logs;
+- Laravel `production:preflight` succeeds with staging production-like settings;
+- schema/migrations are applied through a controlled migration step;
+- the web runtime connects using a role that supports normal application DML but cannot perform unnecessary schema DDL;
+- DDL-denial test succeeds under runtime credentials.
 
-GREEN requires a runtime DDL-denial test, successful normal application access using the runtime identity and no exposed secret material.
+If Neon/provider limitations make two persistent identities impractical on the free staging tier, a controlled migration session followed by a restricted runtime role is required; the design must not silently fall back to schema-owner credentials for normal web runtime.
 
-## Gate 4 — PostgreSQL + Backup/PITR + Restore Drill
+## Gate 4 — PostgreSQL Recovery / Restore Drill
 
-**Goal:** prove recoverability instead of merely proving backup configuration.
+**Goal:** prove recoverability instead of merely proving that a provider advertises backups.
 
 Evidence:
 
-- managed PostgreSQL connection/TLS posture;
-- backup/recovery point evidence;
-- production PostgreSQL PITR capability/configuration evidence;
-- restore into a **separate isolated recovery target**;
-- migration state and application/integrity validation on the restored target.
+- Neon staging connection/TLS posture;
+- recovery point/history capability visible for the selected plan;
+- restore/branch/recovery performed into a separate isolated target where the provider supports it;
+- migration state and application/integrity validation on the recovery target;
+- any free-tier retention limitation recorded explicitly.
 
-GREEN requires a successful isolated restore drill. The original staging database is not overwritten for the first recovery drill. The production PostgreSQL option must have PITR enabled or ready to be enabled before Gate 8.
+GREEN requires an actual isolated recovery drill. A documentation claim without executing recovery is not GREEN.
 
-A configured backup without a successful restore drill is not GREEN.
+Before eventual production promotion, the selected paid/free production database must provide an acceptable PITR/backup policy for the real risk level. A staging free-tier recovery window is not automatically considered production-grade PITR.
 
 ## Gate 5 — Real Deployment + Health Admission
 
-**Goal:** prove the real release sequence in staging.
+**Goal:** prove the real release sequence in Vercel staging.
 
 Required order:
 
-1. select exact candidate SHA/image;
-2. confirm repository CI green on that candidate;
-3. load migration identity;
-4. run `production:preflight`;
-5. apply migrations;
-6. warm Laravel config/route caches where applicable;
-7. remove migration credentials from runtime;
-8. start application under the runtime identity;
-9. verify `/health/live`;
-10. verify `/health/ready`;
-11. only then admit staging for functional QA.
+1. freeze exact candidate SHA;
+2. confirm repository CI green;
+3. run production preflight;
+4. apply migrations through the controlled migration path;
+5. deploy/start the Vercel container under runtime DB credentials;
+6. verify `/health/live`;
+7. verify `/health/ready`;
+8. verify runtime logs contain no secret leakage;
+9. only then admit staging for functional QA.
 
-GREEN requires no migration-on-web-startup behavior, secret-safe probes, correct readiness behavior and recorded release identity.
+GREEN requires no migration-on-web-startup behavior, secret-safe probes and recorded Vercel deployment identity.
 
 ## Gate 6 — Authenticated Smoke/E2E + Browser QA
 
 **Goal:** exercise the hosted application as real users using disposable staging data.
 
-Minimum flow coverage:
+Minimum coverage:
 
 - login and active organization context;
 - dashboard;
@@ -176,24 +213,21 @@ Minimum flow coverage:
 - low-light persistence;
 - keyboard, focus and skip-link sanity.
 
-Browser qualification requires one Chromium-family desktop browser plus one independent engine. If the second engine cannot be automated, a manual check is required and recorded before production promotion.
-
-No production PII is used.
+Browser qualification requires one Chromium-family desktop browser plus one independent engine before production promotion. No production PII is used.
 
 ## Gate 7 — Observability + Failure/Recovery Drill
 
-**Goal:** prove that predictable failures can be detected and recovered safely in staging.
+**Goal:** prove predictable failures can be detected and recovered safely in staging.
 
-Required evidence:
+Evidence:
 
-- provider/application logs are private;
-- inspected logs contain no exposed secrets or raw sensitive payloads;
-- database-unavailable behavior is safely exercised where the provider permits;
+- Vercel runtime logs are private to the workspace;
+- inspected logs contain no secrets or raw sensitive payloads;
+- database-unavailable/readiness failure behavior is safely exercised where feasible;
 - liveness remains process-oriented while readiness fails closed;
-- restart/redeploy of the same candidate returns staging to health;
-- schema-compatible application rollback is rehearsed, or an approved roll-forward rehearsal is used when rollback is unsafe;
-- Gate 4 recovery evidence is still valid;
-- ownership/decision path for application rollback vs schema rollback vs PITR is documented.
+- redeploy/restart of the same candidate returns staging to health;
+- Gate 4 recovery evidence remains valid;
+- rollback/roll-forward decision path is documented.
 
 GREEN requires observable failure without public diagnostic leakage and successful return to a healthy staging state.
 
@@ -203,121 +237,101 @@ GREEN requires observable failure without public diagnostic leakage and successf
 
 Preconditions:
 
-- Gates 1–7 GREEN;
+- Gates 1A–7 GREEN;
 - exact candidate CI remains GREEN;
 - zero unresolved Critical/High findings;
-- production secrets/database/roles are independent from staging;
-- production PostgreSQL PITR is enabled;
-- an appropriate production recovery point is confirmed.
+- production plan/tier is explicitly approved for commercial/institutional use;
+- production secrets/database are independent from staging;
+- production recovery/PITR policy is adequate for the accepted risk level.
 
-Production sequence:
+The Vercel Hobby/free staging setup is **not automatically promoted to commercial production**. Before Gate 8, provider-plan terms, expected load, uptime needs, recovery requirements and costs are re-evaluated. Production may remain on Vercel + Neon with appropriate plans or move to another provider without changing the application-domain design.
 
-1. freeze candidate identity;
-2. execute preflight/migrations using production migration identity;
-3. remove migration credentials;
-4. start runtime under least privilege;
-5. verify production liveness/readiness;
-6. admit traffic;
-7. run minimal non-destructive authenticated smoke checks;
-8. inspect private logs/alerts;
-9. record deployed SHA/image, migration state and health evidence;
-10. make an explicit version/tag decision.
+## Repository-change policy
 
-A semantic version is created only when an explicit versioning policy/version decision exists. Otherwise the exact deployed SHA remains the release identity.
+R1 may add only operational validation artifacts or targeted provider changes justified by Vercel staging:
+
+- revised R1 spec/plan/ledger/scorecard;
+- `Dockerfile.vercel` or narrowly-scoped provider configuration;
+- staging/release smoke/E2E tests;
+- secret-safe deployment configuration;
+- targeted defects fixed via RED → GREEN.
+
+Every repository-file change reruns the complete M9 release matrix: dependency security, real container build/runtime contract, SQLite, PostgreSQL 16 including M6 hardening/concurrency, and Pint.
 
 ## Evidence model
 
 Evidence is classified as:
 
 - **repository:** Git SHA, PR, CI, tests and documentation;
-- **provider:** environment, deployment identity, TLS, PostgreSQL, backup/restore and private logs;
-- **runtime:** preflight, role behavior, probes and authenticated smoke;
-- **manual:** required checks where authenticated automation/tool access is unavailable.
+- **provider:** Vercel project/environment/deployment identity, HTTPS, Neon database/recovery and private logs;
+- **runtime:** preflight, DB-role behavior, probes and authenticated smoke;
+- **manual:** required checks where automation/tool access is unavailable.
 
-Evidence must be secret-safe. Tokens, passwords, PII, private connection strings and sensitive restored records do not belong in GitHub artifacts or public logs.
+Evidence must be secret-safe. Tokens, passwords, PII, connection strings and sensitive restored records do not belong in GitHub artifacts or public logs.
 
 ## Failure policy
 
-R1 is fail-closed:
+R1 remains fail-closed:
 
 - Critical/High finding → promotion blocked;
-- provider FAIL/UNKNOWN → selection blocked;
-- failed restore drill → production blocked;
-- missing PITR capability → production blocked;
+- provider capability FAIL/UNKNOWN → applicable gate blocked;
+- failed recovery drill → production blocked;
 - runtime least-privilege failure → production blocked;
-- readiness failure → traffic admission blocked;
+- readiness failure → functional admission blocked;
 - release-critical authenticated smoke failure → promotion blocked;
 - unverifiable provider claim → UNKNOWN, never PASS.
 
 Failed gates are fixed and rerun; acceptance wording is not weakened to make a failure pass.
 
-## Repository-change policy
-
-R1 may add only operational-validation artifacts or targeted fixes justified by observed staging failures:
-
-- R1 spec/plan/ledger/audit;
-- staging/release smoke or E2E tests;
-- narrowly justified provider/deployment configuration;
-- secret-safe CI integrations;
-- targeted defects fixed via RED → GREEN.
-
-Every repository-file change reruns the complete M9 release matrix: dependency security, real container build/runtime contract, SQLite, PostgreSQL 16 including M6 hardening/concurrency, and Pint.
-
 ## Progress model
 
-R1 progress is evidence-based:
+Existing R1 progress remains evidence-based. Changing provider does not retroactively award percentage.
 
-- approved architecture/design: **5%**;
-- written spec review + implementation/operations plan: next **5%**;
-- Gates 1–7: **10% each**;
-- Gate 8 + production promotion/closeout: final **20%**.
-
-A gate contributes only after its defined evidence is GREEN. Planning does not substitute for provider/runtime evidence.
+- approved R1 staging-first architecture/spec/plan work already earned remains recorded;
+- Gate 1A replaces the AWS provider choice and must become GREEN before Gate 2;
+- Gate 2 and later contribute only after real provider/runtime evidence exists;
+- no percentage is awarded merely for choosing a free provider.
 
 ## Acceptance checklist
 
-### Design/spec
-- [x] Staging-first strategy selected.
-- [x] Production promotion block defined.
-- [x] Eight gates defined.
-- [x] Environment/security boundaries defined.
-- [x] Spec self-review completed.
-- [ ] Written spec approved by user.
-- [ ] Detailed implementation/operations plan committed.
-
-### Gate 1
-- [ ] Provider scorecard complete.
-- [ ] Provider selected with zero blocking FAIL/UNKNOWN.
-- [ ] Production PostgreSQL PITR capability confirmed.
-- [ ] Staging architecture recorded.
+### Provider revision / Gate 1A
+- [x] Vercel + Neon selected for current staging phase.
+- [x] Vercel workspace connection confirmed.
+- [x] Existing Vercel projects enumerated; no existing Tactical Scenario Lab project found.
+- [x] Container/custom-environment capability confirmed from current Vercel documentation.
+- [x] Neon integration path confirmed from current Vercel documentation.
+- [x] AWS retained only as historical/future alternative.
+- [x] Revised spec self-review completed.
+- [ ] Revised written spec approved by user.
 
 ### Gate 2
-- [ ] Hosted isolated staging exists.
-- [ ] Separate staging PostgreSQL exists.
-- [ ] HTTPS/TLS verified.
-- [ ] Plaintext HTTP does not serve authenticated traffic.
-- [ ] Exact deployed artifact identified.
+- [ ] Tactical Scenario Lab Vercel project exists.
+- [ ] Provider container config is committed and CI-green.
+- [ ] Isolated staging environment exists.
+- [ ] Isolated Neon staging database exists.
+- [ ] Staging-only secrets are configured outside Git.
+- [ ] HTTPS deployment is reachable.
+- [ ] Exact candidate/deployment identity recorded.
 
 ### Gate 3
-- [ ] External staging secrets configured.
-- [ ] Migration/runtime roles separated.
+- [ ] `production:preflight` green in hosted staging.
+- [ ] Migration path controlled.
+- [ ] Runtime DB credentials restricted.
 - [ ] Runtime DDL denial proven.
-- [ ] Migration credentials absent from runtime.
+- [ ] No secret leakage found.
 
 ### Gate 4
-- [ ] Backup/recovery point verified.
-- [ ] Production PITR capability/configuration verified.
-- [ ] Isolated restore target created.
-- [ ] Restore drill completed.
-- [ ] Restored integrity/application checks pass.
+- [ ] Provider recovery capability recorded.
+- [ ] Isolated recovery target created.
+- [ ] Recovery drill completed.
+- [ ] Restored migration/application integrity passes.
 
 ### Gate 5
 - [ ] Exact candidate CI green.
-- [ ] Staging preflight green.
-- [ ] Migrations executed under migration identity.
-- [ ] Runtime starts under least privilege.
-- [ ] Liveness green.
-- [ ] Readiness green.
+- [ ] Hosted deployment green.
+- [ ] `/health/live` green.
+- [ ] `/health/ready` green.
+- [ ] Runtime logs inspected.
 
 ### Gate 6
 - [ ] Authenticated smoke/E2E green.
@@ -328,25 +342,21 @@ A gate contributes only after its defined evidence is GREEN. Planning does not s
 
 ### Gate 7
 - [ ] Private observability evidence captured.
-- [ ] Secret/PII log inspection green.
-- [ ] DB/readiness failure behavior validated.
-- [ ] Restart/redeploy recovery green.
-- [ ] Rollback/roll-forward rehearsal complete.
-- [ ] Recovery decision ownership recorded.
+- [ ] Failure/readiness behavior validated.
+- [ ] Same-candidate redeploy/recovery green.
+- [ ] Rollback/roll-forward path recorded.
 
 ### Gate 8
-- [ ] Gates 1–7 GREEN.
-- [ ] Production independently configured.
-- [ ] Production migration/runtime roles separated.
-- [ ] Production PITR enabled.
-- [ ] Production recovery point confirmed.
-- [ ] Production preflight/migrations green.
-- [ ] Production liveness/readiness green.
+- [ ] Gates 1A–7 GREEN.
+- [ ] Production provider/plan terms explicitly approved.
+- [ ] Production secrets/database independent.
+- [ ] Production recovery/PITR policy approved.
+- [ ] Production preflight/deploy/health green.
 - [ ] Minimal production smoke green.
-- [ ] Release SHA/image and migration state recorded.
-- [ ] Version/tag decision explicitly recorded.
+- [ ] Release identity/migration state recorded.
+- [ ] Version/tag decision recorded.
 - [ ] R1 closeout audit complete.
 
 ## Completion definition
 
-R1 is complete only when a staging-qualified immutable candidate has been promoted to production under this policy; production health and minimal smoke evidence are captured; least-privilege and recovery controls remain intact; an isolated restore drill succeeded before promotion; production PITR is enabled; no unresolved Critical/High finding remains; release identity/migration state are recorded; and no external operational result was fabricated.
+R1 is complete only when a staging-qualified immutable candidate has been promoted to an explicitly approved production environment; production health and minimal smoke evidence are captured; least-privilege and recovery controls remain intact; a real staging recovery drill succeeded before promotion; no unresolved Critical/High finding remains; release identity/migration state are recorded; and no external operational result was fabricated.
