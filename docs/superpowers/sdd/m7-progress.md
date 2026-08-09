@@ -12,7 +12,7 @@ Status: IN PROGRESS
 - [x] Gate 4 — Scenarios/templates/history — GREEN
 - [x] Gate 5 — Execution cockpit — GREEN
 - [x] Gate 6 — Assessment & debrief workbench — GREEN
-- [ ] Gate 7 — Management & low-light polish
+- [x] Gate 7 — Management & low-light polish — GREEN
 - [ ] Gate 8 — Forensic UX audit & exact-head gate
 
 ## Baseline
@@ -67,7 +67,14 @@ Status: IN PROGRESS
 - Result: assessment is a navigable institutional workbench with real section anchors, explicit draft/finalized state, finalization readiness/irreversibility messaging, frozen historical presentation after finalization and preserved authorized action-status follow-up.
 
 ### Gate 7 — Management & low-light polish
-- RED SHA: pending
-- RED CI: pending
-- GREEN SHA: pending
-- GREEN CI: pending
+- First RED attempt: `be8029ced2a037372e8cc4977bc0b04ce7a1013a` / CI #758 — discarded as RED evidence because Pint found a test-style issue before functional validation.
+- Valid RED SHA: `86e69dc7dd379d7c439da9f0d79430aaf6a0cc32`
+- Valid RED CI: #759 / run `31312175859` — Pint green; both SQLite and PostgreSQL reached the test phase and failed the new management/theme contracts after build and database hardening steps.
+- GREEN SHA: `0e4fd97f199601ee8cbde036553a00991bbfe3ea`
+- GREEN CI: #766 / run `31312446776` — SQLite, PostgreSQL 16, production asset build, Pint, least-privilege runtime role, M6 rollback/reapply and repeated concurrency invariants all green.
+- Result: management indexes use canonical Tactical Scenario Lab branding, navigation, `x-table` and defined design tokens; low-light mode is opt-in, accessible, browser-local through Alpine + `localStorage`, defaults to light on SSR and introduces no API/database persistence.
+
+### Gate 8 — Forensic UX audit & exact-head gate
+- Audit SHA: pending
+- Exact-head CI: pending
+- Merge evidence: pending
