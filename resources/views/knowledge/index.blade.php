@@ -32,7 +32,7 @@
                         type="search"
                         value="{{ $query }}"
                         placeholder="Ex.: avaliação, cockpit, histórico"
-                        class="min-h-11 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:border-navy-500"
+                        class="min-h-11 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-ink-900 placeholder:text-ink-300 focus:border-navy-500"
                     >
                 </div>
 
