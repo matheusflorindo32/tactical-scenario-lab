@@ -18,7 +18,7 @@ Do not write directly to `main`. M6 integrates only through its own PR after exa
 | 2 | Fail-closed production preflight | GREEN | RED #671; output-contract correction #676; GREEN #677 on SQLite + PostgreSQL 16 + Pint/build |
 | 3 | Structural integrity + runtime role | GREEN | RED #680 proved cross-org direct SQL was possible; composite tenant FK + restricted runtime role; CI #691 green on PostgreSQL 16 + SQLite + Pint |
 | 4 | PostgreSQL database immutability | GREEN | TRUE RED #692; diagnostic #695 isolated PostgreSQL JSON + stale fixture defects; exact clean HEAD `cd0c61cc189865da0a513dd345f33f5f02f149a4`; CI #703 green on PostgreSQL 16 + SQLite + Pint |
-| 5 | Deterministic concurrency hardening | PENDING | — |
+| 5 | Deterministic concurrency hardening | GREEN | Real forked-process barrier harness; 7 race contracts; CI #709 repeated all 7 races 3x, then full PostgreSQL suite, SQLite and Pint all green on `7f6853058b664ed004aa1f8bb3b2477d9847ff0c`; no production changes required |
 | 6 | Liveness/readiness | PENDING | — |
 | 7 | Production operations contract | PENDING | — |
 | 8 | Forensic audit + exact-head integration gate | PENDING | — |
@@ -72,10 +72,22 @@ Do not write directly to `main`. M6 integrates only through its own PR after exa
 - Exact clean HEAD: `cd0c61cc189865da0a513dd345f33f5f02f149a4`.
 - GREEN CI `#703` (`31290814309`): PostgreSQL 16 full PHPUnit success, SQLite full PHPUnit success and Pint success on the same SHA.
 
+## Task 5 evidence — deterministic PostgreSQL concurrency
+
+- `tests/Support/ConcurrentDatabaseOperation.php` uses `pcntl_fork()` workers with independent purged/reconnected database connections and an explicit filesystem barrier; every worker must prove it reached the barrier or the test fails.
+- `tests/Feature/PostgresConcurrencyTest.php` is PostgreSQL-only and uses committed fixture state visible across processes; cleanup returns the schema to a clean migrated state after each test.
+- Proven races: start/start, complete/cancel, concurrent execution sequencing, concurrent scenario revision sequencing, duplicate assessment finalization, duplicate inject delivery with exactly one timeline event, and stale action-item status transition against a terminal winner.
+- CI `#707` proved all seven real races passed but exposed test-fixture contamination after the file; this was corrected in the test harness only, not production behavior.
+- CI `#708` proved the cleanup fix: full PostgreSQL, SQLite and Pint were green.
+- CI workflow then added a dedicated stability gate that runs the seven PostgreSQL race tests three consecutive times before the full PostgreSQL suite.
+- Exact Task 5 HEAD: `7f6853058b664ed004aa1f8bb3b2477d9847ff0c`.
+- GREEN CI `#709` (`31291231683`): 21 repeated concurrency executions passed, followed by the complete PostgreSQL suite; SQLite and Pint also passed on the same HEAD.
+- No application-service remediation was necessary: the existing row locks, aggregate locks, state re-reads and uniqueness constraints already satisfied all tested race contracts.
+
 ## Baseline observations
 
 - M5 is integrated and its exact pre-merge HEAD was green on CI #666.
 - Laravel already defined a `pgsql` connection; M6 now makes PostgreSQL 16 an explicit CI gate instead of relying only on SQLite.
 - `.env.example` retains developer-friendly SQLite defaults and now documents the PostgreSQL/TLS/session production posture without real secrets.
 - Existing domain code already provides useful application-level protection: published ScenarioVersion definition guard, finalized ExecutionAssessment guard, append-only ExecutionEvent model hooks, row locks for execution transitions/finalization/injects/action transitions, and unique `(scenario_id, version_number)` versioning.
-- M6 will prove and reinforce those contracts instead of replacing them.
+- M6 proves and reinforces those contracts instead of replacing them.
