@@ -30,6 +30,12 @@ $sections = [
         ])),
     ],
     [
+        'label' => 'Conhecimento',
+        'items' => [
+            ['label' => 'Base de Conhecimento', 'route' => 'knowledge.index', 'key' => 'knowledge', 'icon' => 'M4 5.5A2.5 2.5 0 016.5 3H11a3 3 0 013 3v15a3 3 0 00-3-3H6.5A2.5 2.5 0 004 20.5v-15zM20 5.5A2.5 2.5 0 0017.5 3H14v15h3.5a2.5 2.5 0 012.5 2.5v-15z'],
+        ],
+    ],
+    [
         'label' => 'Gestão',
         'items' => array_values(array_filter([
             $canViewPeople ? ['label' => 'Pessoas', 'route' => 'people.index', 'key' => 'people', 'icon' => 'M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM22 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75'] : null,
