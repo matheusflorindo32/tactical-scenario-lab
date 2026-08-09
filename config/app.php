@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'Laravel'),
+    'name' => env('APP_NAME', 'Tactical Scenario Lab'),
 
     /*
     |--------------------------------------------------------------------------
@@ -34,8 +34,8 @@ return [
     |--------------------------------------------------------------------------
     |
     | When your application is in debug mode, detailed error messages with
-    | stack traces will be shown on every error that occurs within your
-    | application. If disabled, a simple generic error page is shown.
+    | stack traces will be shown on every error that occurs within every
+    | request. If disabled, a simple generic error page is shown.
     |
     */
 
@@ -78,11 +78,11 @@ return [
     |
     */
 
-    'locale' => env('APP_LOCALE', 'en'),
+    'locale' => env('APP_LOCALE', 'pt_BR'),
 
-    'fallback_locale' => env('APP_FALLBACK_LOCALE', 'en'),
+    'fallback_locale' => env('APP_FALLBACK_LOCALE', 'pt_BR'),
 
-    'faker_locale' => env('APP_FAKER_LOCALE', 'en_US'),
+    'faker_locale' => env('APP_FAKER_LOCALE', 'pt_BR'),
 
     /*
     |--------------------------------------------------------------------------
