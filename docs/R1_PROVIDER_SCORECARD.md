@@ -1,136 +1,126 @@
 # R1 Provider Scorecard — Vercel + Neon Staging
 
 Date: 2026-08-09
-Status: GATE 1A CANDIDATE
+Status: GATE 1A REVALIDATION AFTER REAL DEPLOYMENT
 Baseline: M9 `main` merge `1d77b89ef273e97cc53c7901df2d0f405684df45`
 
 ## Decision
 
 **Active R1 staging architecture: Vercel + Neon.**
 
-AWS remains a documented future higher-control option, but it is no longer the active staging target. The provider switch is motivated by cost and operational simplicity during validation; it does not weaken the M6–M9 security/release contracts.
+AWS remains a documented future higher-control option. The active Vercel adapter is serverless Laravel/PHP, not a Docker/OCI deployment.
 
 ```text
 GitHub exact candidate SHA
         |
         v
       Vercel
-  container deployment
-  preview/staging boundary
-  managed HTTPS
-  deployment identity
-  private runtime logs
+ isolated Preview
+ vercel.json + api/index.php
+ vercel-php PHP 8.4 runtime
+ static public/ assets
+ managed HTTPS + deployment identity
+ private runtime logs
         |
         v
        Neon
  isolated PostgreSQL staging
- external connection secret
- recovery/branch capability
+ controlled migration identity
+ restricted runtime identity required
 ```
 
-## Verified session evidence
+The root M9 `Dockerfile` remains a provider-neutral release/container reference validated by CI. Vercel is not claimed to execute it.
 
-- Authenticated Vercel team: `team_QHEyDZZUIeF7hGokK8amHy4H` (`matheusflorindo32's projects`).
-- Existing Vercel projects were enumerated and no `tactical-scenario-lab` project existed at provider re-selection time.
-- Current Vercel documentation confirms root-level `Dockerfile.vercel` container images, container services, deployment environments, environment-scoped variables, managed deployment URLs/HTTPS and runtime logs.
-- Current Vercel documentation confirms Neon can be provisioned/connected through the Marketplace integration and scoped to selected environments.
+## Observed provider evidence
 
-The absence of a project is not Gate 2 evidence; it is the clean starting state. Actual project, database and deployment creation remain provider/runtime gates.
+Vercel:
 
-## Blocking staging scorecard
+- authenticated team: `team_QHEyDZZUIeF7hGokK8amHy4H`;
+- project exists: `tactical-scenario-lab`, ID `prj_GK7BQot3xOYCKYA09AKMffesiSgj`;
+- initial `main` import was misdetected as Vite and failed after a successful frontend build because Vercel expected `dist`;
+- the corrected R1 adapter uses `framework: null`, `outputDirectory: public`, `api/index.php` and `vercel-php@0.8.0`;
+- Preview deployment for commit `49b0129598188b30b3f88ae43243345a0c35fd7c` reached `READY` as deployment `dpl_DjWdeF2ZmwN7GyfHwEyu7eFwuzhs`;
+- `GET /health/live` reached Laravel over HTTPS and returned the minimal JSON response under PHP 8.4.14;
+- runtime logs for that probe also recorded `MissingAppKeyException`, proving provider-side application secrets are not yet configured and health admission is not complete.
 
-Legend: PASS = capability verified from current first-party Vercel documentation or authenticated provider access; FAIL = incompatible; UNKNOWN = not sufficiently verified. A blocking FAIL/UNKNOWN prevents Gate 1A from becoming GREEN.
+Neon:
 
-| Requirement | Vercel + Neon staging result |
+- dedicated project exists: `tactical-scenario-lab-staging`, ID `curly-moon-55089444`;
+- current provider PostgreSQL version observed: 18.4;
+- pre-migration inspection found zero public application tables;
+- this is a staging-only resource and is not represented as production.
+
+No secret value, database password, connection URL or API token is recorded in this document.
+
+## Corrected blocking scorecard
+
+Legend: PASS = directly observed or documented capability sufficient for the current gate; PARTIAL = real progress exists but acceptance is incomplete; BLOCKED = prerequisite is absent.
+
+| Requirement | Current result |
 |---|---|
-| Authenticated provider workspace | PASS — Vercel workspace is connected in this session |
-| Laravel container execution path | PASS — `Dockerfile.vercel` / container services supported |
-| PostgreSQL provisioning/connectivity path | PASS — Neon Marketplace integration documented |
-| HTTPS for hosted application | PASS — Vercel deployment URLs use managed HTTPS |
-| External environment-scoped secrets | PASS — Vercel environment variables/integration-generated variables |
-| Staging separated from future production | PASS — preview/custom environment model; custom `staging` used if plan permits, isolated preview otherwise |
-| Exact deployment identity | PASS — deployment ID/URL plus Git candidate SHA |
-| Private runtime diagnostics | PASS — Vercel runtime logs require workspace/project access |
-| Runtime DB least privilege can be tested | PASS — PostgreSQL role/grant model remains application-controlled |
-| Recovery drill path exists | PASS for staging design — Neon branching/recovery path must still be executed and qualified at Gate 4 |
-| Provider credentials kept out of Git | PASS — authenticated integration/environment model; no token committed |
-| Free-tier staging is not silently promoted to production | PASS — Gate 8 requires a new explicit provider/plan decision |
+| Authenticated Vercel workspace | PASS |
+| Vercel project boundary | PASS — real project exists |
+| Laravel/PHP execution path | PASS — Preview executed PHP 8.4.14 and Laravel health route |
+| Vite static assets path | PASS — `public`/`public/build` adapter replaces erroneous `dist` expectation |
+| HTTPS deployment | PASS — provider-managed HTTPS observed |
+| Exact deployment identity | PASS — Git SHA + deployment ID/URL available |
+| Private runtime diagnostics | PASS — runtime log inspection available |
+| Dedicated Neon staging project | PASS |
+| PostgreSQL schema initialized | BLOCKED — migrations intentionally not applied yet |
+| Staging application secrets | BLOCKED — APP_KEY and remaining required values not yet configured in Vercel |
+| Readiness against Neon | BLOCKED — secrets/migrations/runtime DB identity not complete |
+| Runtime DB least privilege | BLOCKED — restricted steady-state role not yet proven |
+| Recovery drill | BLOCKED — belongs to Gate 4 |
+| Production isolation | PASS at resource-design level; production remains uncreated/unpromoted |
 
-**Gate 1A candidate result: 12 PASS / 0 FAIL / 0 blocking UNKNOWN.**
+## Runtime adapter contract
 
-This scorecard proves provider capability and architecture only. It does not prove a real hosted staging deployment, a real Neon database, recovery, browser behavior or production readiness.
+Repository-side Vercel adaptation is intentionally narrow:
 
-## Container contract
+- `vercel.json` disables static Vite framework detection;
+- Vercel runs `npm run build` and serves static files from `public`;
+- `api/index.php` starts Laravel through the PHP community runtime;
+- writable Laravel serverless paths are redirected to `/tmp`;
+- no migrations run during HTTP function startup;
+- Node is pinned to 22.x to match CI/release assumptions;
+- root `Dockerfile` continues to be built and inspected separately in the M9 CI matrix.
 
-The repository uses the M9 container as the source contract and adds only the provider-specific filename `Dockerfile.vercel`.
-
-Required invariants:
-
-- PHP 8.4 runtime;
-- `pdo_pgsql` installed;
-- deterministic frontend build from `npm ci` + `npm run build`;
-- non-root runtime user;
-- runtime listens on Vercel `$PORT`;
-- no SQLite production dependency;
-- no `php artisan migrate --force` in container startup;
-- application/database secrets are injected at runtime and never baked into the image.
-
-`tests/Feature/R1VercelContainerContractTest.php` enforces this repository-side contract with RED → GREEN evidence.
+`tests/Feature/R1VercelContainerContractTest.php` now tests this real provider adapter and explicitly rejects the obsolete `Dockerfile.vercel` assumption.
 
 ## Environment isolation decision
 
-For current free staging:
+For R1 staging, an isolated Vercel Preview tied to the R1 branch is acceptable. Production remains a separate future environment and receives independent secrets/database only after the promotion gates.
 
-1. Prefer a Vercel custom environment named `staging` if the active account permits it.
-2. If the account does not permit custom environments, use an isolated Preview deployment tied only to the R1 branch/candidate and connect Neon only to that staging/preview scope.
-3. Production is not created or inferred from staging.
-4. Staging receives unique `APP_KEY`, `PII_FINGERPRINT_KEY` and DB credentials.
-5. Production PII/database credentials are never copied to staging.
+Staging must receive unique values for at least:
 
-The fallback to Preview is not a weakening of data isolation; it changes the provider environment label only. Gate 2 still requires exact deployment identity, distinct database/secrets and HTTPS.
+- `APP_KEY`;
+- `PII_FINGERPRINT_KEY`;
+- PostgreSQL runtime credentials;
+- required secure production-like Laravel settings.
+
+Secrets are configured only in the provider UI/integration and are never pasted into chat or committed.
 
 ## PostgreSQL security contract
 
-Neon staging must preserve the existing M6/M9 database posture:
+Neon staging must preserve the M6/M9 posture:
 
-- controlled migration session performs schema changes;
-- steady-state web runtime uses a restricted PostgreSQL role;
-- runtime role receives only required DML, schema usage and sequence privileges;
-- runtime `CREATE TABLE r1_should_fail(...)` must fail;
-- database connection transport must be encrypted using the provider-supported TLS connection settings;
-- no connection string/password appears in GitHub evidence.
+- a migration-capable identity/session performs schema changes;
+- steady-state HTTP runtime uses a restricted role;
+- runtime receives only required DML, schema usage and sequence privileges;
+- DDL denial must be proved under the runtime role;
+- transport encryption must use the provider-supported TLS posture;
+- the real PostgreSQL 18 provider target must pass migrations and hosted readiness even though CI's reference database remains PostgreSQL 16.
 
-## Recovery boundary
+## Gate decisions
 
-Gate 4 must execute a real isolated Neon recovery/branch drill from actual staging state. A product feature or documentation page is not recovery evidence. Free-tier retention/limits are recorded as observed constraints, not represented as production-grade PITR or an SLA.
+### Gate 1A
 
-Before Gate 8, the production database plan must be separately evaluated for required backup/PITR retention and commercial/institutional use.
+The original provider choice remains **Vercel + Neon**, but the implementation model was corrected from an invalid Docker assumption to the actually observed Vercel PHP runtime model. Gate 1A can be considered GREEN only after the exact corrected repository HEAD passes the inherited M9 matrix.
 
-## Current first-party Vercel references
+### Gate 2
 
-- Container images: https://vercel.com/docs/functions/container-images
-- Services/container runtime: https://vercel.com/docs/services
-- Deployment environments: https://vercel.com/docs/deployments/environments
-- Environment variables: https://vercel.com/docs/environment-variables
-- Neon/Marketplace integration CLI: https://vercel.com/docs/cli/integration
-- Runtime logs: https://vercel.com/docs/observability/runtime-logs
+Gate 2 is **PARTIAL**. Real Vercel project, isolated Preview, HTTPS, exact deployment identity and real Neon staging now exist. It remains blocked on provider-side application/database secrets, controlled migrations, restricted runtime DB credentials and `/health/ready` admission.
 
-## Historical AWS decision
+## Production boundary
 
-The earlier AWS design remains valid as an enterprise/higher-control option and is retained under `infra/aws/staging/README.md`. It is **superseded for the current R1 staging execution** because ECS/Fargate + ALB + RDS + Secrets Manager + CloudWatch introduced unnecessary cost and operational surface for this validation phase.
-
-## Gate 1A acceptance
-
-- [x] Vercel workspace authenticated.
-- [x] Existing projects enumerated; no Tactical Scenario Lab project found.
-- [x] Container execution path confirmed.
-- [x] PostgreSQL/Neon integration path confirmed.
-- [x] HTTPS, environment isolation, external secret and logging capabilities confirmed.
-- [x] Exact deployment evidence model defined.
-- [x] Runtime least-privilege and recovery requirements preserved.
-- [x] AWS retained only as future/historical alternative.
-- [x] `Dockerfile.vercel` contract introduced via RED → GREEN TDD.
-- [ ] Exact-head M9 matrix after all provider-revision repository changes is GREEN.
-- [ ] Real Vercel project/Neon database/deployment exist — belongs to Gate 2, not Gate 1A.
-
-Gate 1A becomes GREEN only after the exact-head repository matrix is green.
+Free/Preview staging is not automatically a commercial/institutional production architecture. Gate 8 must explicitly re-evaluate provider plan terms, expected load, recovery retention, operational requirements and cost before production promotion.
