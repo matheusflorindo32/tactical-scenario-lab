@@ -35,14 +35,19 @@ A carga demonstra, de forma conectada:
 2. duas unidades fictícias;
 3. duas pessoas fictícias com vínculos institucionais separados por unidade;
 4. três cenários publicados com definições versionadas;
-5. vítimas/coortes agregados em um cenário multivítimas;
+5. vítimas individuais e cohort agregado em um cenário multivítimas;
 6. um template institucional criado de uma versão publicada;
-7. uma execução concluída com participantes e atribuição histórica congelada;
+7. uma execução concluída com participantes de múltiplas unidades e atribuição histórica congelada;
 8. uma execução em andamento para alimentar a fila operacional;
-9. timeline observacional;
-10. avaliação M4 finalizada com critérios, evidências e resultado calculado pelo domínio;
-11. debrief estruturado em fato, interpretação e recomendação;
-12. plano de ação com responsável institucional fictício e prazo.
+9. uma segunda execução concluída com avaliação M4 ainda em `draft`;
+10. timeline observacional vinculada às avaliações;
+11. uma avaliação M4 finalizada com critérios, evidências e resultado calculado pelo domínio;
+12. uma ocorrência crítica observada vinculada ao catálogo/versionamento da execução;
+13. um key time cujo tempo decorrido é calculado pelo domínio a partir do início da execução;
+14. debrief estruturado em fato, interpretação e recomendação;
+15. dois action items: um `open` e outro transicionado explicitamente para `in_progress` após a finalização da avaliação.
+
+Esse grafo completo é protegido por teste de integração determinístico. O gate forense do M5 confirmou o contrato ampliado no CI run #662, após um RED deliberado no run #661.
 
 ## Percurso recomendado
 
@@ -50,7 +55,12 @@ A carga demonstra, de forma conectada:
 
 Entre com o usuário demo e abra `/dashboard`.
 
-Confirme a presença da execução em andamento e das filas operacionais do contexto ativo.
+Confirme:
+
+- uma execução `running`;
+- uma execução concluída com avaliação ainda em `draft`;
+- action items em estados `open` e `in_progress`;
+- filas operacionais restritas à organização ativa.
 
 ### 2. Dashboard executivo
 
@@ -58,11 +68,13 @@ Abra `/dashboard/executive`.
 
 As métricas devem refletir `ScenarioExecution` e `ExecutionAssessment` M4. A avaliação finalizada do cenário multivítimas alimenta a taxa de resultado sem depender de `Scenario.score` legado.
 
+No ranking de erros críticos, confirme que a ocorrência exibida vem do registro observado na avaliação — e não apenas do catálogo previsto no cenário.
+
 ### 3. Histórico institucional
 
 Abra `/history/executions`.
 
-Use os filtros de cenário, período e unidade. A execução concluída contém participantes de `Núcleo Alfa` e `Núcleo Bravo`, preservados por snapshot histórico.
+Use os filtros de cenário, período e unidade. A execução concluída do cenário multivítimas contém participantes de `Núcleo Alfa` e `Núcleo Bravo`, preservados por snapshot histórico. A execução deve aparecer uma única vez mesmo quando há múltiplas unidades associadas.
 
 ### 4. Cenários e versões
 
@@ -80,20 +92,38 @@ Abra `/scenario-templates`.
 
 Use `Template — Incidente Multivítimas` para criar um novo cenário. O resultado deve ser uma nova identidade de cenário com versão 1 em `draft`, novos UUIDs e sem copiar execuções, avaliações, evidências ou debriefs da fonte.
 
-### 6. Avaliação e debrief
+### 6. Avaliação finalizada e debrief
 
 Na execução concluída do cenário `Incidente Multivítimas — Estação Aurora`, consulte a avaliação finalizada.
 
-Verifique os critérios, evidências ligadas à timeline, resultado calculado, debrief estruturado e action item. O conteúdo finalizado é histórico e não deve voltar ao estado editável.
+Verifique:
 
-### 7. Reporting
+- critérios e notas estruturadas;
+- evidências ligadas à timeline;
+- resultado calculado;
+- ocorrência crítica observada;
+- key time;
+- debrief em fato, interpretação e recomendação;
+- action items `open` e `in_progress`.
+
+O conteúdo da avaliação finalizada é histórico e não deve voltar ao estado editável. A evolução do status dos action items segue a máquina de estados explícita do domínio.
+
+### 7. Avaliação em rascunho
+
+No cenário `Ameaça Ativa — Complexo Horizonte`, abra a execução concluída que ainda possui avaliação em `draft`.
+
+Ela existe para demonstrar a fila de trabalho M4/M5 e a diferença entre uma execução concluída e uma avaliação ainda não finalizada.
+
+### 8. Reporting
 
 No histórico institucional, valide:
 
 - exportação CSV institucional;
 - PDF de uma execução autorizada;
 - filtros tenant-safe;
-- ausência de contatos e identificadores pessoais no PDF.
+- atribuição histórica de unidade;
+- ausência de contatos e identificadores pessoais no PDF;
+- comportamento multi-unidade sem duplicação da execução.
 
 ## Reinicialização
 
