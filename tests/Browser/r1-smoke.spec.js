@@ -106,18 +106,7 @@ test('logout invalidates the browser session', async ({ page }) => {
 
     await page.getByRole('button', { name: 'Abrir menu da conta' }).click();
 
-    const dropdownState = await page.evaluate(() => {
-        const dropdown = document.querySelector('[x-data="{ open: false }"]');
-        const content = dropdown?.querySelector('[x-show="open"]');
-
-        return {
-            open: dropdown?._x_dataStack?.[0]?.open ?? null,
-            display: content ? getComputedStyle(content).display : null,
-        };
-    });
-    console.log(`[account-dropdown] ${JSON.stringify(dropdownState)}`);
-
-    const logout = page.getByRole('button', { name: 'Encerrar sessão' });
+    const logout = page.getByRole('menuitem', { name: 'Encerrar sessão' });
     await expect(logout).toBeVisible();
     await logout.click();
 
