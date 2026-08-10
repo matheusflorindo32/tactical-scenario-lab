@@ -16,7 +16,7 @@ class R1HostedPreviewAdmissionContractTest extends TestCase
         $this->assertStringContainsString('R1_HEAD_SHA: ${{ github.event.pull_request.head.sha }}', $workflow);
         $this->assertStringContainsString('api.github.com/repos/${GITHUB_REPOSITORY}/deployments?sha=${R1_HEAD_SHA}', $workflow);
         $this->assertStringContainsString('/deployments/${candidate_id}/statuses?per_page=100', $workflow);
-        $this->assertStringContainsString('actions/github-script@v7', $workflow);
+        $this->assertStringContainsString('actions/github-script@v8', $workflow);
         $this->assertStringContainsString('core.getIDToken()', $workflow);
         $this->assertStringContainsString('x-vercel-trusted-oidc-idp-token', $workflow);
         $this->assertStringContainsString('VERCEL_AUTOMATION_BYPASS_SECRET', $workflow);
