@@ -301,7 +301,7 @@ jobs:
           printf '\nAPP_ENV=testing\nAPP_DEBUG=false\nAPP_URL=http://127.0.0.1:8000\nDB_CONNECTION=sqlite\nDB_DATABASE=%s/database/database.sqlite\nPII_FINGERPRINT_KEY=ci-browser-only-fingerprint-key-not-for-production\n' "$GITHUB_WORKSPACE" >> .env
           php artisan key:generate
           php artisan migrate:fresh --force
-          php artisan db:seed --class=DemoSeeder --force
+          php artisan db:seed --class=R1BrowserSeeder --force
 
       - name: Start Laravel test server
         run: |
