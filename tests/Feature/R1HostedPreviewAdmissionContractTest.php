@@ -6,17 +6,14 @@ use Tests\TestCase;
 
 class R1HostedPreviewAdmissionContractTest extends TestCase
 {
-    public function test_r1_has_a_secret_safe_exact_deployment_preview_admission_workflow(): void
+    public function test_r1_primary_ci_has_a_secret_safe_exact_deployment_preview_admission_job(): void
     {
-        $path = base_path('.github/workflows/r1-preview-admission.yml');
+        $workflow = file_get_contents(base_path('.github/workflows/tests.yml'));
 
-        $this->assertFileExists($path);
-
-        $workflow = file_get_contents($path);
-
-        $this->assertStringContainsString('deployment_status:', $workflow);
-        $this->assertStringContainsString('github.event.deployment_status.target_url', $workflow);
-        $this->assertStringContainsString('github.event.deployment.sha', $workflow);
+        $this->assertStringContainsString('deployments: read', $workflow);
+        $this->assertStringContainsString('Hosted Preview — exact deployment admission', $workflow);
+        $this->assertStringContainsString('api.github.com/repos/${GITHUB_REPOSITORY}/deployments?sha=${GITHUB_SHA}', $workflow);
+        $this->assertStringContainsString('/deployments/${deployment_id}/statuses', $workflow);
         $this->assertStringContainsString('VERCEL_AUTOMATION_BYPASS_SECRET', $workflow);
         $this->assertStringContainsString('secrets.VERCEL_AUTOMATION_BYPASS_SECRET', $workflow);
         $this->assertStringContainsString('x-vercel-protection-bypass', $workflow);
