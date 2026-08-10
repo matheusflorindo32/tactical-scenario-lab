@@ -245,6 +245,86 @@ jobs:
       - name: Run tests on PostgreSQL
         run: php artisan test
 
+  browser-smoke:
+    name: Browser smoke — Chromium + Firefox
+    runs-on: ubuntu-latest
+
+    env:
+      APP_ENV: testing
+      APP_DEBUG: 'false'
+      APP_URL: http://127.0.0.1:8000
+      DB_CONNECTION: sqlite
+      PII_FINGERPRINT_KEY: ci-browser-only-fingerprint-key-not-for-production
+      PLAYWRIGHT_BASE_URL: http://127.0.0.1:8000
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, pdo, pdo_sqlite, openssl, tokenizer, xml, ctype, json
+          coverage: none
+          tools: composer:v2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build frontend assets
+        run: npm run build
+
+      - name: Install pinned Playwright runner
+        run: npm install --no-save --package-lock=false @playwright/test@1.55.0
+
+      - name: Install Chromium and Firefox
+        run: npx playwright install --with-deps chromium firefox
+
+      - name: Prepare disposable browser-test application
+        run: |
+          cp .env.example .env
+          touch database/database.sqlite
+          mkdir -p bootstrap/cache storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs
+          printf '\nAPP_ENV=testing\nAPP_DEBUG=false\nAPP_URL=http://127.0.0.1:8000\nDB_CONNECTION=sqlite\nDB_DATABASE=%s/database/database.sqlite\nPII_FINGERPRINT_KEY=ci-browser-only-fingerprint-key-not-for-production\n' "$GITHUB_WORKSPACE" >> .env
+          php artisan key:generate
+          php artisan migrate:fresh --force
+          php artisan db:seed --class=DemoSeeder --force
+
+      - name: Start Laravel test server
+        run: |
+          php artisan serve --host=127.0.0.1 --port=8000 > storage/logs/browser-server.log 2>&1 &
+          echo $! > /tmp/tactical-browser-server.pid
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error http://127.0.0.1:8000/login > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat storage/logs/browser-server.log
+          exit 1
+
+      - name: Verify local health probes
+        run: |
+          curl --fail --silent --show-error http://127.0.0.1:8000/health/live
+          curl --fail --silent --show-error http://127.0.0.1:8000/health/ready
+
+      - name: Run authenticated browser smoke
+        run: npx playwright test
+
+      - name: Show Laravel server log on failure
+        if: failure()
+        run: cat storage/logs/browser-server.log || true
+
   lint:
     name: Lint (Pint)
     runs-on: ubuntu-latest
