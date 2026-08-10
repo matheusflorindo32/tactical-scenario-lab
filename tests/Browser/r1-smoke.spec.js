@@ -5,6 +5,14 @@ const manager = {
     password: 'Demo-M5-2026!',
 };
 
+async function waitForAlpine(page) {
+    await page.waitForFunction(() => Boolean(
+        window.Alpine
+        && typeof window.Alpine.store === 'function'
+        && window.Alpine.store('theme'),
+    ));
+}
+
 async function login(page) {
     await page.goto('/login');
 
@@ -18,6 +26,7 @@ async function login(page) {
 
     await expect(page).toHaveURL(/\/dashboard(?:\?.*)?$/);
     await expect(page.getByRole('heading', { name: 'Painel do instrutor' })).toBeVisible();
+    await waitForAlpine(page);
 }
 
 async function expectHealthyPage(page, path) {
