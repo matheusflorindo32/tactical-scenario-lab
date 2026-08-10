@@ -7,8 +7,8 @@ const manager = {
 
 test.beforeEach(async ({ page }) => {
     page.on('console', (message) => {
-        if (['error', 'warning'].includes(message.type())) {
-            console.log(`[browser-console:${message.type()}] ${message.text()}`);
+        if (message.type() === 'error') {
+            console.log(`[browser-console:error] ${message.text()}`);
         }
     });
 
@@ -18,68 +18,20 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function waitForAlpine(page) {
-    await page.waitForFunction(() => Boolean(
-        window.Alpine
-        && typeof window.Alpine.store === 'function'
-        && window.Alpine.store('theme'),
-    ));
-
-    const state = await page.evaluate(async () => {
+    await page.waitForFunction(() => {
         const topbar = document.querySelector('header[x-data]');
         const themeButton = document.querySelector('[data-theme-toggle]');
         const dropdown = document.querySelector('[x-data="{ open: false }"]');
-        const accountButton = document.querySelector('[aria-label="Abrir menu da conta"]');
-        const dropdownTrigger = accountButton?.parentElement;
-        const dropdownContent = dropdown?.querySelector('[x-show="open"]');
-        const store = window.Alpine.store('theme');
 
-        const before = {
-            topbarInitialized: Boolean(topbar?._x_dataStack),
-            alpineVersion: window.Alpine?.version ?? null,
-            theme: store?.current ?? null,
-            themeHandler: themeButton?.getAttribute('x-on:click') ?? null,
-            themeButtonInitialized: Boolean(themeButton?._x_attributeCleanups),
-            dropdownInitialized: Boolean(dropdown?._x_dataStack),
-            dropdownTriggerHandler: dropdownTrigger?.getAttribute('x-on:click') ?? null,
-            dropdownTriggerInitialized: Boolean(dropdownTrigger?._x_attributeCleanups),
-            dropdownOpen: dropdown?._x_dataStack?.[0]?.open ?? null,
-        };
-
-        themeButton?.click();
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        const themeAfterNativeClick = store?.current ?? null;
-
-        store?.toggle();
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        const themeAfterDirectStoreToggle = store?.current ?? null;
-
-        if (store) {
-            store.current = 'light';
-            store.apply();
-            try { localStorage.setItem('tsl-theme', 'light'); } catch (_) {}
-        }
-
-        accountButton?.click();
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        const dropdownAfterAccountButtonClick = dropdown?._x_dataStack?.[0]?.open ?? null;
-        const dropdownContentDisplayAfterClick = dropdownContent
-            ? getComputedStyle(dropdownContent).display
-            : null;
-        if (dropdown?._x_dataStack?.[0]) {
-            dropdown._x_dataStack[0].open = false;
-            await new Promise((resolve) => setTimeout(resolve, 50));
-        }
-
-        return {
-            ...before,
-            themeAfterNativeClick,
-            themeAfterDirectStoreToggle,
-            dropdownAfterAccountButtonClick,
-            dropdownContentDisplayAfterClick,
-        };
+        return Boolean(
+            window.Alpine
+            && typeof window.Alpine.store === 'function'
+            && window.Alpine.store('theme')
+            && topbar?._x_dataStack
+            && themeButton?._x_attributeCleanups
+            && dropdown?._x_dataStack,
+        );
     });
-
-    console.log(`[alpine-binding-probe] ${JSON.stringify(state)}`);
 }
 
 async function login(page) {
@@ -153,7 +105,21 @@ test('logout invalidates the browser session', async ({ page }) => {
     await login(page);
 
     await page.getByRole('button', { name: 'Abrir menu da conta' }).click();
-    await page.getByRole('button', { name: 'Encerrar sessão' }).click();
+
+    const dropdownState = await page.evaluate(() => {
+        const dropdown = document.querySelector('[x-data="{ open: false }"]');
+        const content = dropdown?.querySelector('[x-show="open"]');
+
+        return {
+            open: dropdown?._x_dataStack?.[0]?.open ?? null,
+            display: content ? getComputedStyle(content).display : null,
+        };
+    });
+    console.log(`[account-dropdown] ${JSON.stringify(dropdownState)}`);
+
+    const logout = page.getByRole('button', { name: 'Encerrar sessão' });
+    await expect(logout).toBeVisible();
+    await logout.click();
 
     await expect(page).toHaveURL(/\/login$/);
 
