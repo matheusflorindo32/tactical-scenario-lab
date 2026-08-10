@@ -14,7 +14,7 @@ class R1BrowserGateContractTest extends TestCase
         $workflow = file_get_contents(base_path('.github/workflows/tests.yml'));
 
         $this->assertStringContainsString('Browser smoke — Chromium + Firefox', $workflow);
-        $this->assertStringContainsString('@playwright/test@1.55.0', $workflow);
+        $this->assertStringContainsString('@playwright/test@1.62.0', $workflow);
         $this->assertStringContainsString('playwright install --with-deps chromium firefox', $workflow);
         $this->assertStringContainsString('DemoSeeder', $workflow);
         $this->assertStringContainsString('npx playwright test', $workflow);
