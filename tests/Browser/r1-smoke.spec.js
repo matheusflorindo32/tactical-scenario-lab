@@ -24,20 +24,50 @@ async function waitForAlpine(page) {
         && window.Alpine.store('theme'),
     ));
 
-    const state = await page.evaluate(() => {
+    const state = await page.evaluate(async () => {
         const themeButton = document.querySelector('[data-theme-toggle]');
         const dropdown = document.querySelector('[x-data="{ open: false }"]');
+        const accountButton = document.querySelector('[aria-label="Abrir menu da conta"]');
+        const dropdownTrigger = accountButton?.parentElement;
+        const store = window.Alpine.store('theme');
 
-        return {
+        const before = {
+            bodyInitialized: Boolean(document.body?._x_dataStack),
             alpineVersion: window.Alpine?.version ?? null,
-            theme: window.Alpine?.store?.('theme')?.current ?? null,
+            theme: store?.current ?? null,
             themeHandler: themeButton?.getAttribute('x-on:click') ?? null,
             themeButtonInitialized: Boolean(themeButton?._x_attributeCleanups),
             dropdownInitialized: Boolean(dropdown?._x_dataStack),
+            dropdownTriggerHandler: dropdownTrigger?.getAttribute('x-on:click') ?? null,
+            dropdownTriggerInitialized: Boolean(dropdownTrigger?._x_attributeCleanups),
+            dropdownOpen: dropdown?._x_dataStack?.[0]?.open ?? null,
+        };
+
+        themeButton?.click();
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        const themeAfterNativeClick = store?.current ?? null;
+
+        store?.toggle();
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        const themeAfterDirectStoreToggle = store?.current ?? null;
+        store?.set('light');
+
+        dropdownTrigger?.click();
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        const dropdownAfterNativeClick = dropdown?._x_dataStack?.[0]?.open ?? null;
+        if (dropdown?._x_dataStack?.[0]) {
+            dropdown._x_dataStack[0].open = false;
+        }
+
+        return {
+            ...before,
+            themeAfterNativeClick,
+            themeAfterDirectStoreToggle,
+            dropdownAfterNativeClick,
         };
     });
 
-    console.log(`[alpine-state] ${JSON.stringify(state)}`);
+    console.log(`[alpine-binding-probe] ${JSON.stringify(state)}`);
 }
 
 async function login(page) {
