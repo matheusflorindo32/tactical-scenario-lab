@@ -5,12 +5,39 @@ const manager = {
     password: 'Demo-M5-2026!',
 };
 
+test.beforeEach(async ({ page }) => {
+    page.on('console', (message) => {
+        if (['error', 'warning'].includes(message.type())) {
+            console.log(`[browser-console:${message.type()}] ${message.text()}`);
+        }
+    });
+
+    page.on('pageerror', (error) => {
+        console.log(`[browser-pageerror] ${error.stack ?? error.message}`);
+    });
+});
+
 async function waitForAlpine(page) {
     await page.waitForFunction(() => Boolean(
         window.Alpine
         && typeof window.Alpine.store === 'function'
         && window.Alpine.store('theme'),
     ));
+
+    const state = await page.evaluate(() => {
+        const themeButton = document.querySelector('[data-theme-toggle]');
+        const dropdown = document.querySelector('[x-data="{ open: false }"]');
+
+        return {
+            alpineVersion: window.Alpine?.version ?? null,
+            theme: window.Alpine?.store?.('theme')?.current ?? null,
+            themeHandler: themeButton?.getAttribute('x-on:click') ?? null,
+            themeButtonInitialized: Boolean(themeButton?._x_attributeCleanups),
+            dropdownInitialized: Boolean(dropdown?._x_dataStack),
+        };
+    });
+
+    console.log(`[alpine-state] ${JSON.stringify(state)}`);
 }
 
 async function login(page) {
