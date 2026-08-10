@@ -50,7 +50,12 @@ async function waitForAlpine(page) {
         store?.toggle();
         await new Promise((resolve) => setTimeout(resolve, 50));
         const themeAfterDirectStoreToggle = store?.current ?? null;
-        store?.set('light');
+
+        if (store) {
+            store.current = 'light';
+            store.apply();
+            try { localStorage.setItem('tsl-theme', 'light'); } catch (_) {}
+        }
 
         dropdownTrigger?.click();
         await new Promise((resolve) => setTimeout(resolve, 50));
