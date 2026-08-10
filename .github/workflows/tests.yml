@@ -285,7 +285,10 @@ jobs:
         run: npm run build
 
       - name: Install pinned Playwright runner
-        run: npm install --no-save --package-lock=false @playwright/test@1.55.0
+        run: npm install --no-save --package-lock=false @playwright/test@1.62.0
+
+      - name: Audit browser runner dependencies
+        run: npm audit --audit-level=high
 
       - name: Install Chromium and Firefox
         run: npx playwright install --with-deps chromium firefox
