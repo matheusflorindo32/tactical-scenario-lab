@@ -495,7 +495,7 @@ jobs:
 
       - name: Mint GitHub OIDC token for Vercel Trusted Source
         id: oidc
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const token = await core.getIDToken();
