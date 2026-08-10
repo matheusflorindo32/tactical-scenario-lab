@@ -5,6 +5,11 @@ const manager = {
     password: 'Demo-M5-2026!',
 };
 
+const viewer = {
+    email: 'demo.viewer@example.test',
+    password: 'Demo-R1-Viewer-2026!',
+};
+
 test.beforeEach(async ({ page }) => {
     page.on('console', (message) => {
         if (message.type() === 'error') {
@@ -34,15 +39,15 @@ async function waitForAlpine(page) {
     });
 }
 
-async function login(page) {
+async function login(page, credentials = manager) {
     await page.goto('/login');
 
     await expect(page.getByRole('heading', { name: 'Entrar no sistema' })).toBeVisible();
 
     const email = page.locator('input[name="email"]');
     await expect(email).toBeFocused();
-    await email.fill(manager.email);
-    await page.locator('input[name="password"]').fill(manager.password);
+    await email.fill(credentials.email);
+    await page.locator('input[name="password"]').fill(credentials.password);
     await page.getByRole('button', { name: 'Entrar com segurança' }).click();
 
     await expect(page).toHaveURL(/\/dashboard(?:\?.*)?$/);
@@ -99,6 +104,21 @@ test('manager can traverse the institutional application and operational workspa
     await assessmentLink.click();
     await expect(page).toHaveURL(/\/assessments\//);
     await expect(page.locator('main#main')).toBeVisible();
+});
+
+test('restricted viewer is allowed to read scenarios and forbidden from management paths', async ({ page }) => {
+    await login(page, viewer);
+
+    const scenarios = await page.goto('/scenarios');
+    expect(scenarios).not.toBeNull();
+    expect(scenarios.status()).toBe(200);
+    await expect(page.locator('main#main')).toBeVisible();
+
+    for (const path of ['/scenarios/create', '/people', '/access']) {
+        const response = await page.goto(path);
+        expect(response, `No HTTP response for ${path}`).not.toBeNull();
+        expect(response.status(), `Expected ${path} to be forbidden`).toBe(403);
+    }
 });
 
 test('logout invalidates the browser session', async ({ page }) => {
