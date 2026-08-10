@@ -249,6 +249,73 @@ jobs:
       - name: Run tests on PostgreSQL
         run: php artisan test
 
+      - name: Drill PostgreSQL readiness failure and recovery
+        shell: bash
+        run: |
+          set -euo pipefail
+          php artisan serve --host=127.0.0.1 --port=8001 > storage/logs/r1-postgres-drill.log 2>&1 &
+          app_pid=$!
+          postgres_container=""
+
+          cleanup() {
+            kill "$app_pid" 2>/dev/null || true
+            if [ -n "${postgres_container:-}" ]; then
+              running="$(docker inspect -f '{{.State.Running}}' "$postgres_container" 2>/dev/null || true)"
+              if [ "$running" = "false" ]; then
+                docker start "$postgres_container" > /dev/null 2>&1 || true
+              fi
+            fi
+          }
+          trap cleanup EXIT
+
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error http://127.0.0.1:8001/health/ready > /tmp/r1-ready-up.json; then
+              break
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              cat storage/logs/r1-postgres-drill.log
+              exit 1
+            fi
+            sleep 1
+          done
+
+          live_before_status="$(curl --silent --show-error --output /tmp/r1-live-before.json --write-out '%{http_code}' http://127.0.0.1:8001/health/live)"
+          ready_before_status="$(curl --silent --show-error --output /tmp/r1-ready-before.json --write-out '%{http_code}' http://127.0.0.1:8001/health/ready)"
+          test "$live_before_status" = "200"
+          test "$ready_before_status" = "200"
+
+          postgres_container="$(docker ps --filter ancestor=postgres:16 --format '{{.ID}}' | head -n1)"
+          test -n "$postgres_container"
+          docker stop "$postgres_container" > /dev/null
+
+          live_status="$(curl --silent --show-error --max-time 10 --output /tmp/r1-live-down.json --write-out '%{http_code}' http://127.0.0.1:8001/health/live)"
+          ready_down_status="$(curl --silent --show-error --max-time 10 --output /tmp/r1-ready-down.json --write-out '%{http_code}' http://127.0.0.1:8001/health/ready)"
+          test "$live_status" = "200"
+          test "$ready_down_status" = "503"
+
+          docker start "$postgres_container" > /dev/null
+          for attempt in $(seq 1 30); do
+            if PGPASSWORD="$DB_PASSWORD" pg_isready --host="$DB_HOST" --port="$DB_PORT" --username="$DB_USERNAME" --dbname="$DB_DATABASE" > /dev/null 2>&1; then
+              break
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              echo "PostgreSQL did not recover."
+              exit 1
+            fi
+            sleep 1
+          done
+
+          ready_recovered_status=""
+          for attempt in $(seq 1 30); do
+            ready_recovered_status="$(curl --silent --show-error --max-time 10 --output /tmp/r1-ready-recovered.json --write-out '%{http_code}' http://127.0.0.1:8001/health/ready || true)"
+            if [ "$ready_recovered_status" = "200" ]; then
+              break
+            fi
+            sleep 1
+          done
+          test "$ready_recovered_status" = "200"
+          echo "Disposable PostgreSQL readiness failure/recovery drill passed: live stayed 200, readiness moved 200 -> 503 -> 200."
+
   browser-smoke:
     name: Browser smoke — Chromium + Firefox
     runs-on: ubuntu-latest
