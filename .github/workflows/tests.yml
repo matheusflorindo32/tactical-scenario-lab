@@ -367,6 +367,11 @@ jobs:
       - browser-smoke
       - lint
 
+    permissions:
+      contents: read
+      deployments: read
+      id-token: write
+
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       R1_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
@@ -421,63 +426,108 @@ jobs:
           echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
           echo "Exact Vercel deployment resolved for PR HEAD $R1_HEAD_SHA."
 
-      - name: Detect automation bypass configuration
-        id: bypass
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ -z "${VERCEL_AUTOMATION_BYPASS_SECRET:-}" ]; then
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::VERCEL_AUTOMATION_BYPASS_SECRET is not configured; protected hosted health admission remains pending."
-            exit 0
-          fi
+      - name: Mint GitHub OIDC token for Vercel Trusted Source
+        id: oidc
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const token = await core.getIDToken();
+            core.setSecret(token);
+            core.setOutput('token', token);
 
-          echo "configured=true" >> "$GITHUB_OUTPUT"
-
-      - name: Verify protected Preview health admission
-        if: steps.bypass.outputs.configured == 'true'
+      - name: Select protected Preview authentication
+        id: auth
         shell: bash
         env:
           DEPLOYMENT_URL: ${{ steps.deployment.outputs.deployment_url }}
+          TRUSTED_OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
+          STATIC_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
           set -euo pipefail
           base="${DEPLOYMENT_URL%/}"
 
-          live_body="$(curl --fail --silent --show-error \
-            -H "x-vercel-protection-bypass: ${VERCEL_AUTOMATION_BYPASS_SECRET}" \
-            -H 'x-vercel-set-bypass-cookie: true' \
-            "$base/health/live")"
+          oidc_status="$(curl --silent --show-error --max-time 20 \
+            --output /tmp/r1-oidc-live.json --write-out '%{http_code}' \
+            -H "x-vercel-trusted-oidc-idp-token: ${TRUSTED_OIDC_TOKEN}" \
+            "$base/health/live" || true)"
 
-          ready_body="$(curl --fail --silent --show-error \
-            -H "x-vercel-protection-bypass: ${VERCEL_AUTOMATION_BYPASS_SECRET}" \
-            -H 'x-vercel-set-bypass-cookie: true' \
-            "$base/health/ready")"
+          if [ "$oidc_status" = "200" ] && [ "$(cat /tmp/r1-oidc-live.json 2>/dev/null || true)" = '{"status":"ok"}' ]; then
+            echo "mode=oidc" >> "$GITHUB_OUTPUT"
+            echo "GitHub OIDC Trusted Source authenticated the protected Preview."
+            exit 0
+          fi
 
-          root_status="$(curl --silent --show-error --output /tmp/r1-root.html --write-out '%{http_code}' \
-            -H "x-vercel-protection-bypass: ${VERCEL_AUTOMATION_BYPASS_SECRET}" \
-            -H 'x-vercel-set-bypass-cookie: true' \
-            "$base/")"
+          if [ -n "${STATIC_BYPASS_SECRET:-}" ]; then
+            secret_status="$(curl --silent --show-error --max-time 20 \
+              --output /tmp/r1-secret-live.json --write-out '%{http_code}' \
+              -H "x-vercel-protection-bypass: ${STATIC_BYPASS_SECRET}" \
+              -H 'x-vercel-set-bypass-cookie: true' \
+              "$base/health/live" || true)"
+
+            if [ "$secret_status" = "200" ] && [ "$(cat /tmp/r1-secret-live.json 2>/dev/null || true)" = '{"status":"ok"}' ]; then
+              echo "mode=secret" >> "$GITHUB_OUTPUT"
+              echo "Vercel Protection Bypass for Automation authenticated the protected Preview."
+              exit 0
+            fi
+          fi
+
+          echo "::error::No supported protected Preview authentication method succeeded. Configure Vercel Trusted Sources for GitHub OIDC or VERCEL_AUTOMATION_BYPASS_SECRET."
+          exit 1
+
+      - name: Verify protected Preview health admission
+        shell: bash
+        env:
+          AUTH_MODE: ${{ steps.auth.outputs.mode }}
+          DEPLOYMENT_URL: ${{ steps.deployment.outputs.deployment_url }}
+          TRUSTED_OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
+          STATIC_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          set -euo pipefail
+          base="${DEPLOYMENT_URL%/}"
+          auth_headers=()
+
+          if [ "$AUTH_MODE" = "oidc" ]; then
+            auth_headers=(-H "x-vercel-trusted-oidc-idp-token: ${TRUSTED_OIDC_TOKEN}")
+          elif [ "$AUTH_MODE" = "secret" ]; then
+            auth_headers=(-H "x-vercel-protection-bypass: ${STATIC_BYPASS_SECRET}" -H 'x-vercel-set-bypass-cookie: true')
+          else
+            echo "::error::Unknown protected Preview authentication mode."
+            exit 1
+          fi
+
+          live_body="$(curl --fail --silent --show-error --max-time 20 "${auth_headers[@]}" "$base/health/live")"
+          ready_body="$(curl --fail --silent --show-error --max-time 20 "${auth_headers[@]}" "$base/health/ready")"
+          root_status="$(curl --silent --show-error --max-time 20 --output /tmp/r1-root.html --write-out '%{http_code}' "${auth_headers[@]}" "$base/")"
 
           test "$live_body" = '{"status":"ok"}'
           php -r '$payload=json_decode($argv[1], true, 512, JSON_THROW_ON_ERROR); exit((($payload["status"] ?? null) === "ready" && ($payload["database"] ?? null) === "ok") ? 0 : 1);' "$ready_body"
           test "$root_status" = "200"
 
-          echo "Protected liveness, readiness and root admission passed for exact PR HEAD $R1_HEAD_SHA."
+          echo "Protected liveness, readiness and root admission passed for exact PR HEAD $R1_HEAD_SHA using $AUTH_MODE authentication."
 
       - name: Sustained readiness observation window
-        if: steps.bypass.outputs.configured == 'true'
         shell: bash
         env:
+          AUTH_MODE: ${{ steps.auth.outputs.mode }}
           DEPLOYMENT_URL: ${{ steps.deployment.outputs.deployment_url }}
+          TRUSTED_OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
+          STATIC_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
           set -euo pipefail
           base="${DEPLOYMENT_URL%/}"
+          auth_headers=()
+
+          if [ "$AUTH_MODE" = "oidc" ]; then
+            auth_headers=(-H "x-vercel-trusted-oidc-idp-token: ${TRUSTED_OIDC_TOKEN}")
+          elif [ "$AUTH_MODE" = "secret" ]; then
+            auth_headers=(-H "x-vercel-protection-bypass: ${STATIC_BYPASS_SECRET}" -H 'x-vercel-set-bypass-cookie: true')
+          else
+            echo "::error::Unknown protected Preview authentication mode."
+            exit 1
+          fi
 
           for attempt in $(seq 1 30); do
-            status="$(curl --silent --show-error --output /tmp/r1-ready.json --write-out '%{http_code}' \
-              -H "x-vercel-protection-bypass: ${VERCEL_AUTOMATION_BYPASS_SECRET}" \
-              -H 'x-vercel-set-bypass-cookie: true' \
-              "$base/health/ready")"
+            status="$(curl --silent --show-error --max-time 20 --output /tmp/r1-ready.json --write-out '%{http_code}' "${auth_headers[@]}" "$base/health/ready")"
 
             if [ "$status" != "200" ]; then
               echo "Readiness failed during observation window at attempt $attempt with HTTP $status."
