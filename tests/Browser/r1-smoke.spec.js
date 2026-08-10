@@ -25,14 +25,16 @@ async function waitForAlpine(page) {
     ));
 
     const state = await page.evaluate(async () => {
+        const topbar = document.querySelector('header[x-data]');
         const themeButton = document.querySelector('[data-theme-toggle]');
         const dropdown = document.querySelector('[x-data="{ open: false }"]');
         const accountButton = document.querySelector('[aria-label="Abrir menu da conta"]');
         const dropdownTrigger = accountButton?.parentElement;
+        const dropdownContent = dropdown?.querySelector('[x-show="open"]');
         const store = window.Alpine.store('theme');
 
         const before = {
-            bodyInitialized: Boolean(document.body?._x_dataStack),
+            topbarInitialized: Boolean(topbar?._x_dataStack),
             alpineVersion: window.Alpine?.version ?? null,
             theme: store?.current ?? null,
             themeHandler: themeButton?.getAttribute('x-on:click') ?? null,
@@ -57,18 +59,23 @@ async function waitForAlpine(page) {
             try { localStorage.setItem('tsl-theme', 'light'); } catch (_) {}
         }
 
-        dropdownTrigger?.click();
+        accountButton?.click();
         await new Promise((resolve) => setTimeout(resolve, 50));
-        const dropdownAfterNativeClick = dropdown?._x_dataStack?.[0]?.open ?? null;
+        const dropdownAfterAccountButtonClick = dropdown?._x_dataStack?.[0]?.open ?? null;
+        const dropdownContentDisplayAfterClick = dropdownContent
+            ? getComputedStyle(dropdownContent).display
+            : null;
         if (dropdown?._x_dataStack?.[0]) {
             dropdown._x_dataStack[0].open = false;
+            await new Promise((resolve) => setTimeout(resolve, 50));
         }
 
         return {
             ...before,
             themeAfterNativeClick,
             themeAfterDirectStoreToggle,
-            dropdownAfterNativeClick,
+            dropdownAfterAccountButtonClick,
+            dropdownContentDisplayAfterClick,
         };
     });
 
