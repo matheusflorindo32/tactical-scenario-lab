@@ -24,7 +24,7 @@ class R1BrowserSeeder extends Seeder
         $this->call(DemoSeeder::class);
 
         $organization = Organization::query()
-            ->where('slug', 'demo-response-academy')
+            ->where('name', DemoSeeder::ORGANIZATION_NAME)
             ->firstOrFail();
 
         $viewer = User::query()->updateOrCreate(
