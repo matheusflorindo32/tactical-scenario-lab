@@ -1,4 +1,4 @@
-name: R1 Hosted Diagnostic
+name: tests
 
 on:
   pull_request:
