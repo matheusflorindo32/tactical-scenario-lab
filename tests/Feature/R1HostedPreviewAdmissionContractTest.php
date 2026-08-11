@@ -25,6 +25,9 @@ class R1HostedPreviewAdmissionContractTest extends TestCase
         $this->assertStringContainsString('x-vercel-set-bypass-cookie', $workflow);
         $this->assertStringContainsString('/health/live', $workflow);
         $this->assertStringContainsString('/health/ready', $workflow);
+        $this->assertStringContainsString('https://vercel.com/sso-api', $workflow);
+        $this->assertStringContainsString('OIDC health admission passed while the HTML root remained protected by Vercel SSO.', $workflow);
+        $this->assertStringContainsString('Automation bypass admitted the protected HTML root.', $workflow);
         $this->assertStringContainsString('Sustained readiness observation window', $workflow);
         $this->assertStringContainsString('No supported protected Preview authentication method succeeded', $workflow);
         $this->assertStringNotContainsString('your_bypass_secret_here', $workflow);
