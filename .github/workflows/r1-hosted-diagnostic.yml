@@ -122,10 +122,13 @@ jobs:
           set -euo pipefail
           base="${DEPLOYMENT_URL%/}"
           status="$(curl --silent --show-error --max-time 20 \
+            --dump-header /tmp/root.headers \
             --output /tmp/root.html --write-out '%{http_code}' \
             -H "x-vercel-trusted-oidc-idp-token: ${OIDC_TOKEN}" \
             "$base/" || true)"
-          echo "fresh-root status=$status bytes=$(wc -c < /tmp/root.html 2>/dev/null || echo 0)"
+          location="$(awk 'BEGIN{IGNORECASE=1} /^location:/{sub(/\r$/, ""); sub(/^[^:]+:[[:space:]]*/, ""); print; exit}' /tmp/root.headers)"
+          safe_location="$(printf '%s' "$location" | sed 's/[?].*$//')"
+          echo "fresh-root status=$status bytes=$(wc -c < /tmp/root.html 2>/dev/null || echo 0) location=$safe_location"
 
       - name: Mint token for explicit replay probe
         id: replay_token
