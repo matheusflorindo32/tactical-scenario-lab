@@ -564,13 +564,39 @@ jobs:
 
           live_body="$(curl --fail --silent --show-error --max-time 20 "${auth_headers[@]}" "$base/health/live")"
           ready_body="$(curl --fail --silent --show-error --max-time 20 "${auth_headers[@]}" "$base/health/ready")"
-          root_status="$(curl --silent --show-error --max-time 20 --output /tmp/r1-root.html --write-out '%{http_code}' "${auth_headers[@]}" "$base/")"
+          root_status="$(curl --silent --show-error --max-time 20 \
+            --dump-header /tmp/r1-root.headers \
+            --output /tmp/r1-root.html --write-out '%{http_code}' \
+            "${auth_headers[@]}" "$base/")"
 
           test "$live_body" = '{"status":"ok"}'
           php -r '$payload=json_decode($argv[1], true, 512, JSON_THROW_ON_ERROR); exit((($payload["status"] ?? null) === "ready" && ($payload["database"] ?? null) === "ok") ? 0 : 1);' "$ready_body"
-          test "$root_status" = "200"
 
-          echo "Protected liveness, readiness and root admission passed for exact PR HEAD $R1_HEAD_SHA using $AUTH_MODE authentication."
+          if [ "$AUTH_MODE" = "oidc" ]; then
+            if [ "$root_status" != "302" ]; then
+              echo "::error::OIDC health admission succeeded, but the HTML root was not behind the expected Vercel SSO boundary (HTTP $root_status)."
+              exit 1
+            fi
+
+            root_location="$(awk 'BEGIN{IGNORECASE=1} /^location:/{sub(/\r$/, ""); sub(/^[^:]+:[[:space:]]*/, ""); print; exit}' /tmp/r1-root.headers)"
+            case "$root_location" in
+              https://vercel.com/sso-api*) ;;
+              *)
+                echo "::error::OIDC root admission redirected somewhere other than the expected Vercel SSO boundary."
+                exit 1
+                ;;
+            esac
+
+            echo "OIDC health admission passed while the HTML root remained protected by Vercel SSO."
+          else
+            if [ "$root_status" != "200" ]; then
+              echo "::error::Automation bypass did not admit the protected HTML root (HTTP $root_status)."
+              exit 1
+            fi
+            echo "Automation bypass admitted the protected HTML root."
+          fi
+
+          echo "Protected liveness and readiness admission passed for exact PR HEAD $R1_HEAD_SHA using $AUTH_MODE authentication."
 
       - name: Sustained readiness observation window
         shell: bash
