@@ -2,13 +2,12 @@
 
 namespace Tests\Feature;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 final class ProxySchemeContractTest extends TestCase
 {
-    /**
-     * @dataProvider proxyHeaderProvider
-     */
+    #[DataProvider('proxyHeaderProvider')]
     public function test_request_behind_proxy_trusts_forwarded_scheme(
         string $forwardedProto,
         string $expectedScheme,
