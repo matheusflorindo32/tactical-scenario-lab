@@ -136,7 +136,6 @@ Route::middleware(['auth', 'account.active'])->group(function () {
     Route::post('/scenarios/{scenario}/execute', [ScenarioController::class, 'execute'])->name('scenarios.execute');
 });
 
-Route::get('/__diagnostic/proxy-scheme', [App\Http\Controllers\DiagnosticController::class, 'proxyScheme']);
 
 Route::get('/health', fn () => response()->json([
     'status' => 'ok',
