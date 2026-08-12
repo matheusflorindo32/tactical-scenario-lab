@@ -71,7 +71,9 @@ Hosted Preview — exact deployment admission
 
 Reject evidence from any older SHA.
 
-Observed during first audit run #951: Pint found exactly two style defects (`routes/web.php` extra blank line and `ProxySchemeContractTest.php` quote/concat formatting). Both were corrected before the next exact-head run.
+Observed during audit run #951: Pint found exactly two style defects (`routes/web.php` extra blank line and `ProxySchemeContractTest.php` quote/concat formatting). Both were corrected.
+
+Observed during audit run #952: Pint, security and container gates passed; SQLite failed only because PHPUnit 12 did not consume the legacy `@dataProvider` docblock and invoked the parameterized proxy test with zero arguments. The test was migrated to the PHPUnit 12 `#[DataProvider('proxyHeaderProvider')]` attribute without changing the proxy behavior under test.
 
 ---
 
