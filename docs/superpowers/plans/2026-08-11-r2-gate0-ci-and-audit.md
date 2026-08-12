@@ -71,6 +71,8 @@ Hosted Preview — exact deployment admission
 
 Reject evidence from any older SHA.
 
+Observed during first audit run #951: Pint found exactly two style defects (`routes/web.php` extra blank line and `ProxySchemeContractTest.php` quote/concat formatting). Both were corrected before the next exact-head run.
+
 ---
 
 ### Task 2: Close Gate 0 from hosted evidence
