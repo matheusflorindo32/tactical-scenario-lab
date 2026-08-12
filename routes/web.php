@@ -136,7 +136,6 @@ Route::middleware(['auth', 'account.active'])->group(function () {
     Route::post('/scenarios/{scenario}/execute', [ScenarioController::class, 'execute'])->name('scenarios.execute');
 });
 
-
 Route::get('/health', fn () => response()->json([
     'status' => 'ok',
     'app' => config('app.name'),
