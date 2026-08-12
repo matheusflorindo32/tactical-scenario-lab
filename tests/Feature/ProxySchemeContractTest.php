@@ -71,6 +71,20 @@ final class ProxySchemeContractTest extends TestCase
         $this->assertStringStartsWith('http://', url('/'));
     }
 
+    public function test_regression_x_forwarded_proto_must_make_is_secure_true(): void
+    {
+        $this->withHeaders([
+            'X-Forwarded-Proto' => 'https',
+            'X-Forwarded-Host' => 'preview.vercel.app',
+        ])->get('/');
+
+        $this->assertTrue(
+            request()->isSecure(),
+            'REGRESSION: X-Forwarded-Proto=https must make isSecure() true. ' .
+            'If this fails, trustProxies headers configuration was removed or broken.'
+        );
+    }
+
     public static function proxyHeaderProvider(): array
     {
         return [
