@@ -30,7 +30,7 @@ final class ProxySchemeContractTest extends TestCase
         $this->assertSame(
             $expectedIsSecure,
             request()->isSecure(),
-            "isSecure() must be " . ($expectedIsSecure ? 'true' : 'false') . " for X-Forwarded-Proto={$forwardedProto}"
+            'isSecure() must be '.($expectedIsSecure ? 'true' : 'false')." for X-Forwarded-Proto={$forwardedProto}"
         );
     }
 
@@ -42,13 +42,13 @@ final class ProxySchemeContractTest extends TestCase
         ])->get('/');
 
         $url = url('/');
-        $this->assertStringStartsWith('https://', $url, "url('/') must be HTTPS when proxy declares HTTPS");
+        $this->assertStringStartsWith('https://', $url, 'url(\'/\') must be HTTPS when proxy declares HTTPS');
 
         $assetUrl = asset('build/manifest.json');
-        $this->assertStringStartsWith('https://', $assetUrl, "asset() must be HTTPS when proxy declares HTTPS");
+        $this->assertStringStartsWith('https://', $assetUrl, 'asset() must be HTTPS when proxy declares HTTPS');
 
         $routeUrl = route('health.live');
-        $this->assertStringStartsWith('https://', $routeUrl, "route() must be HTTPS when proxy declares HTTPS");
+        $this->assertStringStartsWith('https://', $routeUrl, 'route() must be HTTPS when proxy declares HTTPS');
     }
 
     public function test_url_generator_produces_http_when_proxy_declares_http(): void
@@ -59,7 +59,7 @@ final class ProxySchemeContractTest extends TestCase
         ])->get('/');
 
         $url = url('/');
-        $this->assertStringStartsWith('http://', $url, "url('/') must be HTTP when proxy declares HTTP");
+        $this->assertStringStartsWith('http://', $url, 'url(\'/\') must be HTTP when proxy declares HTTP');
     }
 
     public function test_config_app_url_scheme_is_preserved_when_no_proxy_headers(): void
