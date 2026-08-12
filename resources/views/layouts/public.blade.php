@@ -7,12 +7,12 @@
     <meta name="theme-color" content="#0b1a2c">
 
     <title>
-        @yield('title', 'Tactical Scenario Lab — Simulação clínica para instrutores de APH')
+        @yield('title', 'Tactical Scenario Lab — Treinamento orientado por evidências')
     </title>
 
     <meta
         name="description"
-        content="@yield('description', 'Ferramenta educacional para instrutores gerarem, executarem e debriefarem cenários de atendimento pré-hospitalar em minutos.')"
+        content="@yield('description', 'Plataforma institucional para planejar, executar, avaliar e debriefar treinamentos baseados em cenários.')"
     >
 
     <link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
@@ -33,63 +33,7 @@
         Ir para o conteúdo principal
     </a>
 
-    <header class="sticky top-0 z-30 border-b border-stone-200 bg-white/85 backdrop-blur-md">
-        <div class="tsl-container flex h-16 items-center justify-between">
-            <a href="{{ route('home') }}" aria-label="Página inicial">
-                <x-brand />
-            </a>
-
-            <nav
-                class="hidden items-center gap-8 text-sm text-ink-700 md:flex"
-                aria-label="Seções principais"
-            >
-                <a
-                    href="{{ route('home') }}#produto"
-                    class="transition hover:text-navy-900"
-                >
-                    Produto
-                </a>
-
-                <a
-                    href="{{ route('home') }}#como-funciona"
-                    class="transition hover:text-navy-900"
-                >
-                    Como funciona
-                </a>
-
-                <a
-                    href="{{ route('home') }}#publico"
-                    class="transition hover:text-navy-900"
-                >
-                    Público
-                </a>
-
-                <a
-                    href="{{ route('home') }}#funcionalidades"
-                    class="transition hover:text-navy-900"
-                >
-                    Funcionalidades
-                </a>
-            </nav>
-
-            <div class="flex items-center gap-2">
-                <x-button
-                    href="{{ route('scenarios.index') }}"
-                    variant="ghost"
-                    size="sm"
-                >
-                    Painel
-                </x-button>
-
-                <x-button
-                    href="{{ route('scenarios.create') }}"
-                    size="sm"
-                >
-                    Começar
-                </x-button>
-            </div>
-        </div>
-    </header>
+    <x-public-header />
 
     <main id="main">
         @yield('content')
