@@ -28,7 +28,7 @@
 - Consumes: PR #14 base `feature/r1-production-operational-validation`.
 - Produces: pull-request workflow runs for both `main` and the frozen R1 branch.
 
-- [ ] **Step 1: Confirm current trigger gap**
+- [x] **Step 1: Confirm current trigger gap**
 
 Current workflow:
 
@@ -82,9 +82,11 @@ Reject evidence from any older SHA.
 - Consumes: exact R2 HEAD and its Vercel deployment.
 - Produces: Gate 0 acceptance or blocking findings.
 
-- [ ] **Step 1: Verify HTML scheme**
+- [x] **Step 1: Verify HTML scheme**
 
 Require generated Vite CSS, JS, `url()`, `route()`, and `asset()` links to use `https://` on the exact Preview.
+
+Observed on deployment `dpl_GiqogAyuXz6Z4oEEnVDFZpzouHvW`: emitted Vite CSS, JS and internal Laravel links use `https://` after the explicit forwarded-header fix.
 
 - [ ] **Step 2: Verify health semantics**
 
