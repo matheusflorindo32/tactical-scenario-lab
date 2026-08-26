@@ -44,11 +44,12 @@ jobs:
               text = text.replace(old, new, 1)
           path.write_text(text)
           PY
-      - name: Verify lock diff is nanoid-only
+      - name: Verify PR lock diff is nanoid-only
         run: |
-          git diff -- package-lock.json
-          changed=$(git diff --numstat -- package-lock.json | awk '{print $1+$2}')
+          git diff origin/main -- package-lock.json
+          changed=$(git diff --numstat origin/main -- package-lock.json | awk '{print $1+$2}')
           test "$changed" -eq 6
+          test "$(git diff origin/main -- package-lock.json | grep -c '^[-+].*3\.3\.1[78]')" -eq 4
       - name: Verify clean install, audit, and frontend build
         run: |
           npm ci
