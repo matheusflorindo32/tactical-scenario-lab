@@ -16,14 +16,26 @@ class M9CiReleaseContractTest extends TestCase
         $this->assertStringNotContainsString('feature/phase-2-', $workflow);
     }
 
-    public function test_release_pipeline_uses_current_node24_action_runtime(): void
+    public function test_release_pipeline_uses_immutable_current_node24_action_pins(): void
     {
         $workflow = file_get_contents(base_path('.github/workflows/tests.yml'));
 
-        $this->assertStringContainsString('actions/checkout@v6', $workflow);
-        $this->assertStringContainsString('actions/setup-node@v6', $workflow);
+        $this->assertStringContainsString(
+            'actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803',
+            $workflow,
+        );
+        $this->assertStringContainsString(
+            'actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38',
+            $workflow,
+        );
+        $this->assertStringContainsString(
+            'shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240',
+            $workflow,
+        );
         $this->assertStringNotContainsString('actions/checkout@v4', $workflow);
         $this->assertStringNotContainsString('actions/setup-node@v4', $workflow);
+        $this->assertStringNotContainsString('actions/checkout@v6', $workflow);
+        $this->assertStringNotContainsString('actions/setup-node@v6', $workflow);
     }
 
     public function test_release_pipeline_retains_all_required_quality_gates(): void
