@@ -60,7 +60,7 @@ jobs:
             core.setSecret(token);
             core.setOutput('token', token);
 
-      - name: Report session cookie attribute booleans only
+      - name: Report cookie names and attribute booleans only
         shell: bash
         env:
           DEPLOYMENT_URL: ${{ steps.deployment.outputs.deployment_url }}
@@ -73,21 +73,23 @@ jobs:
           test "$status" = "200"
 
           awk '
-            BEGIN { found=0; secure=0; httponly=0; samesite=0 }
+            BEGIN { count=0 }
             {
               lower=tolower($0)
-              if (lower ~ /^set-cookie:/ && lower ~ /-session=/) {
-                found=1
-                if (lower ~ /(^|;[[:space:]]*)secure([;[:space:]]|$)/) secure=1
-                if (lower ~ /(^|;[[:space:]]*)httponly([;[:space:]]|$)/) httponly=1
-                if (lower ~ /samesite=lax/) samesite=1
+              if (lower ~ /^set-cookie:/) {
+                line=$0
+                sub(/^[^:]+:[[:space:]]*/, "", line)
+                split(line, parts, "=")
+                name=parts[1]
+                secure=(lower ~ /(^|;[[:space:]]*)secure([;[:space:]]|$)/) ? "true" : "false"
+                httponly=(lower ~ /(^|;[[:space:]]*)httponly([;[:space:]]|$)/) ? "true" : "false"
+                samesite=(lower ~ /samesite=lax/) ? "true" : "false"
+                printf("cookie_name=%s secure=%s httponly=%s samesite_lax=%s\n", name, secure, httponly, samesite)
+                count++
               }
             }
             END {
-              printf("session_cookie_found=%s\n", found ? "true" : "false")
-              printf("secure=%s\n", secure ? "true" : "false")
-              printf("httponly=%s\n", httponly ? "true" : "false")
-              printf("samesite_lax=%s\n", samesite ? "true" : "false")
-              exit found ? 0 : 1
+              printf("set_cookie_header_count=%d\n", count)
+              exit count > 0 ? 0 : 1
             }
           ' /tmp/login.headers
