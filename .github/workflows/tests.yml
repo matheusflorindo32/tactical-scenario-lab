@@ -362,19 +362,41 @@ jobs:
 
           live_body="$(curl --fail --silent --show-error --max-time 20 -H "$auth_header" "$base/health/live")"
           ready_body="$(curl --fail --silent --show-error --max-time 20 -H "$auth_header" "$base/health/ready")"
-
           test "$live_body" = '{"status":"ok"}'
           php -r '$payload=json_decode($argv[1], true, 512, JSON_THROW_ON_ERROR); exit((($payload["status"] ?? null) === "ready" && ($payload["database"] ?? null) === "ok") ? 0 : 1);' "$ready_body"
 
           root_status="$(curl --silent --show-error --max-time 20 --dump-header /tmp/root.headers --output /tmp/root.html --write-out '%{http_code}' -H "$auth_header" "$base/")"
-          test "$root_status" = "302"
-          root_location="$(awk 'BEGIN{IGNORECASE=1} /^location:/{sub(/\r$/, ""); sub(/^[^:]+:[[:space:]]*/, ""); print; exit}' /tmp/root.headers)"
-          case "$root_location" in
-            https://vercel.com/sso-api*) ;;
-            *) echo "::error::Protected HTML root did not remain behind the expected Vercel SSO boundary."; exit 1 ;;
+          test "$root_status" = "200"
+
+          login_status="$(curl --silent --show-error --max-time 20 --dump-header /tmp/login.headers --output /tmp/login.html --write-out '%{http_code}' -H "$auth_header" "$base/login")"
+          test "$login_status" = "200"
+          grep -Eq 'name=["'"']_token["'"']' /tmp/login.html
+
+          session_cookie="$(awk 'BEGIN{IGNORECASE=1} /^set-cookie:/{line=$0; if (line ~ /_session=/ && line ~ /HttpOnly/i) {print line; exit}}' /tmp/login.headers)"
+          test -n "$session_cookie"
+          grep -qi 'Secure' <<<"$session_cookie"
+          grep -qi 'HttpOnly' <<<"$session_cookie"
+          grep -qi 'SameSite=Lax' <<<"$session_cookie"
+
+          dashboard_status="$(curl --silent --show-error --max-time 20 --dump-header /tmp/dashboard.headers --output /tmp/dashboard.html --write-out '%{http_code}' -H "$auth_header" "$base/dashboard")"
+          test "$dashboard_status" = "302"
+          dashboard_location="$(awk 'BEGIN{IGNORECASE=1} /^location:/{sub(/\r$/, ""); sub(/^[^:]+:[[:space:]]*/, ""); print; exit}' /tmp/dashboard.headers)"
+          case "$dashboard_location" in
+            *'/login'*) ;;
+            *) echo "::error::Unauthenticated dashboard did not redirect to login."; exit 1 ;;
           esac
 
-          echo "OIDC liveness/readiness admission passed for exact PR HEAD ${CANDIDATE_SHA}; HTML root remains protected by Vercel SSO."
+          asset_url="$(grep -oE '(src|href)="[^"]*/build/assets/[^"]+"' /tmp/root.html | head -n1 | sed -E 's/^(src|href)="([^"]+)"$/\2/')"
+          test -n "$asset_url"
+          case "$asset_url" in
+            https://*) full_asset_url="$asset_url" ;;
+            /*) full_asset_url="${base}${asset_url}" ;;
+            *) full_asset_url="${base}/${asset_url}" ;;
+          esac
+          asset_status="$(curl --silent --show-error --max-time 20 --output /dev/null --write-out '%{http_code}' -H "$auth_header" "$full_asset_url")"
+          test "$asset_status" = "200"
+
+          echo "OIDC admitted liveness, readiness, root, login, session-cookie contract, auth boundary, and a built asset for exact PR HEAD ${CANDIDATE_SHA}."
 
       - name: Sustained readiness observation window
         shell: bash
