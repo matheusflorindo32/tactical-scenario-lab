@@ -12,7 +12,7 @@ $abilities = $activeAccess?->abilities ?? [];
 $canManageScenarios = in_array(\App\Support\Auth\AccessAbility::SCENARIOS_MANAGE, $abilities, true);
 @endphp
 
-<header class="sticky top-0 z-30 border-b border-stone-200 bg-white/90 backdrop-blur-md">
+<header x-data class="sticky top-0 z-30 border-b border-stone-200 bg-white/90 backdrop-blur-md">
     <div class="tsl-container flex h-16 items-center justify-between gap-4">
         <div class="flex min-w-0 items-center gap-3 sm:gap-5">
             <button
