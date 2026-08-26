@@ -372,11 +372,9 @@ jobs:
           test "$login_status" = "200"
           grep -Eq 'name=["'"']_token["'"']' /tmp/login.html
 
-          session_cookie="$(awk 'BEGIN{IGNORECASE=1} /^set-cookie:/{line=$0; if (line ~ /_session=/ && line ~ /HttpOnly/i) {print line; exit}}' /tmp/login.headers)"
-          test -n "$session_cookie"
-          grep -qi 'Secure' <<<"$session_cookie"
-          grep -qi 'HttpOnly' <<<"$session_cookie"
-          grep -qi 'SameSite=Lax' <<<"$session_cookie"
+          awk 'BEGIN{IGNORECASE=1; found=0}
+               /^set-cookie:/{lower=tolower($0); if ($0 ~ /_session=/ && lower ~ /httponly/ && lower ~ /secure/ && lower ~ /samesite=lax/) found=1}
+               END{exit found ? 0 : 1}' /tmp/login.headers
 
           dashboard_status="$(curl --silent --show-error --max-time 20 --dump-header /tmp/dashboard.headers --output /tmp/dashboard.html --write-out '%{http_code}' -H "$auth_header" "$base/dashboard")"
           test "$dashboard_status" = "302"
