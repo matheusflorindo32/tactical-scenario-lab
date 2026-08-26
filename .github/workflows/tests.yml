@@ -240,7 +240,7 @@ jobs:
 
       - name: Repeat M6 concurrency invariants
         run: |
-          for attempt in 1 2 3; do
+          for attempt in $(seq 1 3); do
             echo "M6 concurrency attempt ${attempt}/3"
             php artisan test tests/Feature/PostgresConcurrencyTest.php
           done
@@ -271,3 +271,129 @@ jobs:
 
       - name: Run Pint
         run: vendor/bin/pint --test
+
+  hosted-preview-admission:
+    name: Hosted Preview — OIDC exact deployment admission
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    needs:
+      - security-audit
+      - container-build
+      - phpunit
+      - phpunit-postgres
+      - lint
+
+    permissions:
+      contents: read
+      deployments: read
+      id-token: write
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
+
+    steps:
+      - name: Resolve exact Vercel deployment for pull request HEAD
+        id: deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${CANDIDATE_SHA:-}"
+
+          deployment_id=""
+          deployment_url=""
+
+          for attempt in $(seq 1 90); do
+            deployments="$(curl --fail --silent --show-error \
+              -H 'Accept: application/vnd.github+json' \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/deployments?sha=${CANDIDATE_SHA}&per_page=100")"
+
+            while read -r candidate_id; do
+              [ -n "$candidate_id" ] || continue
+
+              statuses="$(curl --fail --silent --show-error \
+                -H 'Accept: application/vnd.github+json' \
+                -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+                -H 'X-GitHub-Api-Version: 2022-11-28' \
+                "https://api.github.com/repos/${GITHUB_REPOSITORY}/deployments/${candidate_id}/statuses?per_page=100")"
+
+              state="$(jq -r '.[0].state // empty' <<<"$statuses")"
+              candidate_url="$(jq -r '.[0].environment_url // .[0].target_url // empty' <<<"$statuses")"
+
+              if [ "$state" = "success" ] && [[ "$candidate_url" == https://*.vercel.app* ]]; then
+                deployment_id="$candidate_id"
+                deployment_url="$candidate_url"
+                break 2
+              fi
+            done < <(jq -r '.[].id' <<<"$deployments")
+
+            sleep 2
+          done
+
+          if [ -z "$deployment_id" ] || [ -z "$deployment_url" ]; then
+            echo "::error::No successful Vercel deployment was resolved for exact PR HEAD ${CANDIDATE_SHA}."
+            exit 1
+          fi
+
+          echo "deployment_id=$deployment_id" >> "$GITHUB_OUTPUT"
+          echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
+          echo "Exact Vercel deployment resolved for PR HEAD ${CANDIDATE_SHA}."
+
+      - name: Mint GitHub OIDC token for Vercel Trusted Source
+        id: oidc
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const token = await core.getIDToken();
+            core.setSecret(token);
+            core.setOutput('token', token);
+
+      - name: Verify OIDC protected Preview admission
+        shell: bash
+        env:
+          DEPLOYMENT_URL: ${{ steps.deployment.outputs.deployment_url }}
+          TRUSTED_OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
+        run: |
+          set -euo pipefail
+          base="${DEPLOYMENT_URL%/}"
+          auth_header="x-vercel-trusted-oidc-idp-token: ${TRUSTED_OIDC_TOKEN}"
+
+          live_body="$(curl --fail --silent --show-error --max-time 20 -H "$auth_header" "$base/health/live")"
+          ready_body="$(curl --fail --silent --show-error --max-time 20 -H "$auth_header" "$base/health/ready")"
+
+          test "$live_body" = '{"status":"ok"}'
+          php -r '$payload=json_decode($argv[1], true, 512, JSON_THROW_ON_ERROR); exit((($payload["status"] ?? null) === "ready" && ($payload["database"] ?? null) === "ok") ? 0 : 1);' "$ready_body"
+
+          root_status="$(curl --silent --show-error --max-time 20 --dump-header /tmp/root.headers --output /tmp/root.html --write-out '%{http_code}' -H "$auth_header" "$base/")"
+          test "$root_status" = "302"
+          root_location="$(awk 'BEGIN{IGNORECASE=1} /^location:/{sub(/\r$/, ""); sub(/^[^:]+:[[:space:]]*/, ""); print; exit}' /tmp/root.headers)"
+          case "$root_location" in
+            https://vercel.com/sso-api*) ;;
+            *) echo "::error::Protected HTML root did not remain behind the expected Vercel SSO boundary."; exit 1 ;;
+          esac
+
+          echo "OIDC liveness/readiness admission passed for exact PR HEAD ${CANDIDATE_SHA}; HTML root remains protected by Vercel SSO."
+
+      - name: Sustained readiness observation window
+        shell: bash
+        env:
+          DEPLOYMENT_URL: ${{ steps.deployment.outputs.deployment_url }}
+          TRUSTED_OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
+        run: |
+          set -euo pipefail
+          base="${DEPLOYMENT_URL%/}"
+          auth_header="x-vercel-trusted-oidc-idp-token: ${TRUSTED_OIDC_TOKEN}"
+
+          for attempt in $(seq 1 30); do
+            status="$(curl --silent --show-error --max-time 20 --output /tmp/ready.json --write-out '%{http_code}' -H "$auth_header" "$base/health/ready")"
+            if [ "$status" != "200" ]; then
+              echo "::error::Readiness failed at attempt ${attempt} with HTTP ${status}."
+              exit 1
+            fi
+            php -r '$payload=json_decode(file_get_contents($argv[1]), true, 512, JSON_THROW_ON_ERROR); exit((($payload["status"] ?? null) === "ready" && ($payload["database"] ?? null) === "ok") ? 0 : 1);' /tmp/ready.json
+            sleep 1
+          done
+
+          echo "Sustained readiness observation completed for exact PR HEAD ${CANDIDATE_SHA}."
