@@ -372,9 +372,42 @@ jobs:
           test "$login_status" = "200"
           grep -Eq 'name=["'"']_token["'"']' /tmp/login.html
 
-          awk 'BEGIN{IGNORECASE=1; found=0}
-               /^set-cookie:/{lower=tolower($0); if (lower ~ /-session=/ && lower ~ /httponly/ && lower ~ /secure/ && lower ~ /samesite=lax/) found=1}
-               END{exit found ? 0 : 1}' /tmp/login.headers
+          python - <<'PY'
+          from pathlib import Path
+          import sys
+
+          lines = Path('/tmp/login.headers').read_text(errors='replace').splitlines()
+          cookies = []
+          for line in lines:
+              if not line.lower().startswith('set-cookie:'):
+                  continue
+              raw = line.split(':', 1)[1].strip()
+              name = raw.split('=', 1)[0].strip()
+              lower = raw.lower()
+              cookies.append({
+                  'name': name,
+                  'secure': '; secure' in lower or lower.endswith('secure'),
+                  'httponly': '; httponly' in lower or lower.endswith('httponly'),
+                  'samesite_lax': 'samesite=lax' in lower,
+              })
+
+          print(f'::notice::set_cookie_header_count={len(cookies)}')
+          for cookie in cookies:
+              print(
+                  '::notice::cookie_name={name} secure={secure} httponly={httponly} samesite_lax={samesite_lax}'.format(
+                      name=cookie['name'],
+                      secure=str(cookie['secure']).lower(),
+                      httponly=str(cookie['httponly']).lower(),
+                      samesite_lax=str(cookie['samesite_lax']).lower(),
+                  )
+              )
+
+          session_candidates = [c for c in cookies if 'session' in c['name'].lower()]
+          passed = any(c['secure'] and c['httponly'] and c['samesite_lax'] for c in session_candidates)
+          if not passed:
+              print('::error::No session cookie satisfied Secure + HttpOnly + SameSite=Lax.')
+              sys.exit(1)
+          PY
 
           dashboard_status="$(curl --silent --show-error --max-time 20 --dump-header /tmp/dashboard.headers --output /tmp/dashboard.html --write-out '%{http_code}' -H "$auth_header" "$base/dashboard")"
           test "$dashboard_status" = "302"
