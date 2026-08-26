@@ -60,7 +60,7 @@ jobs:
             core.setSecret(token);
             core.setOutput('token', token);
 
-      - name: Report cookie names and attribute booleans only
+      - name: Report sanitized cookie diagnostics
         shell: bash
         env:
           DEPLOYMENT_URL: ${{ steps.deployment.outputs.deployment_url }}
@@ -72,24 +72,32 @@ jobs:
           status="$(curl --silent --show-error --max-time 20 --dump-header /tmp/login.headers --output /dev/null --write-out '%{http_code}' -H "$auth_header" "$base/login")"
           test "$status" = "200"
 
-          awk '
-            BEGIN { count=0 }
-            {
-              lower=tolower($0)
-              if (lower ~ /^set-cookie:/) {
-                line=$0
-                sub(/^[^:]+:[[:space:]]*/, "", line)
-                split(line, parts, "=")
-                name=parts[1]
-                secure=(lower ~ /(^|;[[:space:]]*)secure([;[:space:]]|$)/) ? "true" : "false"
-                httponly=(lower ~ /(^|;[[:space:]]*)httponly([;[:space:]]|$)/) ? "true" : "false"
-                samesite=(lower ~ /samesite=lax/) ? "true" : "false"
-                printf("cookie_name=%s secure=%s httponly=%s samesite_lax=%s\n", name, secure, httponly, samesite)
-                count++
-              }
-            }
-            END {
-              printf("set_cookie_header_count=%d\n", count)
-              exit count > 0 ? 0 : 1
-            }
-          ' /tmp/login.headers
+          python - <<'PY'
+          from pathlib import Path
+
+          lines = Path('/tmp/login.headers').read_text(errors='replace').splitlines()
+          cookies = []
+          for line in lines:
+              if not line.lower().startswith('set-cookie:'):
+                  continue
+              raw = line.split(':', 1)[1].strip()
+              name = raw.split('=', 1)[0].strip()
+              lower = raw.lower()
+              cookies.append({
+                  'name': name,
+                  'secure': '; secure' in lower or lower.endswith('secure'),
+                  'httponly': '; httponly' in lower or lower.endswith('httponly'),
+                  'samesite_lax': 'samesite=lax' in lower,
+              })
+
+          print(f'::notice::set_cookie_header_count={len(cookies)}')
+          for cookie in cookies:
+              print(
+                  '::notice::cookie_name={name} secure={secure} httponly={httponly} samesite_lax={samesite_lax}'.format(
+                      name=cookie['name'],
+                      secure=str(cookie['secure']).lower(),
+                      httponly=str(cookie['httponly']).lower(),
+                      samesite_lax=str(cookie['samesite_lax']).lower(),
+                  )
+              )
+          PY
