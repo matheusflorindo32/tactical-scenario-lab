@@ -374,23 +374,26 @@ jobs:
 
           php -r '
           $lines = file($argv[1], FILE_IGNORE_NEW_LINES);
-          $total = $secure = $suffix = $match = 0;
+          $sessionFound = $sessionSecure = $sessionHttpOnly = $sessionSameSiteLax = false;
           foreach ($lines as $line) {
               $lower = strtolower($line);
-              if (!str_starts_with($lower, "set-cookie:")) {
+              if (!str_starts_with($lower, "set-cookie:") || !str_contains($lower, "-session=")) {
                   continue;
               }
-              $total++;
-              $hasSecurity = str_contains($lower, "httponly")
-                  && str_contains($lower, "secure")
-                  && str_contains($lower, "samesite=lax");
-              $hasSuffix = str_contains($lower, "-session=");
-              if ($hasSecurity) $secure++;
-              if ($hasSuffix) $suffix++;
-              if ($hasSecurity && $hasSuffix) $match++;
+              $sessionFound = true;
+              $sessionSecure = str_contains($lower, "secure");
+              $sessionHttpOnly = str_contains($lower, "httponly");
+              $sessionSameSiteLax = str_contains($lower, "samesite=lax");
+              break;
           }
-          printf("Sanitized cookie diagnostics: set_cookie_headers=%d secure_http_only_lax=%d session_suffix=%d.\n", $total, $secure, $suffix);
-          exit($match > 0 ? 0 : 1);
+          printf(
+              "Sanitized session-cookie attributes: found=%s secure=%s httponly=%s samesite_lax=%s.\n",
+              $sessionFound ? "true" : "false",
+              $sessionSecure ? "true" : "false",
+              $sessionHttpOnly ? "true" : "false",
+              $sessionSameSiteLax ? "true" : "false"
+          );
+          exit($sessionFound && $sessionSecure && $sessionHttpOnly && $sessionSameSiteLax ? 0 : 1);
           ' /tmp/login.headers
 
           dashboard_status="$(curl --silent --show-error --max-time 20 --dump-header /tmp/dashboard.headers --output /tmp/dashboard.html --write-out '%{http_code}' -H "$auth_header" "$base/dashboard")"
