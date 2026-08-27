@@ -365,7 +365,7 @@ jobs:
           test "$live_body" = '{"status":"ok"}'
           php -r '$payload=json_decode($argv[1], true, 512, JSON_THROW_ON_ERROR); exit((($payload["status"] ?? null) === "ready" && ($payload["database"] ?? null) === "ok") ? 0 : 1);' "$ready_body"
 
-          root_status="$(curl --silent --show-error --max-time 20 --dump-header /tmp/root.headers --output /tmp/root.html --write-out '%{http_code}' -H "$auth_header" "$base/")"
+          root_status="$(curl --silent --show-error --max-time 20 --output /tmp/root.html --write-out '%{http_code}' -H "$auth_header" "$base/")"
           test "$root_status" = "200"
 
           login_status="$(curl --silent --show-error --max-time 20 --dump-header /tmp/login.headers --output /tmp/login.html --write-out '%{http_code}' -H "$auth_header" "$base/login")"
@@ -373,9 +373,8 @@ jobs:
           grep -Eq "name=[\"']_token[\"']" /tmp/login.html
 
           php -r '
-          $lines = file($argv[1], FILE_IGNORE_NEW_LINES);
           $match = false;
-          foreach ($lines as $line) {
+          foreach (file($argv[1], FILE_IGNORE_NEW_LINES) as $line) {
               $lower = strtolower($line);
               if (str_starts_with($lower, "set-cookie:")
                   && str_contains($lower, "-session=")
@@ -389,34 +388,28 @@ jobs:
           exit($match ? 0 : 1);
           ' /tmp/login.headers
 
-          dashboard_status="$(curl --silent --show-error --max-time 20 --dump-header /tmp/dashboard.headers --output /tmp/dashboard.html --write-out '%{http_code}' -H "$auth_header" "$base/dashboard")"
+          dashboard_status="$(curl --silent --show-error --max-time 20 --output /dev/null --write-out '%{http_code}' -H "$auth_header" "$base/dashboard")"
           test "$dashboard_status" = "302"
-          php -r '
-          $location = null;
-          foreach (file($argv[1], FILE_IGNORE_NEW_LINES) as $line) {
-              if (str_starts_with(strtolower($line), "location:")) {
-                  $location = trim(substr($line, strlen("location:")));
-                  break;
+          dashboard_effective_url="$(curl --silent --show-error --max-time 20 --location --output /dev/null --write-out '%{url_effective}' -H "$auth_header" "$base/dashboard")"
+          case "$dashboard_effective_url" in
+            */login) ;;
+            *) echo "::error::Unauthenticated dashboard did not resolve to login."; exit 1 ;;
+          esac
+
+          manifest_status="$(curl --silent --show-error --max-time 20 --output /tmp/manifest.json --write-out '%{http_code}' -H "$auth_header" "$base/build/manifest.json")"
+          test "$manifest_status" = "200"
+          asset_path="$(php -r '
+          $manifest = json_decode(file_get_contents($argv[1]), true, 512, JSON_THROW_ON_ERROR);
+          foreach ($manifest as $entry) {
+              if (is_array($entry) && isset($entry["file"]) && is_string($entry["file"]) && $entry["file"] !== "") {
+                  echo "/build/".ltrim($entry["file"], "/");
+                  exit(0);
               }
           }
-          exit(is_string($location) && str_contains($location, "/login") ? 0 : 1);
-          ' /tmp/dashboard.headers
-
-          asset_url="$(php -r '
-          $html = file_get_contents($argv[1]);
-          $pattern = "~(?:src|href)=[\"\x27]([^\"\x27]*/build/assets/[^\"\x27]+)[\"\x27]~i";
-          if (!preg_match($pattern, $html, $match)) {
-              exit(1);
-          }
-          echo html_entity_decode($match[1], ENT_QUOTES | ENT_HTML5);
-          ' /tmp/root.html)"
-          test -n "$asset_url"
-          case "$asset_url" in
-            https://*) full_asset_url="$asset_url" ;;
-            /*) full_asset_url="${base}${asset_url}" ;;
-            *) full_asset_url="${base}/${asset_url}" ;;
-          esac
-          asset_status="$(curl --silent --show-error --max-time 20 --output /dev/null --write-out '%{http_code}' -H "$auth_header" "$full_asset_url")"
+          exit(1);
+          ' /tmp/manifest.json)"
+          test -n "$asset_path"
+          asset_status="$(curl --silent --show-error --max-time 20 --output /dev/null --write-out '%{http_code}' -H "$auth_header" "${base}${asset_path}")"
           test "$asset_status" = "200"
 
           echo "OIDC admitted liveness, readiness, root, login, session-cookie contract, auth boundary, and a built asset for exact PR HEAD ${CANDIDATE_SHA}."
