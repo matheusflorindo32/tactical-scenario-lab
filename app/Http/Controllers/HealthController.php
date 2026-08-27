@@ -16,13 +16,6 @@ final class HealthController extends Controller
 
     public function live(): JsonResponse
     {
-        error_log(sprintf(
-            'SESSION_DIAG secure=%s httponly=%s samesite_lax=%s',
-            config('session.secure') === true ? 'true' : 'false',
-            config('session.http_only') === true ? 'true' : 'false',
-            strtolower((string) config('session.same_site')) === 'lax' ? 'true' : 'false',
-        ));
-
         return response()->json([
             'status' => 'ok',
         ]);
