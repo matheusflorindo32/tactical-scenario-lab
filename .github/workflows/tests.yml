@@ -374,37 +374,42 @@ jobs:
 
           php -r '
           $lines = file($argv[1], FILE_IGNORE_NEW_LINES);
-          $sessionFound = $sessionSecure = $sessionHttpOnly = $sessionSameSiteLax = false;
+          $match = false;
           foreach ($lines as $line) {
               $lower = strtolower($line);
-              if (!str_starts_with($lower, "set-cookie:") || !str_contains($lower, "-session=")) {
-                  continue;
+              if (str_starts_with($lower, "set-cookie:")
+                  && str_contains($lower, "-session=")
+                  && str_contains($lower, "secure")
+                  && str_contains($lower, "httponly")
+                  && str_contains($lower, "samesite=lax")) {
+                  $match = true;
+                  break;
               }
-              $sessionFound = true;
-              $sessionSecure = str_contains($lower, "secure");
-              $sessionHttpOnly = str_contains($lower, "httponly");
-              $sessionSameSiteLax = str_contains($lower, "samesite=lax");
-              break;
           }
-          printf(
-              "Sanitized session-cookie attributes: found=%s secure=%s httponly=%s samesite_lax=%s.\n",
-              $sessionFound ? "true" : "false",
-              $sessionSecure ? "true" : "false",
-              $sessionHttpOnly ? "true" : "false",
-              $sessionSameSiteLax ? "true" : "false"
-          );
-          exit($sessionFound && $sessionSecure && $sessionHttpOnly && $sessionSameSiteLax ? 0 : 1);
+          exit($match ? 0 : 1);
           ' /tmp/login.headers
 
           dashboard_status="$(curl --silent --show-error --max-time 20 --dump-header /tmp/dashboard.headers --output /tmp/dashboard.html --write-out '%{http_code}' -H "$auth_header" "$base/dashboard")"
           test "$dashboard_status" = "302"
-          dashboard_location="$(awk '{lower=tolower($0); if (lower ~ /^location:/) {sub(/\r$/, ""); sub(/^[^:]+:[[:space:]]*/, ""); print; exit}}' /tmp/dashboard.headers)"
-          case "$dashboard_location" in
-            *'/login'*) ;;
-            *) echo "::error::Unauthenticated dashboard did not redirect to login."; exit 1 ;;
-          esac
+          php -r '
+          $location = null;
+          foreach (file($argv[1], FILE_IGNORE_NEW_LINES) as $line) {
+              if (str_starts_with(strtolower($line), "location:")) {
+                  $location = trim(substr($line, strlen("location:")));
+                  break;
+              }
+          }
+          exit(is_string($location) && str_contains($location, "/login") ? 0 : 1);
+          ' /tmp/dashboard.headers
 
-          asset_url="$(grep -oE '(src|href)="[^"]*/build/assets/[^"]+"' /tmp/root.html | head -n1 | sed -E 's/^(src|href)="([^"]+)"$/\2/')"
+          asset_url="$(php -r '
+          $html = file_get_contents($argv[1]);
+          $pattern = "~(?:src|href)=[\"\x27]([^\"\x27]*/build/assets/[^\"\x27]+)[\"\x27]~i";
+          if (!preg_match($pattern, $html, $match)) {
+              exit(1);
+          }
+          echo html_entity_decode($match[1], ENT_QUOTES | ENT_HTML5);
+          ' /tmp/root.html)"
           test -n "$asset_url"
           case "$asset_url" in
             https://*) full_asset_url="$asset_url" ;;
