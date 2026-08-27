@@ -18,6 +18,10 @@ final class HealthController extends Controller
     {
         return response()->json([
             'status' => 'ok',
+        ])->withHeaders([
+            'X-Diagnostic-Session-Secure' => config('session.secure') === true ? 'true' : 'false',
+            'X-Diagnostic-Session-HttpOnly' => config('session.http_only') === true ? 'true' : 'false',
+            'X-Diagnostic-Session-SameSite-Lax' => strtolower((string) config('session.same_site')) === 'lax' ? 'true' : 'false',
         ]);
     }
 
