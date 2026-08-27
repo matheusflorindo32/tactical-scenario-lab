@@ -16,12 +16,14 @@ final class HealthController extends Controller
 
     public function live(): JsonResponse
     {
+        Log::info('Sanitized session configuration diagnostic.', [
+            'session_secure' => config('session.secure') === true,
+            'session_http_only' => config('session.http_only') === true,
+            'session_same_site_lax' => strtolower((string) config('session.same_site')) === 'lax',
+        ]);
+
         return response()->json([
             'status' => 'ok',
-        ])->withHeaders([
-            'X-Diagnostic-Session-Secure' => config('session.secure') === true ? 'true' : 'false',
-            'X-Diagnostic-Session-HttpOnly' => config('session.http_only') === true ? 'true' : 'false',
-            'X-Diagnostic-Session-SameSite-Lax' => strtolower((string) config('session.same_site')) === 'lax' ? 'true' : 'false',
         ]);
     }
 
