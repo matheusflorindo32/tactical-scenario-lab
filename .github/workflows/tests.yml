@@ -372,13 +372,13 @@ jobs:
           test "$login_status" = "200"
           grep -Eq 'name=["'"']_token["'"']' /tmp/login.html
 
-          awk 'BEGIN{IGNORECASE=1; found=0}
-               /^set-cookie:/{lower=tolower($0); if (lower ~ /-session=/ && lower ~ /httponly/ && lower ~ /secure/ && lower ~ /samesite=lax/) found=1}
+          awk 'BEGIN{found=0}
+               {lower=tolower($0); if (lower ~ /^set-cookie:/ && lower ~ /-session=/ && lower ~ /httponly/ && lower ~ /secure/ && lower ~ /samesite=lax/) found=1}
                END{exit found ? 0 : 1}' /tmp/login.headers
 
           dashboard_status="$(curl --silent --show-error --max-time 20 --dump-header /tmp/dashboard.headers --output /tmp/dashboard.html --write-out '%{http_code}' -H "$auth_header" "$base/dashboard")"
           test "$dashboard_status" = "302"
-          dashboard_location="$(awk 'BEGIN{IGNORECASE=1} /^location:/{sub(/\r$/, ""); sub(/^[^:]+:[[:space:]]*/, ""); print; exit}' /tmp/dashboard.headers)"
+          dashboard_location="$(awk '{lower=tolower($0); if (lower ~ /^location:/) {sub(/\r$/, ""); sub(/^[^:]+:[[:space:]]*/, ""); print; exit}}' /tmp/dashboard.headers)"
           case "$dashboard_location" in
             *'/login'*) ;;
             *) echo "::error::Unauthenticated dashboard did not redirect to login."; exit 1 ;;
