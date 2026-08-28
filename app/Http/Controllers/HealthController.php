@@ -49,14 +49,11 @@ final class HealthController extends Controller
 
     public function releaseDiagnostic(): JsonResponse
     {
-        if (! app()->environment('production')) {
-            return response()->json(['status' => 'unavailable'], 404);
-        }
-
         try {
             $connection = DB::connection();
             DB::select('select 1');
 
+            $appEnvProduction = app()->environment('production');
             $sslmode = strtolower((string) $connection->getConfig('sslmode'));
             $configuredRootCert = $connection->getConfig('sslrootcert');
             $environmentRootCert = getenv('PGSSLROOTCERT') ?: null;
@@ -65,18 +62,25 @@ final class HealthController extends Controller
                 : (is_string($environmentRootCert) ? $environmentRootCert : '');
             $rootCertIsSystem = $rootCert === 'system';
             $rootCertPresent = $rootCert !== '';
+            $homeRootCert = rtrim((string) getenv('HOME'), '/').'/.postgresql/root.crt';
             $rootCertReadable = $rootCertIsSystem
                 || ($rootCertPresent && is_readable($rootCert))
-                || is_readable((string) getenv('HOME').'/.postgresql/root.crt');
+                || ($homeRootCert !== '/.postgresql/root.crt' && is_readable($homeRootCert));
             $host = (string) $connection->getConfig('host');
 
-            $preflightExitCode = Artisan::call('production:preflight', [
-                '--database' => true,
-            ]);
+            $preflightExecuted = false;
+            $preflightPassed = false;
+
+            if ($appEnvProduction) {
+                $preflightExecuted = true;
+                $preflightPassed = Artisan::call('production:preflight', [
+                    '--database' => true,
+                ]) === 0;
+            }
 
             return response()->json([
                 'status' => 'ok',
-                'app_env_production' => true,
+                'app_env_production' => $appEnvProduction,
                 'database_connection_pgsql' => config('database.default') === 'pgsql',
                 'database_url_present' => filled($connection->getConfig('url')),
                 'effective_sslmode' => $sslmode,
@@ -85,7 +89,8 @@ final class HealthController extends Controller
                 'sslrootcert_system' => $rootCertIsSystem,
                 'sslrootcert_readable_or_system' => $rootCertReadable,
                 'database_host_is_hostname' => $host !== '' && filter_var($host, FILTER_VALIDATE_IP) === false,
-                'production_preflight_database_passed' => $preflightExitCode === 0,
+                'production_preflight_database_executed' => $preflightExecuted,
+                'production_preflight_database_passed' => $preflightPassed,
             ]);
         } catch (Throwable) {
             Log::warning('Release diagnostic unavailable.', [
