@@ -15,7 +15,6 @@ return Application::configure(basePath: dirname(__DIR__))
         then: function (): void {
             Route::get('/health/live', [HealthController::class, 'live'])->name('health.live');
             Route::get('/health/ready', [HealthController::class, 'ready'])->name('health.ready');
-            Route::get('/health/release-diagnostic', [HealthController::class, 'releaseDiagnostic'])->name('health.release-diagnostic');
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
