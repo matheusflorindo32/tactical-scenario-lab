@@ -37,8 +37,8 @@ final class ProductionConfigurationValidator
             $violations[] = 'DB_CONNECTION must be pgsql.';
         }
 
-        if (config('database.connections.pgsql.sslmode') === 'disable') {
-            $violations[] = 'DB_SSLMODE must not be disable.';
+        if (strtolower((string) config('database.connections.pgsql.sslmode')) !== 'verify-full') {
+            $violations[] = 'DB_SSLMODE must be verify-full in production.';
         }
 
         if ((bool) config('production.require_secure_session') && ! (bool) config('session.secure')) {
