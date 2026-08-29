@@ -31,20 +31,20 @@ final class HealthController extends Controller
             $preflightPassed = Artisan::call('production:preflight', ['--database' => true]) === 0;
         }
 
-        Log::info('Release diagnostic snapshot.', [
-            'category' => 'release_diagnostic',
-            'production' => $production,
-            'pgsql' => config('database.default') === 'pgsql',
-            'db_url_set' => config('database.connections.pgsql.url') !== null,
-            'sslmode' => $sslmode,
-            'verify_full' => $sslmode === 'verify-full',
-            'root_cert_set' => $rootCertSet,
-            'root_cert_system' => $rootCertSet && $rootCert === 'system',
-            'host_is_hostname' => $host !== '' && $host !== 'localhost' && filter_var($host, FILTER_VALIDATE_IP) === false,
-            'validator_pass' => $validatorPass,
-            'preflight_executed' => $preflightExecuted,
-            'preflight_passed' => $preflightPassed,
-        ]);
+        error_log(sprintf(
+            'RELEASE_DIAG production=%s pgsql=%s db_url_set=%s sslmode=%s verify_full=%s root_cert_set=%s root_cert_system=%s host_is_hostname=%s validator_pass=%s preflight_executed=%s preflight_passed=%s',
+            $production ? 'true' : 'false',
+            config('database.default') === 'pgsql' ? 'true' : 'false',
+            config('database.connections.pgsql.url') !== null ? 'true' : 'false',
+            $sslmode,
+            $sslmode === 'verify-full' ? 'true' : 'false',
+            $rootCertSet ? 'true' : 'false',
+            $rootCertSet && $rootCert === 'system' ? 'true' : 'false',
+            $host !== '' && $host !== 'localhost' && filter_var($host, FILTER_VALIDATE_IP) === false ? 'true' : 'false',
+            $validatorPass ? 'true' : 'false',
+            $preflightExecuted ? 'true' : 'false',
+            $preflightPassed ? 'true' : 'false',
+        ));
 
         return response()->json([
             'status' => 'ok',
