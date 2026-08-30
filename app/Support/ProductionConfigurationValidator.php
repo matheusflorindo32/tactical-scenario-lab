@@ -29,16 +29,36 @@ final class ProductionConfigurationValidator
             $violations[] = 'APP_DEBUG must be false.';
         }
 
+        if (! $this->hasSafeApplicationUrl((string) config('app.url'))) {
+            $violations[] = 'APP_URL must use HTTPS and must not point to localhost.';
+        }
+
         if (config('database.default') !== 'pgsql') {
             $violations[] = 'DB_CONNECTION must be pgsql.';
         }
 
-        if (config('database.connections.pgsql.sslmode') === 'disable') {
-            $violations[] = 'DB_SSLMODE must not be disable.';
+        if (strtolower((string) config('database.connections.pgsql.sslmode')) !== 'verify-full') {
+            $violations[] = 'DB_SSLMODE must be verify-full in production.';
         }
 
         if ((bool) config('production.require_secure_session') && ! (bool) config('session.secure')) {
             $violations[] = 'SESSION_SECURE_COOKIE must be true.';
+        }
+
+        if (! in_array(config('session.driver'), ['database', 'redis'], true)) {
+            $violations[] = 'SESSION_DRIVER must use database or redis in production.';
+        }
+
+        if (! in_array(config('cache.default'), ['database', 'redis'], true)) {
+            $violations[] = 'CACHE_STORE must use database or redis in production.';
+        }
+
+        if (! $this->emitsLogsToStderr()) {
+            $violations[] = 'LOG_CHANNEL must emit to stderr in production.';
+        }
+
+        if ($this->productionLogLevel() === 'debug') {
+            $violations[] = 'LOG_LEVEL must not be debug in production.';
         }
 
         return $violations;
@@ -51,5 +71,40 @@ final class ProductionConfigurationValidator
         if ($violations !== []) {
             throw new LogicException('Unsafe production configuration: '.implode(' ', $violations));
         }
+    }
+
+    private function hasSafeApplicationUrl(string $url): bool
+    {
+        $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+
+        return $scheme === 'https'
+            && $host !== ''
+            && ! in_array($host, ['localhost', '127.0.0.1', '::1'], true);
+    }
+
+    private function emitsLogsToStderr(): bool
+    {
+        $channel = config('logging.default');
+
+        if ($channel === 'stderr') {
+            return true;
+        }
+
+        if ($channel !== 'stack') {
+            return false;
+        }
+
+        return in_array('stderr', (array) config('logging.channels.stack.channels', []), true);
+    }
+
+    private function productionLogLevel(): string
+    {
+        $level = config('logging.level')
+            ?? config('logging.channels.stderr.level')
+            ?? config('logging.channels.'.config('logging.default').'.level')
+            ?? 'debug';
+
+        return strtolower((string) $level);
     }
 }

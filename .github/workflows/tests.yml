@@ -8,6 +8,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   security-audit:
     name: Security — Composer and npm audit
@@ -15,17 +18,17 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Setup PHP 8.4
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
           php-version: '8.4'
           coverage: none
           tools: composer:v2
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '22'
           cache: npm
@@ -50,7 +53,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Build release container
         run: docker build --tag tactical-scenario-lab:ci .
@@ -70,10 +73,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Setup PHP 8.4
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
           php-version: '8.4'
           extensions: mbstring, pdo, pdo_sqlite, openssl, tokenizer, xml, ctype, json
@@ -81,7 +84,7 @@ jobs:
           tools: composer:v2
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '22'
           cache: npm
@@ -158,10 +161,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Setup PHP 8.4
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
           php-version: '8.4'
           extensions: mbstring, pdo, pdo_pgsql, openssl, tokenizer, xml, ctype, json
@@ -169,7 +172,7 @@ jobs:
           tools: composer:v2
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '22'
           cache: npm
@@ -237,7 +240,7 @@ jobs:
 
       - name: Repeat M6 concurrency invariants
         run: |
-          for attempt in 1 2 3; do
+          for attempt in $(seq 1 3); do
             echo "M6 concurrency attempt ${attempt}/3"
             php artisan test tests/Feature/PostgresConcurrencyTest.php
           done
@@ -251,10 +254,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Setup PHP 8.4
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
           php-version: '8.4'
           coverage: none
@@ -268,3 +271,167 @@ jobs:
 
       - name: Run Pint
         run: vendor/bin/pint --test
+
+  hosted-preview-admission:
+    name: Hosted Preview — OIDC exact deployment admission
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    needs:
+      - security-audit
+      - container-build
+      - phpunit
+      - phpunit-postgres
+      - lint
+
+    permissions:
+      contents: read
+      deployments: read
+      id-token: write
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
+
+    steps:
+      - name: Resolve exact Vercel deployment for pull request HEAD
+        id: deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${CANDIDATE_SHA:-}"
+
+          deployment_id=""
+          deployment_url=""
+
+          for attempt in $(seq 1 90); do
+            deployments="$(curl --fail --silent --show-error \
+              -H 'Accept: application/vnd.github+json' \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/deployments?sha=${CANDIDATE_SHA}&per_page=100")"
+
+            while read -r candidate_id; do
+              [ -n "$candidate_id" ] || continue
+
+              statuses="$(curl --fail --silent --show-error \
+                -H 'Accept: application/vnd.github+json' \
+                -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+                -H 'X-GitHub-Api-Version: 2022-11-28' \
+                "https://api.github.com/repos/${GITHUB_REPOSITORY}/deployments/${candidate_id}/statuses?per_page=100")"
+
+              state="$(jq -r '.[0].state // empty' <<<"$statuses")"
+              candidate_url="$(jq -r '.[0].environment_url // .[0].target_url // empty' <<<"$statuses")"
+
+              if [ "$state" = "success" ] && [[ "$candidate_url" == https://*.vercel.app* ]]; then
+                deployment_id="$candidate_id"
+                deployment_url="$candidate_url"
+                break 2
+              fi
+            done < <(jq -r '.[].id' <<<"$deployments")
+
+            sleep 2
+          done
+
+          if [ -z "$deployment_id" ] || [ -z "$deployment_url" ]; then
+            echo "::error::No successful Vercel deployment was resolved for exact PR HEAD ${CANDIDATE_SHA}."
+            exit 1
+          fi
+
+          echo "deployment_id=$deployment_id" >> "$GITHUB_OUTPUT"
+          echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
+          echo "Exact Vercel deployment resolved for PR HEAD ${CANDIDATE_SHA}."
+
+      - name: Mint GitHub OIDC token for Vercel Trusted Source
+        id: oidc
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const token = await core.getIDToken();
+            core.setSecret(token);
+            core.setOutput('token', token);
+
+      - name: Verify OIDC protected Preview admission
+        shell: bash
+        env:
+          DEPLOYMENT_URL: ${{ steps.deployment.outputs.deployment_url }}
+          TRUSTED_OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
+        run: |
+          set -euo pipefail
+          base="${DEPLOYMENT_URL%/}"
+          auth_header="x-vercel-trusted-oidc-idp-token: ${TRUSTED_OIDC_TOKEN}"
+
+          live_body="$(curl --fail --silent --show-error --max-time 20 -H "$auth_header" "$base/health/live")"
+          ready_body="$(curl --fail --silent --show-error --max-time 20 -H "$auth_header" "$base/health/ready")"
+          test "$live_body" = '{"status":"ok"}'
+          php -r '$payload=json_decode($argv[1], true, 512, JSON_THROW_ON_ERROR); exit((($payload["status"] ?? null) === "ready" && ($payload["database"] ?? null) === "ok") ? 0 : 1);' "$ready_body"
+
+          root_status="$(curl --silent --show-error --max-time 20 --output /tmp/root.html --write-out '%{http_code}' -H "$auth_header" "$base/")"
+          test "$root_status" = "200"
+
+          login_status="$(curl --silent --show-error --max-time 20 --dump-header /tmp/login.headers --output /tmp/login.html --write-out '%{http_code}' -H "$auth_header" "$base/login")"
+          test "$login_status" = "200"
+          grep -Eq "name=[\"']_token[\"']" /tmp/login.html
+
+          php -r '
+          $match = false;
+          foreach (file($argv[1], FILE_IGNORE_NEW_LINES) as $line) {
+              $lower = strtolower($line);
+              if (str_starts_with($lower, "set-cookie:")
+                  && str_contains($lower, "-session=")
+                  && str_contains($lower, "secure")
+                  && str_contains($lower, "httponly")
+                  && str_contains($lower, "samesite=lax")) {
+                  $match = true;
+                  break;
+              }
+          }
+          exit($match ? 0 : 1);
+          ' /tmp/login.headers
+
+          dashboard_status="$(curl --silent --show-error --max-time 20 --output /dev/null --write-out '%{http_code}' -H "$auth_header" "$base/dashboard")"
+          test "$dashboard_status" = "302"
+          dashboard_effective_url="$(curl --silent --show-error --max-time 20 --location --output /dev/null --write-out '%{url_effective}' -H "$auth_header" "$base/dashboard")"
+          case "$dashboard_effective_url" in
+            */login) ;;
+            *) echo "::error::Unauthenticated dashboard did not resolve to login."; exit 1 ;;
+          esac
+
+          manifest_status="$(curl --silent --show-error --max-time 20 --output /tmp/manifest.json --write-out '%{http_code}' -H "$auth_header" "$base/build/manifest.json")"
+          test "$manifest_status" = "200"
+          asset_path="$(php -r '
+          $manifest = json_decode(file_get_contents($argv[1]), true, 512, JSON_THROW_ON_ERROR);
+          foreach ($manifest as $entry) {
+              if (is_array($entry) && isset($entry["file"]) && is_string($entry["file"]) && $entry["file"] !== "") {
+                  echo "/build/".ltrim($entry["file"], "/");
+                  exit(0);
+              }
+          }
+          exit(1);
+          ' /tmp/manifest.json)"
+          test -n "$asset_path"
+          asset_status="$(curl --silent --show-error --max-time 20 --output /dev/null --write-out '%{http_code}' -H "$auth_header" "${base}${asset_path}")"
+          test "$asset_status" = "200"
+
+          echo "OIDC admitted liveness, readiness, root, login, session-cookie contract, auth boundary, and a built asset for exact PR HEAD ${CANDIDATE_SHA}."
+
+      - name: Sustained readiness observation window
+        shell: bash
+        env:
+          DEPLOYMENT_URL: ${{ steps.deployment.outputs.deployment_url }}
+          TRUSTED_OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
+        run: |
+          set -euo pipefail
+          base="${DEPLOYMENT_URL%/}"
+          auth_header="x-vercel-trusted-oidc-idp-token: ${TRUSTED_OIDC_TOKEN}"
+
+          for attempt in $(seq 1 30); do
+            status="$(curl --silent --show-error --max-time 20 --output /tmp/ready.json --write-out '%{http_code}' -H "$auth_header" "$base/health/ready")"
+            if [ "$status" != "200" ]; then
+              echo "::error::Readiness failed at attempt ${attempt} with HTTP ${status}."
+              exit 1
+            fi
+            php -r '$payload=json_decode(file_get_contents($argv[1]), true, 512, JSON_THROW_ON_ERROR); exit((($payload["status"] ?? null) === "ready" && ($payload["database"] ?? null) === "ok") ? 0 : 1);' /tmp/ready.json
+            sleep 1
+          done
+
+          echo "Sustained readiness observation completed for exact PR HEAD ${CANDIDATE_SHA}."
